@@ -89,7 +89,10 @@
 .adv-tote b{font-size:32px;line-height:1;color:var(--sx-yel);-webkit-text-stroke-width:6px}
 .adv-tote b i{color:#fff;font-size:20px}
 .adv-tote small{font:600 12px/1.2 var(--sx-pix);color:#fff;text-shadow:var(--sx-out1);margin-top:4px}
-.adv-parade{position:absolute;left:0;right:0;bottom:0;width:100%;height:120px;pointer-events:none}
+.adv-parade{position:absolute;left:0;right:0;bottom:0;width:100%;height:220px;pointer-events:none}
+/* the title's demo, seen from far off: a haze over it, under the logo and the strip */
+.adv-haze{position:absolute;inset:0;background:rgba(18,34,86,.3);pointer-events:none}
+.adv-title{position:relative}
 .adv-legal{position:absolute;left:0;right:0;bottom:5px;text-align:center;font:600 11px/1.3 var(--sx-pix);color:#fff;text-shadow:var(--sx-out1);pointer-events:none}
 
 /* ---- the main menu: five bars, slanted, stepping in */
@@ -415,9 +418,9 @@
 .adv-tk-box:not(.done) .adv-tk-hint{visibility:hidden}
 .adv .adv-tk-skip{position:absolute;top:14px;right:14px}
 
-@media (max-height:600px){.adv-title{gap:9px;margin-bottom:96px}.adv-title .adv-logo{font-size:clamp(26px,6.6vw,62px)}.adv-parade{height:96px}}
+@media (max-height:600px){.adv-title{gap:9px;margin-bottom:96px}.adv-title .adv-logo{font-size:clamp(26px,6.6vw,62px)}.adv-parade{height:170px}}
 @media (max-width:760px){
-  .adv-tote{gap:12px}.adv-tote b{font-size:24px}.adv-legal{font-size:9.5px;padding:0 8px}.adv-parade{height:140px}.adv-title{margin-bottom:156px}
+  .adv-tote{gap:12px}.adv-tote b{font-size:24px}.adv-legal{font-size:9.5px;padding:0 8px}.adv-parade{height:200px}.adv-title{margin-bottom:156px}
   .adv-cast{grid-template-columns:1fr 1fr;gap:6px;padding:8px}
   .adv-who{gap:6px;padding:6px}.adv-who-tx>b{font-size:15px}.adv-mv{font-size:11px}
   .adv-gr{display:grid;grid-template-columns:auto auto;gap:3px 8px}.adv-gr i{font-size:10px}.adv-gr .g{font-size:13px}

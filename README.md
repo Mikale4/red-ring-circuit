@@ -421,19 +421,21 @@ Star Rings, the story's progress and Emerl's moves are kept in this browser
 (`redringcircuit.save`); on a browser where the game was played as Post Parade's cabinet, that
 record comes along the first time, and so do the settings and the two players' keys.
 
-**The title screen** comes first. Behind it runs a demo: one of the cast at random plays a
-zone's first Act at random, by itself, to the goal post (the post spins), then another runner
-in another zone, round and round. A robot holds right and jumps for walls, gaps and badniks,
-uses the runner's air action for a wall or a drop (Knuckles climbs), is never hurt, and plays
-quietly; put back on the road if it falls, it skips ahead if it sticks (a run takes about half
-a minute). The stage it used is built fresh before anyone plays it. Over it the Red Ring
-Circuit logo under its Sonic & Friends banner, Press Enter, Start, and your record (zones
-cleared, Red Star Rings found, S grades). Along the bottom, on a strip of checkered soil under
-grass, up to four of the cast at a time come on at random, each to do something of their own:
-dash across, hop across, run in and stop to show a move or two (the 1-2-3, the heavy, the
-upper, the guard, a heal, a special) and run on, rev a Spin Dash and roll off, fly over
-(Tails, Cream, Gamma, Eggman), or glide over and drop (Knuckles). Under it is the line that
-says it is a fan-made game and the characters are SEGA's.
+**The title screen** comes first. Behind it, far off and under a haze so it stays behind
+everything else, runs a demo: one of the cast at random plays a zone's first Act at random, by
+itself, to the goal post (the post spins), then another runner in another zone, round and round.
+A robot holds right and jumps for walls, gaps and badniks, uses the runner's air action for a
+wall or a drop (Knuckles climbs), is never hurt, and plays quietly; put back on the road if it
+falls, it skips ahead if it sticks (a run takes about half a minute). The stage it used is built
+fresh before anyone plays it. Over it the Red Ring Circuit logo under its Sonic & Friends
+banner, Press Enter and Start. Along the bottom, on a strip of checkered soil under grass, up to
+four of the cast at a time come on at random, each to do one thing: walk across, run across,
+come in and stand a while, rev a Spin Dash and roll off, fly over (Tails, Cream, Gamma,
+Eggman), or glide over and drop (Knuckles). Sonic Battle draws no walk, so Sonic's and
+Knuckles' walks, and their waiting poses (Sonic's foot-tap and finger wag, Knuckles' look
+about), are Sonic Advance's, in Sonic Battle's colours; Mighty's walk and pose and Metal
+Sonic's pose are their own sheets' extras; the rest stand in their idle. Under it is the line
+that says it is a fan-made game and the characters are SEGA's.
 
 **Controls.** Arrows or WASD to run (and Up and Down to pick a move, crouch or climb), Space
 to jump (hold for height), Z, X and C to attack. Enter goes on from the title to the main

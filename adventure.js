@@ -5005,6 +5005,7 @@
     const aspect = R.domElement.width / Math.max(1, R.domElement.height);
     /* a tall phone screen backs the camera off until twelve metres of the stage fit across */
     let D = clamp(12.5 / (2 * Math.tan(17 * PI / 180) * aspect), CAM_D, 42);
+    if (!battle && mode === "title" && demo) D *= 2;              // the title's demo: far off, behind the strip
     if (battle) D = battleView(aspect, dt);              // a battle frames everyone in it
     else {
       const halfW = Math.tan(17 * PI / 180) * D * aspect, halfH = Math.tan(17 * PI / 180) * D;
@@ -7778,22 +7779,20 @@
   }
 
   /* The title screen: behind it, a demo -- one of the cast, at random, playing a zone's first
-     Act, at random, to its goal post, then another, round and round; the logo; Press Enter; the
-     trainer's record on a little tote board; and along the bottom a strip of checkered soil under
-     grass where up to four of the cast at a time come on, at random, to do something of their own. */
+     Act, at random, to its goal post, then another, round and round -- seen from far off, under a
+     haze, so it stays behind; the logo; Press Enter; and along the bottom a strip of checkered soil
+     under grass where up to four of the cast at a time come on, at random, to do something of their own. */
   let glideX = 12, parade = null;
   function title() {
     endBattle(); storyRun = null; talk = null;
     if (mode !== "title" && mode !== "main" && world) { glideX = Math.max(12, world.start.x); camX = glideX + 3; }
     mode = "title"; paused = false; music();
     demoStart();
-    const ov = host.querySelector(".adv-ov"), list = stages();
+    const ov = host.querySelector(".adv-ov");
     host.querySelector(".adv-hud").classList.remove("on");
     host.classList.remove("playing");
-    const clearedN = list.filter((s, i) => cleared(i)).length;
-    const shoes = list.reduce((n, s, i) => n + zoneShoes(i), 0);
-    const sGrades = list.reduce((n, s, i) => { let k = 0; for (let a = 0; a < nActs(i); a++) if ((saveData.stages[s.id + "-" + (a + 1)] || {}).grade === "S") k++; return n + k; }, 0);
     ov.innerHTML = `
+      <div class="adv-haze"></div>
       <div class="adv-title pop">
         <div class="adv-brand">
           <div class="adv-kicker">SONIC &amp; FRIENDS</div>
@@ -7803,11 +7802,6 @@
         <div class="adv-tgo">
           <button class="btn lg" id="advTStart" data-enter>${ico("flag")}Start</button>
           ${opts0 && opts0.onExit ? `<button class="btn ghost" id="advTBack" data-back>${ico("back")}Back to the hall</button>` : ""}
-        </div>
-        <div class="adv-tote">
-          <div><b class="num">${clearedN}<i>/${list.length}</i></b><small>Zones cleared</small></div>
-          <div><b class="num">${shoes}<i>/${list.length * 3}</i></b><small>Red Star Rings</small></div>
-          <div><b class="num">${sGrades}</b><small>S grades</small></div>
         </div>
       </div>
       <canvas class="adv-parade"></canvas>
@@ -7906,25 +7900,24 @@
     p.x = glideX; p.y = y; p.vx = 0; p.vy = 0; p.face = 1; p.state = "run"; p.inv = 99; p.dead = 0;
   }
   /* The strip along the bottom of the title: up to four of the cast at a time come on, at random,
-     each to do a thing of their own -- dash across; hop across; run in, stop and show a move or
-     two (the 1-2-3, the heavy, the upper, the guard, a heal, a special) and run on; rev a Spin
-     Dash and roll off; fly over (Tails, Cream, Gamma, Eggman); glide over and drop (Knuckles) --
-     in their own frames from their own atlas, crisp, at a whole number of times size. */
+     each to do a thing of their own -- walk across (those whose sheets draw a walk: Sonic, Knuckles,
+     Mighty); run across; walk or run in, stop and stand a while (a waiting pose where the sheet has
+     one: Sonic's foot-tap, Knuckles', Mighty's, Metal's), then go on; rev a Spin Dash and roll off;
+     fly over (Tails, Cream, Gamma, Eggman); glide over and drop (Knuckles) -- in their own frames
+     from their own atlas, crisp, at a whole number of times size. */
   const PARADE_MAX = 4;
   function paradeActor(W, k, busy) {
     const ids = CAST.map(c => c.id).filter(id => SHEETS[id] && !busy.has(id));
     if (!ids.length) return null;
     const id = ids[Math.floor(Math.random() * ids.length)], f = SHEETS[id].f, has = n => f[n] && f[n].length;
-    const acts = ["dash", "hop", "show", "show", "show"];
+    const acts = ["run", "run", "stand", "stand"];
+    if (has("walk")) acts.push("walk", "walk", "stand");
     if (has("spin") && has("rev")) acts.push("spin");
     if (has("fly")) acts.push("fly", "fly");
-    if (has("glide")) acts.push("glide", "glide");
+    if (has("glide")) acts.push("glide");
     const act = acts[Math.floor(Math.random() * acts.length)], dir = Math.random() < 0.5 ? 1 : -1;
-    const moves = [["atk1", "atk2", "atk3"], ["atk1", "atk2", "heavy"], ["heavy"], ["upper"], ["guard"], ["heal"], ["dashatk"],
-                   has("shot") ? ["shot"] : ["atk1", "atk2", "atk3"], has("power") ? ["power"] : ["upper"], ["trap"]].filter(m => m.every(has));
-    return { id, act, dir, t: 0, pt: 0, x: dir > 0 ? -50 : W + 50, y: 0, phase: "in",
-             stop: W * (0.18 + Math.random() * 0.64), moves: moves[Math.floor(Math.random() * moves.length)] || ["idle"], mi: 0,
-             hopT: 0.3 + Math.random() * 0.5, alt: 34 + Math.random() * 26 };
+    return { id, act, dir, t: 0, pt: 0, x: dir > 0 ? -50 : W + 50, y: 0, phase: "in", walk: has("walk") && Math.random() < 0.6,
+             stop: W * (0.15 + Math.random() * 0.7), wait: 1.6 + Math.random() * 1.8, alt: 16 + Math.random() * 14 };
   }
   /* one step of an actor: where they are, and which frames; false once they're gone */
   function paradeStep(a, dt, W, k) {
@@ -7932,43 +7925,34 @@
     a.t += dt; a.pt += dt;
     const go = (v, name, fps) => { a.x += a.dir * v * dt; a.name = name; a.fps = fps; a.loop = true; };
     const to = ph => { a.phase = ph; a.pt = 0; };
-    const once = (name, fps) => { a.name = name; a.fps = fps; a.loop = false; return a.pt >= (f[name] || [0]).length / fps; };
     const gone = () => a.dir > 0 ? a.x > W + 60 : a.x < -60;
+    const past = () => a.dir > 0 ? a.x > a.stop : a.x < a.stop;
     a.y = 0;
     switch (a.act) {
-      case "dash": go(sp * 3.4, has("dash") ? "dash" : "run", 16); return !gone();
-      case "fly": go(sp * 1.5, "fly", 12); a.y = a.alt + Math.sin(a.t * 3) * 5; return !gone();
+      case "walk": go(sp * 0.75, "walk", 9); return !gone();
+      case "fly": go(sp * 1.5, "fly", 12); a.y = a.alt + Math.sin(a.t * 3) * 4; return !gone();
       case "glide":
-        if (a.phase === "in") { go(sp * 1.9, "glide", 10); a.y = Math.max(0, a.alt - a.pt * 9); if ((a.dir > 0 ? a.x > a.stop : a.x < a.stop) || a.y <= 0) to("drop"); return true; }
-        if (a.phase === "drop") { a.y = Math.max(0, a.alt - 9 * 1.6 - a.pt * 160); a.x += a.dir * sp * 0.6 * dt; a.name = "fall"; a.fps = 10; a.loop = true; if (a.y <= 0) to("off"); return true; }
+        if (a.phase === "in") { go(sp * 1.9, "glide", 10); a.y = Math.max(0, a.alt + 10 - a.pt * 7); if (past() || a.y <= 0) to("drop"); return true; }
+        if (a.phase === "drop") { a.y = Math.max(0, (a.y || 0) - a.pt * 120); a.x += a.dir * sp * 0.5 * dt; a.name = "fall"; a.fps = 10; a.loop = true; if (a.y <= 0) to("off"); return true; }
         go(sp * 2.2, "run", 14); return !gone();
-      case "hop":
-        if (a.phase === "air") {
-          const T = 0.62, u = Math.min(1, a.pt / T);
-          a.x += a.dir * sp * 2.2 * dt; a.y = 4 * 46 * u * (1 - u);
-          a.name = u < 0.5 ? "jump" : "fall"; a.fps = 14; a.loop = true;
-          if (u >= 1) { a.hopT = 0.25 + Math.random() * 0.6; to("run"); }
-          return true;
-        }
-        go(sp * 2.2, "run", 14); if (a.pt > a.hopT && a.x > -10 && a.x < W + 10) to("air"); return !gone();
       case "spin":
-        if (a.phase === "in") { go(sp * 2, "run", 13); if (a.dir > 0 ? a.x > a.stop : a.x < a.stop) to("skid"); return true; }
-        if (a.phase === "skid") { once("skid", 12); a.x += a.dir * sp * Math.max(0, 1 - a.pt * 3) * dt; if (a.pt > 0.3) to("rev"); return true; }
+        if (a.phase === "in") { go(sp * 2, "run", 13); if (past()) to("skid"); return true; }
+        if (a.phase === "skid") { a.name = "skid"; a.fps = 12; a.loop = false; a.x += a.dir * sp * Math.max(0, 1 - a.pt * 3) * dt; if (a.pt > 0.3) to("rev"); return true; }
         if (a.phase === "rev") { a.name = "rev"; a.fps = 10 + a.pt * 30; a.loop = true; if (a.pt > 0.8) to("roll"); return true; }
         go(sp * 5, "spin", 24); return !gone();
-      default:                                              // show: in, a stop, a move or two, and on
-        if (a.phase === "in") { go(sp * 2, "run", 13); if (a.dir > 0 ? a.x > a.stop : a.x < a.stop) to("skid"); return true; }
-        if (a.phase === "skid") { once("skid", 12); a.x += a.dir * sp * Math.max(0, 1 - a.pt * 3) * dt; if (a.pt > 0.3) to("wait"); return true; }
-        if (a.phase === "wait") { a.name = "idle"; a.fps = 7; a.loop = true; if (a.pt > 0.5 + Math.random() * 0.02) to("move"); return true; }
-        if (a.phase === "move") {
-          const m = a.moves[a.mi], long = m === "guard" || m === "heal";
-          if (long) { a.name = m; a.fps = 10; a.loop = true; if (a.pt > 1.1) { a.mi++; a.pt = 0; } }
-          else if (once(m, 15)) { a.mi++; a.pt = 0; }
-          if (a.mi >= a.moves.length) { if (Math.random() < 0.35) a.dir = -a.dir; to("rest"); }
+      case "stand":                                         // in, a stop, a while standing (their waiting pose, if they have one), and on
+        if (a.phase === "in") { if (a.walk) go(sp * 0.75, "walk", 9); else go(sp * 2, "run", 13); if (past()) to(a.walk ? "wait" : "skid"); return true; }
+        if (a.phase === "skid") { a.name = "skid"; a.fps = 12; a.loop = false; a.x += a.dir * sp * Math.max(0, 1 - a.pt * 3) * dt; if (a.pt > 0.3) to("wait"); return true; }
+        if (a.phase === "wait") {
+          const pose = has("pose") && a.pt > 0.6, n = pose ? f.pose.length : 0;
+          if (pose && a.pt - 0.6 < n / 8) { a.name = "pose"; a.fps = 8; a.loop = false; a.pose0 = 0.6; }
+          else { a.name = "idle"; a.fps = 7; a.loop = true; }
+          if (a.pt > (pose ? 0.6 + n / 8 + 0.5 : a.wait)) { if (Math.random() < 0.35) a.dir = -a.dir; to("off"); }
           return true;
         }
-        if (a.phase === "rest") { a.name = "idle"; a.fps = 7; a.loop = true; if (a.pt > 0.6) to("off"); return true; }
-        go(sp * 2.3, "run", 14); return !gone();
+        if (a.walk) go(sp * 0.75, "walk", 9); else go(sp * 2.3, "run", 14);
+        return !gone();
+      default: go(sp * 2.2, "run", 14); return !gone();      // run
     }
   }
   function drawParade(dt) {
@@ -7980,7 +7964,7 @@
     if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(Hh * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(Hh * dpr); }
     const g = cv.getContext("2d");
     g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, Hh); g.imageSmoothingEnabled = false;
-    const k = Hh >= 110 ? 2 : 1.5, track = Math.round(Hh * 0.3), top = Hh - track, t = parade.t;
+    const k = (root.innerHeight || 800) < 600 ? 1.5 : 2, track = Math.round(18 * k), top = Hh - track, t = parade.t;
     // the ground: checkered soil in two browns under a lip of grass
     const sq = 12;
     for (let r = 0, y = top + 8; y < Hh; r++, y += sq) for (let c = 0, x = -sq; x < W + sq; c++, x += sq) {
@@ -8005,7 +7989,7 @@
       const img = IMGS[a.id] || (IMGS[a.id] = Object.assign(new Image(), { src: A.url }));
       if (!img.complete || !img.naturalWidth) continue;
       const L = A.f[a.name] || A.f.idle, n = L.length;
-      let i = a.loop ? Math.floor(a.pt * a.fps) % n : Math.min(n - 1, Math.floor(a.pt * a.fps));
+      let i = a.loop ? Math.floor(a.pt * a.fps) % n : Math.min(n - 1, Math.floor((a.pt - (a.name === "pose" ? a.pose0 || 0 : 0)) * a.fps));
       if (a.id === "eggman" && (a.name === "run" || a.name === "idle" || a.name === "dash")) i = EGG_FLAME[Math.floor(t * 30) % EGG_FLAME.length] % n;   // his booster, flickering
       const fr = L[i], c = castOf(a.id);
       const lift = c.lift ? Math.round(c.lift / PX * k * 0.6 + Math.sin(t * 3.4) * 2) : 0;
