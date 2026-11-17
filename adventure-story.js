@@ -1,5 +1,5 @@
 /*
- * Post Parade Adventure 2: the story, "The Red Star Rings".
+ * Red Ring Circuit, the hall's arcade cabinet: the story, "The Red Star Rings".
  *
  * An original story for the cabinet's cast, in twenty chapters. Thirty-nine Red Star Rings, each
  * holding a star's worth of power, have fallen across the world with the shooting stars: the

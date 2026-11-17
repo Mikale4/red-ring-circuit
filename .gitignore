@@ -1,0 +1,5 @@
+# Only the playable game goes in the repository: the page, its scripts, sprites and audio.
+# The tools -- the stage generator, the packers, the validator -- and the source art they
+# read (sprite sheets, the full soundtracks, the sound rips) stay local.
+/tools/
+/.claude/

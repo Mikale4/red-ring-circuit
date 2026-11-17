@@ -1,8 +1,10 @@
 /*
- * Post Parade Adventure 2 -- the arcade cabinet in the hall.
+ * Red Ring Circuit (Sonic & Friends) -- a fan-made Sonic platformer and fighter in voxels.
+ * It began as an arcade cabinet in the hall of Post Parade (github.com/Mikale4/post-parade),
+ * "Post Parade Adventure 2", and became a game of its own on 2026-11-17.
  *
- * A side-on platformer in the race's own voxels: the same mesher, the same light, seen from
- * the side. Its runners are fourteen, each in their own 2D sprites in Sonic Battle's style: Sonic,
+ * A side-on platformer in voxels (voxkit.js: the sparse grid and AO mesher Post Parade's race
+ * is built with), seen from the side. Its runners are fourteen, each in their own 2D sprites in Sonic Battle's style: Sonic,
  * Tails, Knuckles, Amy, Rouge, Shadow, Cream, Chaos and Chaos Gamma from SEGA's Sonic Battle
  * (Game Boy Advance, 2003), ripped by QuadFactor (The Spriters Resource); Dr. Eggman, Metal
  * Sonic, Mighty and Silver drawn in its style by TheKnucklesMainG4 (DeviantArt).
@@ -2688,12 +2690,109 @@
     pop: () => { noise(0.07, 0.12, 1600); tone(880, 1500, 0.08, "triangle", 0.07); },
     bumper: () => { tone(620, 980, 0.09, "square", 0.08); tone(1320, 1320, 0.07, "triangle", 0.05, 0.05); },
   };
+  /* The Sonic games' own sounds (audio/sonic/sfx/, from Mr Lange's Sonic Sounds Complete rips of
+     Sonic 3 & Knuckles, named from the Sonic Retro disassembly): each sound here that has one
+     plays it; the synthesized one above stands in till it has loaded, or where none is used. */
+  const SND = "audio/";
+  const SFX_FILE = {
+    jump: "62-jump", double: "62-jump", coin: ["33-ring-right", "34-ring-left"], ringLoss: "b9-ring-loss", shoe: "9c-super-emerald",
+    spring: "b1-spring", dash: "b6-dash", stomp: "b4-explode", breakIt: "3d-break", boom: "4e-missile-explode", blast: "48-blast",
+    impact: "49-thump", shot: "4d-projectile", set: "3a-shield", grab: "4a-grab", rev: "ab-spin-dash", roll: "3c-roll",
+    homing: "42-insta-shield-attack", splash: "39-splash", bubble: "38-bubble", warn: "a9-air-ding", check: "63-star-post",
+    fall: "35-death", goal: "b8-signpost", stumble: "36-skid", pop: "3d-break", bumper: "aa-bumper",
+    bossIn: "50-boss-activate", bossHit: "6e-boss-hit", quake: "61-boss-hit-floor", fire: "4f-flamethrower-quiet", missile: "51-missile-throw",
+  };
+  Object.assign(SFX, { bossIn: () => SFX.warn(), bossHit: () => { SFX.hit(); SFX.impact(); }, quake: () => SFX.impact(), fire: () => SFX.blast(), missile: () => SFX.shot() });
+  const SAMPLES = {};
+  let ringSide = 0;
+  function loadSamples() {
+    if (loadSamples.done) return;
+    loadSamples.done = true;
+    try { AC = AC || new (root.AudioContext || root.webkitAudioContext)(); } catch (e) { return; }
+    const names = new Set(); for (const v of Object.values(SFX_FILE)) [].concat(v).forEach(n => names.add(n));
+    names.forEach(n => fetch(SND + "sfx/" + n + ".mp3").then(r => (r.ok ? r.arrayBuffer() : null))
+      .then(b => b && new Promise((ok, no) => AC.decodeAudioData(b, ok, no))).then(buf => { if (buf) SAMPLES[n] = buf; }).catch(() => {}));
+  }
+  function sample(n, rate, vol) {
+    const b = SAMPLES[n];
+    if (!b || !AC) return false;
+    try {
+      if (AC.state === "suspended") AC.resume();
+      const src = AC.createBufferSource(), g = AC.createGain();
+      src.buffer = b; src.playbackRate.value = rate || 1; g.gain.value = (vol == null ? 0.42 : vol) * sfxVol();
+      src.connect(g); g.connect(AC.destination); src.start();
+      return true;
+    } catch (e) { return false; }
+  }
+  for (const k in SFX_FILE) {
+    const syn = SFX[k];
+    SFX[k] = (...a) => {
+      let f = SFX_FILE[k];
+      if (Array.isArray(f)) f = f[(ringSide = 1 - ringSide)];                    // a ring: right, then left, as in the games
+      const rate = k === "rev" ? 1 + clamp(a[0] || 0, 0, 1) * 0.6 : k === "double" ? 1.15 : 1;   // a Spin Dash revs higher as it builds
+      if (!sample(f, rate)) syn(...a);
+    };
+  }
+
+  /* The music: the Sonic games' own, from the soundtracks in audio/sonic/ (khinsider: Sonic the
+     Hedgehog 4 Genesis, Sonic 3 Angel Island Revisited, the Sonic 2 and Sonic 1 Anniversary
+     Editions), played by the cabinet itself (the rest of Post Parade's music stops while it is
+     open). Each zone has its two Acts' themes; the menus, the battles, the bosses and the
+     story theirs; and the classic jingles: the Act clear, invincibility, the drowning count. */
+  const ZONE_BGM = { cape: "splash-hill", works: "sky-fortress", parlour: "spring-yard", peak: "ice-cap", club: "casino-night", expressway: "star-light",
+    museum: "marble", springs: "hydrocity", canyon: "sandopolis", ruins: "lava-reef", depot: "metropolis", stars: "half-pipe", station: "death-egg" };
+  const BATTLE_BGM = ["battle-azure-lake", "battle-balloon-park", "battle-chrome-gadget", "battle-desert-palace", "battle-endless-mine"];
+  const SCREEN_BGM = { title: "title", main: "main-menu", menu: "zone-select", options: "options", setup: "competition-menu", story: "story", scene: "story" };
+  const BOSS_BGM = { mecha: "metal-battle", frog: "final-boss" };
+  const musicVol = () => { try { const v = root.Settings && Settings.get("musicVolume"); return v == null ? 0.55 : v; } catch (e) { return 0.55; } };
+  const BGM = { els: [], cur: 0, key: null, at: {}, over: null };
+  function fadeEl(el, v, ms, done) {
+    clearInterval(el._fade);
+    const v0 = el.volume, n = Math.max(1, Math.round(ms / 30)); let i = 0;
+    el._fade = setInterval(() => { i++; el.volume = clamp(v0 + (v - v0) * i / n, 0, 1); if (i >= n) { clearInterval(el._fade); if (done) done(); } }, 30);
+  }
+  /** Play the track `key` (crossfading); a zone's theme picks up where it left off (`resume`). */
+  function bgm(key, opts) {
+    opts = opts || {};
+    if (!key || (key === BGM.key && !opts.restart)) return;
+    if (!BGM.els.length) BGM.els = [new Audio(), new Audio()];
+    const from = BGM.els[BGM.cur], to = BGM.els[1 - BGM.cur];
+    if (BGM.key && !from.paused && from.loop) BGM.at[BGM.key] = from.currentTime;     // where a theme was, to pick up again
+    if (!from.paused) fadeEl(from, 0, 260, () => from.pause());
+    to.pause(); to.loop = !opts.once; to.volume = 0;
+    const at = opts.resume ? BGM.at[key] || 0 : 0;
+    to.src = SND + key + ".mp3";
+    to.onloadedmetadata = () => { if (at) try { to.currentTime = at < to.duration - 1 ? at : 0; } catch (e) {} };
+    const go = to.play(); if (go && go.catch) go.catch(() => {});
+    fadeEl(to, musicVol(), 260);
+    BGM.cur = 1 - BGM.cur; BGM.key = key;
+  }
+  function bgmStop() { BGM.els.forEach(el => fadeEl(el, 0, 260, () => el.pause())); BGM.key = null; BGM.over = null; }
+  function bgmVolume() { const el = BGM.els[BGM.cur]; if (el && !el.paused) el.volume = musicVol(); }
+  const zoneBgm = d => (ZONE_BGM[d.theme] || "splash-hill") + "-" + Math.min(2, d.actN || 1);
+  const bossBgm = b => b.C.chase ? (b.hp <= b.C.hp / 2 ? "boss-chase-2" : "boss-chase-1") : b.gem > 0 ? "mini-boss" : BOSS_BGM[b.key] || "boss";
+
 
   // ---------------------------------------------------------------- the save
-  const KEY = () => "postparade.adventure." + ((root.Auth && Auth.current && Auth.current()) ? Auth.current().id : "guest");
+  const KEY = () => "redringcircuit.save";
+  /* The first time on a browser where the game was played as Post Parade's arcade cabinet
+     (postparade.adventure.<trainer>, the same site), its record comes along: the fullest one. */
+  function oldSave() {
+    let best = null, most = -1;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!/^postparade\.adventure\.(?!keys$)/.test(k)) continue;
+        const o = JSON.parse(localStorage.getItem(k)), n = o && o.stages ? Object.keys(o.stages).length + (o.story && o.story.done || 0) : -1;
+        if (n > most) { most = n; best = o; }
+      }
+    } catch (e) {}
+    return best;
+  }
   function load() {
     let s = null;
     try { s = JSON.parse(localStorage.getItem(KEY())); } catch (e) {}
+    if (!s) { s = oldSave(); if (s) save(s); }
     s = s && typeof s === "object" ? s : {};
     s.stages = s.stages || {}; s.cast = s.cast || "sonic";
     return s;
@@ -4615,17 +4714,17 @@
     b.lock = true; b.state = "fight"; b.mode = "in"; b.t = 0; b.camX = b.C.chase ? player.x + 3 : (b.a0 + b.a1) / 2;
     if (b.C.chase) { b.x = player.x + 14; b.y = b.gy; }
     sheetMats("bosses").mat.color.setHex(world.T.tint || 0xffffff);
-    try { if (root.Sound && Sound.play) Sound.play(b.C.music || "rival"); } catch (e) {}
+    music();
     hudToast(b.gem ? "Gemerl!" : b.C.name);
-    SFX.warn();
+    SFX.bossIn();
   }
   const pinchOf = b => b.hp <= b.C.hp / 2;
   function bossHit(b, p) {
     if (b.inv > 0) return;
     b.inv = 0.9;
-    if (b.gem > 0) { b.gem--; if (!b.gem) { b.mode = "gemout"; b.t2 = 0; } }
-    else b.hp--;
-    hitSpark(p.x + sgn(b.x - p.x) * 0.4, p.y + p.hh * 0.6, 1.5, 0xffffff); hitStop(0.07); shakeCam(0.14); SFX.hit(); SFX.impact();
+    if (b.gem > 0) { b.gem--; if (!b.gem) { b.mode = "gemout"; b.t2 = 0; music(); } }
+    else { b.hp--; if (b.C.chase && b.hp === Math.floor(b.C.hp / 2)) music(); }       // a chase's second phase has its own theme
+    hitSpark(p.x + sgn(b.x - p.x) * 0.4, p.y + p.hh * 0.6, 1.5, 0xffffff); hitStop(0.07); shakeCam(0.14); SFX.bossHit();
     p.vx = -(sgn(b.x - p.x) || p.face) * 7; p.vy = Math.max(p.vy, 9); p.ground = false; p.airMove = false; p.airUses = 0;
     if (p.state === "homing" || p.state === "seek" || p.state === "dash" || p.state === "roll" || p.state === "glide") p.state = "run";
     p.curl = true;
@@ -4642,9 +4741,9 @@
   }
   /* a shot: falls if it has weight, bursts or bounces where it meets the floor */
   function bshot(b, o) { b.shots.push(Object.assign({ x: b.x, y: b.y + 1, vx: 0, vy: 0, g: 0, r: 0.35, life: 6, t: 0, fps: 12, mid: true }, o)); }
-  function bfire(b, x, h, life) { b.fires.push({ x, t: 0, h: h || 1.8, life: life || 1.1 }); }
+  function bfire(b, x, h, life) { b.fires.push({ x, t: 0, h: h || 1.8, life: life || 1.1 }); SFX.fire(); }
   function quake(b, x, range) {
-    shakeCam(0.3); impact(x, b.gy, { c: 0xd8c8a8, flash: 1.2, shake: 0.2 });
+    shakeCam(0.3); impact(x, b.gy, { c: 0xd8c8a8, flash: 1.2, shake: 0.2 }); SFX.quake();
     burst(x, b.gy + 0.1, [0xd8d0c0, 0xb0a890], 18, 6);
     const p = player;
     if (p.ground && Math.abs(p.x - x) < range) hurt(p, x);
@@ -4739,7 +4838,7 @@
           case "fall": b.vy -= GRAV * dt; b.y += b.vy * dt; if (b.y <= b.gy) { b.y = b.gy; b.mode = "land"; b.t2 = 0; } break;
           case "land": if (b.t2 > 0.7) { b.mode = "walk"; b.at = 1; } break;
           case "spin": if (b.t2 > 0.45) b.x += b.face * 11 * sp * dt; if (b.t2 > 1.4 || b.x <= b.a0 + 0.6 || b.x >= b.a1 - 0.6) { b.mode = "land"; b.t2 = 0.25; } break;
-          case "shoot": if (b.t2 > 0.35 && !b.fired) { b.fired = true; SFX.shot();
+          case "shoot": if (b.t2 > 0.35 && !b.fired) { b.fired = true; SFX.missile();
               bshot(b, { name: "mecha.missile", y: b.y + 0.7, vx: b.face * 8, r: 0.35, home: 1.6, life: 2.4, fps: 14 }); }
             if (b.t2 > 0.9) { b.mode = "walk"; b.fired = false; b.at = 1.2; } break;
         }
@@ -5006,7 +5105,7 @@
         }
       } else {
         c.t += dt;
-        if (c.t > 1.6 && mode === "play") { try { music(); } catch (e) {} finish(p); }
+        if (c.t > 1.6 && mode === "play") finish(p);
       }
     }
     // shots
@@ -5075,6 +5174,7 @@
   function finish(p) {
     mode = "goal"; p.state = "run";
     if (world.goal) { world.goal.fire = 2.5; world.goal.fireT = 0; }
+    bgm("act-clear", { once: true });
     SFX.goal();
     const time = world.t;
     const st = curDef();
@@ -5865,6 +5965,7 @@
     mode = m; paused = false; parade = null; talk = null;
     host.querySelector(".adv-hud").classList.remove("on");
     host.classList.remove("playing");
+    music();
     return host.querySelector(".adv-ov");
   }
   function mainMenu() {
@@ -5881,12 +5982,12 @@
       ["training", "dumbbell", "Training", "Every move on a dummy that does as it's told", ""],
       ["options", "gear", "Options", "Music, sound, screen shake and the two-player keys", ""],
       ["exit", "door", "Exit", "Back to the hall", ""],
-    ];
+    ].filter(it => it[0] !== "exit" || (opts0 && opts0.onExit));
     ov.innerHTML = `
       <div class="adv-main pop">
         <div class="adv-brand">
-          <div class="adv-kicker">POST PARADE</div>
-          <div class="adv-logo">ADVENTURE 2</div>
+          <div class="adv-kicker">SONIC &amp; FRIENDS</div>
+          <div class="adv-logo">RED RING CIRCUIT</div>
         </div>
         <div class="adv-mm">
           ${items.map(([id, ic, t, sub, note], i) => `
@@ -6119,7 +6220,7 @@
   function battleOver() {
     const B = battle;
     if (B.cfg.kind === "story") return storyBattleOver(B);
-    mode = "results";
+    mode = "results"; bgm("competition-results");
     host.querySelector(".adv-hud").classList.remove("on");
     /* a player's Emerl on the winning side learns one move of someone else's (Sonic Battle's skill card) */
     const won = B.winner != null && B.fs.some(f => f.team === B.winner && f.c.id === "emerl" && f.ctl !== "cpu");
@@ -6199,14 +6300,14 @@
      ones the rest of Post Parade uses), and the keys two players share a keyboard with. A key is
      set by picking it and pressing the new one (Esc leaves it as it was); a key does one thing,
      so taking it from one place clears it from another. */
-  const KEYMAP_KEY = "postparade.adventure.keys";
+  const KEYMAP_KEY = "redringcircuit.keys";
   const ACTS = [["L", "Left"], ["R", "Right"], ["U", "Up"], ["D", "Down"], ["J", "Jump"], ["Z", "Light"], ["X", "Heavy"], ["C", "Special"]];
   const KEYS_DEF = () => ({
     p: [{ L: ["KeyA"], R: ["KeyD"], U: ["KeyW"], D: ["KeyS"], J: ["Space"], Z: ["KeyV"], X: ["KeyB"], C: ["KeyN"] },
         { L: ["ArrowLeft"], R: ["ArrowRight"], U: ["ArrowUp"], D: ["ArrowDown"], J: ["Numpad0", "Quote"], Z: ["Numpad1", "KeyK"], X: ["Numpad2", "KeyL"], C: ["Numpad3", "Semicolon"] }],
     padSwap: false });
   let KEYMAP = KEYS_DEF();
-  try { const k = JSON.parse(localStorage.getItem(KEYMAP_KEY)); if (k && k.p && k.p.length === 2) KEYMAP = Object.assign(KEYS_DEF(), k); } catch (e) {}
+  try { const k = JSON.parse(localStorage.getItem(KEYMAP_KEY) || localStorage.getItem("postparade.adventure.keys")); if (k && k.p && k.p.length === 2) KEYMAP = Object.assign(KEYS_DEF(), k); } catch (e) {}
   const saveKeys = () => { try { localStorage.setItem(KEYMAP_KEY, JSON.stringify(KEYMAP)); } catch (e) {} };
   function duoKey(code) {
     if (!code) return null;
@@ -6268,6 +6369,7 @@
       if (key === "pad") { KEYMAP.padSwap = v === "1"; saveKeys(); }
       else if (key === "set:shake") S && S.set("shake", v === "1");
       else if (S) { const d = def(key.slice(4)); const c = d && d.choices.find(c => String(c[0]) === v); if (c) S.set(d.id, c[0]); }
+      bgmVolume();
       optionsScreen();
     });
     ov.querySelectorAll("[data-key]").forEach(el => el.onclick = () => {
@@ -6523,7 +6625,7 @@
   function title() {
     endBattle(); storyRun = null; talk = null;
     if (mode !== "title" && mode !== "main" && world) { glideX = Math.max(12, world.start.x); camX = glideX + 3; }
-    mode = "title"; paused = false;
+    mode = "title"; paused = false; music();
     const ov = host.querySelector(".adv-ov"), list = stages();
     host.querySelector(".adv-hud").classList.remove("on");
     host.classList.remove("playing");
@@ -6533,13 +6635,13 @@
     ov.innerHTML = `
       <div class="adv-title pop">
         <div class="adv-brand">
-          <div class="adv-kicker">POST PARADE</div>
-          <div class="adv-logo">ADVENTURE 2</div>
+          <div class="adv-kicker">SONIC &amp; FRIENDS</div>
+          <div class="adv-logo">RED RING CIRCUIT</div>
         </div>
         <div class="adv-press">${TOUCH ? "Tap Start" : "Press Enter"}</div>
         <div class="adv-tgo">
           <button class="btn lg" id="advTStart" data-enter>${ico("flag")}Start</button>
-          <button class="btn ghost" id="advTBack" data-back>${ico("back")}Back to the hall</button>
+          ${opts0 && opts0.onExit ? `<button class="btn ghost" id="advTBack" data-back>${ico("back")}Back to the hall</button>` : ""}
         </div>
         <div class="adv-tote">
           <div><b class="num">${clearedN}<i>/${list.length}</i></b><small>Zones cleared</small></div>
@@ -6548,10 +6650,10 @@
         </div>
       </div>
       <canvas class="adv-parade"></canvas>
-      <div class="adv-legal">A fan-made cabinet, not affiliated with SEGA. Sonic and his friends, rivals and Dr. Eggman belong to SEGA.</div>`;
+      <div class="adv-legal">A fan-made game, not affiliated with SEGA. Sonic and his friends, rivals and Dr. Eggman belong to SEGA.</div>`;
     parade = { cv: ov.querySelector(".adv-parade"), t: 0 };
     ov.querySelector("#advTStart").onclick = () => mainMenu();
-    ov.querySelector("#advTBack").onclick = () => exit();
+    if (ov.querySelector("#advTBack")) ov.querySelector("#advTBack").onclick = () => exit();
     autoFocus();
   }
   /* the camera goes along the stage's low road on its own; nobody is there to see */
@@ -6605,7 +6707,7 @@
 
   function menu() {
     endBattle(); storyRun = null; talk = null;
-    mode = "menu"; paused = false; parade = null;
+    mode = "menu"; paused = false; parade = null; music();
     const ov = host.querySelector(".adv-ov"), list = stages();
     host.querySelector(".adv-hud").classList.remove("on");
     host.classList.remove("playing");
@@ -6653,7 +6755,7 @@
             `<b>&larr; &rarr;</b> run, twice to dash &middot; <b>Space</b> jump, again in the air &middot; <b>Z</b> light &middot; <b>X</b> heavy &middot; <b>C</b> special<br>
              <b>&uarr;</b> or <b>&darr;</b> with <b>X</b> or <b>C</b> for another move &middot; <b>&darr;</b> crouch &middot; <b>&darr; + Space</b> Spin Dash, or drop through &middot; <b>Enter</b> start, and pause<br>
              In the menus: <b>arrows</b> to choose &middot; <b>Z</b> to confirm &middot; <b>X</b> to go back`}</div>
-          <div class="adv-credit">Sonic and his friends, his rivals and Dr. Eggman belong to SEGA. Sonic, Tails, Knuckles, Amy, Rouge, Shadow, Cream, Chaos and Chaos Gamma are from SEGA's Sonic Battle (Game Boy Advance, 2003), ripped by QuadFactor; Emerl, and every move he copies, re-ripped by Dinoshi 64 (some rips by Mr. C); Knuckles' climbing and the Spin Dash rev, dust and blast effects are from Sonic Advance (2001), ripped by AsuharaMoon; all from The Spriters Resource. Dr. Eggman, Metal Sonic, Mighty and Silver are drawn in Sonic Battle's style by TheKnucklesMainG4 (DeviantArt). The badniks are from Sonic Advance, Sonic Advance 2 and Sonic Advance 3, ripped by SpitfyaUK and Techokami, Fatazz and SkyLights (The Spriters Resource), and from TheKnucklesMainG4's Modern Sonic Badniks sheet (DeviantArt). The monitors and shields are Sonic Advance 3's, ripped by SpitfyaUK and Techokami (The Spriters Resource). Eggman's bosses, Gemerl and the capsule are from Sonic Advance, Sonic Advance 2 and Sonic Advance 3, ripped by SonicDash57, Flare, raidlandguy, SkyLights, Shade and Sonikku (The Spriters Resource).</div>
+          <div class="adv-credit">Sonic and his friends, his rivals and Dr. Eggman belong to SEGA. Sonic, Tails, Knuckles, Amy, Rouge, Shadow, Cream, Chaos and Chaos Gamma are from SEGA's Sonic Battle (Game Boy Advance, 2003), ripped by QuadFactor; Emerl, and every move he copies, re-ripped by Dinoshi 64 (some rips by Mr. C); Knuckles' climbing and the Spin Dash rev, dust and blast effects are from Sonic Advance (2001), ripped by AsuharaMoon; all from The Spriters Resource. Dr. Eggman, Metal Sonic, Mighty and Silver are drawn in Sonic Battle's style by TheKnucklesMainG4 (DeviantArt). The badniks are from Sonic Advance, Sonic Advance 2 and Sonic Advance 3, ripped by SpitfyaUK and Techokami, Fatazz and SkyLights (The Spriters Resource), and from TheKnucklesMainG4's Modern Sonic Badniks sheet (DeviantArt). The monitors and shields are Sonic Advance 3's, ripped by SpitfyaUK and Techokami (The Spriters Resource). Eggman's bosses, Gemerl and the capsule are from Sonic Advance, Sonic Advance 2 and Sonic Advance 3, ripped by SonicDash57, Flare, raidlandguy, SkyLights, Shade and Sonikku (The Spriters Resource). The music is from the soundtracks of Sonic the Hedgehog 4 Genesis, Sonic 3 Angel Island Revisited, and the Sonic 2 and Sonic 1 Anniversary Editions (khinsider); the sound effects are Sonic 3 &amp; Knuckles', from Mr Lange's Sonic Sounds Complete.</div>
         </div>
       </div>`;
     ov.querySelectorAll(".adv-spr").forEach(cv => paintCard(cv, cv.dataset.who));
@@ -6692,8 +6794,20 @@
     });
   }
   function music() {
-    const T = THEMES[world && world.def ? world.def.theme : stages()[stageIdx].theme] || THEMES.cape;
-    try { if (root.Sound && Sound.play) Sound.play(T.music); } catch (e) {}
+    if (!host) return;
+    if (battle) {
+      const cfg = battle.cfg;
+      if (cfg.kind === "training") return bgm("training");
+      if (storyRun && storyRun.i === STORY().length - 1) return bgm("story-final");      // the story's last fight
+      return bgm(BATTLE_BGM[(cfg.arena || 0) % BATTLE_BGM.length]);
+    }
+    if (mode === "play" || mode === "goal") {
+      const b = world && world.boss;
+      if (b && b.lock && (b.state === "fight" || b.state === "boom")) return bgm(bossBgm(b));
+      if (world && world.def) bgm(zoneBgm(world.def), { resume: true });
+      return;
+    }
+    bgm(SCREEN_BGM[mode]);
   }
 
   function play() {
@@ -6702,7 +6816,7 @@
       world.group.remove(player.spr); if (player.dust) world.group.remove(player.dust);
       world.t = 0; player = makePlayer(castOf(runnerId())); snapCamera(); acc = 0; last = 0;
     } else loadDef(curDef());
-    world.played = true;
+    world.played = true; BGM.over = null;
     if (storyRun) { storyRun.said = {}; storyRun.commT = 0; }
     mode = "play"; paused = false;
     host.querySelector(".adv-ov").innerHTML = "";
@@ -6738,6 +6852,10 @@
   function hud() {
     const h = host.querySelector(".adv-hud"); if (!h || !player) return;
     const p = player, set = (key, val, fn) => { if (hudCache[key] !== val) { hudCache[key] = val; fn(val); } };
+    if (mode === "play") {
+      const over = p.dead ? null : p.star > 0.05 ? "invincible" : p.inWater && p.air < 12 ? "drowning" : null;
+      if (over !== BGM.over) { BGM.over = over; if (over) bgm(over, { once: over === "drowning" }); else music(); }
+    }
     set("car", p.carrots, v => { const c = h.querySelector(".adv-car"); c.querySelector("b").textContent = v; c.classList.toggle("zero", !v); });   // none: the counter flashes red
     set("hs", p.shoes.join(), () => h.querySelector(".adv-hs").innerHTML = p.shoes.map(b => `<em class="${b ? "got" : ""}">${RED_I}</em>`).join(""));
     set("clock", fmt(world.t), v => h.querySelector(".adv-clock").textContent = v);
@@ -6791,7 +6909,7 @@
           <div class="adv-row"><span>Falls</span><b class="num">${r.falls}</b></div>
           <div class="adv-row adv-big"><span>Grade</span><b class="g g${r.grade}">${r.grade}</b></div>
         </div>
-        ${r.earned ? `<div class="adv-pay">${ico("carrot")}<b class="num">+${r.earned}</b> carrots to your stable</div>` : ""}
+        ${r.earned && root.Stable ? `<div class="adv-pay">${ico("carrot")}<b class="num">+${r.earned}</b> carrots to your stable</div>` : ""}
         <div class="adv-btns">
           ${storyRun ? `<button class="btn" id="advSCont" data-focus>${ico("book")}Go on with the story</button>`
             : next >= 0 ? `<button class="btn" id="advNext">${ico("next")}Next: ${esc(list[next].name)} Act ${nextAct + 1}</button>` : `<button class="btn" id="advMenu">${ico("flag")}All thirteen zones cleared</button>`}
@@ -6819,6 +6937,8 @@
     battle = null; storyRun = null; talk = null; rebind = null; actor = null; input = INPUT0;
     saveData = load();
     emerlImgs();                                         // Emerl's sheets, ready for when he is picked
+    try { if (root.Sound && Sound.stop) Sound.stop(); } catch (e) {}                 // the cabinet plays its own music
+    loadSamples();
     castId = CAST.some(c => c.id === saveData.cast) ? saveData.cast : "sonic";
     const list = stages();
     if (!list.length) return false;
@@ -6837,6 +6957,7 @@
   }
   function exit() {
     const cb = opts0 && opts0.onExit;
+    if (!cb) return;                                     // on its own page there is nowhere to go back to
     close();
     if (cb) cb();
   }
@@ -6847,6 +6968,7 @@
     for (const k in touch) touch[k] = 0;
     duoKeys.forEach(m => { for (const k in m) m[k] = 0; });
     battle = null; storyRun = null; talk = null; rebind = null; actor = null; input = INPUT0;
+    bgmStop();
     disposeWorld(); player = null;
     if (R && R.domElement.parentNode) R.domElement.parentNode.removeChild(R.domElement);
     host = null;
@@ -6857,5 +6979,6 @@
               play: (i, id, a) => { if (id) castId = id; if (i != null) stageIdx = i; actIdx = a || 0; play(); }, draw: dt => draw(dt || 1 / 60), input: INPUT0, keys, touch, parse,
               get battle() { return battle; }, get mode() { return mode; }, get talk() { return talk; }, startBattle, mainMenu, storyMenu, playChapter, battleSetup,
               trainingSetup, optionsScreen, arenaDef, emerlLearn, emerlSkills, emerlCast, get saveData() { return saveData; },
-              bossWeak: () => world && world.boss && BRAIN[world.boss.key].weak(world.boss), tick: (n, h) => { for (let k = 0; k < (n || 1); k++) { if (battle) battleTick(h || 1 / 120); } } } };
+              bossWeak: () => world && world.boss && BRAIN[world.boss.key].weak(world.boss),
+              get bgm() { return BGM; }, get samples() { return Object.keys(SAMPLES); }, sfx: SFX, tick: (n, h) => { for (let k = 0; k < (n || 1); k++) { if (battle) battleTick(h || 1 / 120); } } } };
 })(typeof globalThis !== "undefined" ? globalThis : this);

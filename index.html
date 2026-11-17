@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Red Ring Circuit</title>
+<meta name="description" content="Red Ring Circuit: a fan-made Sonic platformer and fighter in voxels. Thirteen zones, Eggman's bosses, a story, Sonic Battle's fighting and Emerl.">
+<meta name="theme-color" content="#14298c">
+<link rel="icon" type="image/svg+xml" href="assets/icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;1,700;1,800&family=Dela+Gothic+One&family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&family=Pixelify+Sans:wght@400;500;600;700&family=Rubik:ital,wght@1,800;1,900&display=swap" rel="stylesheet">
+<script>
+  /* the stylesheets with a cache-busting stamp, so an edit is never hidden behind a stale copy */
+  var V = Date.now();
+  document.write('<link rel="stylesheet" href="theme.css?v=' + V + '">');
+  document.write('<link rel="stylesheet" href="game.css?v=' + V + '">');
+</script>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #050a22; }
+  #game { position: fixed; inset: 0; }
+  #nogame { position: fixed; inset: 0; display: grid; place-items: center; color: #fff; font: 600 16px/1.5 "Pixelify Sans", system-ui, sans-serif; text-align: center; padding: 24px; }
+</style>
+</head>
+<body>
+<div id="game"></div>
+<!-- three.js r128 (cdnjs), the build the voxels were made with -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* The modules, in order and with the same stamp: the voxel kit and the icons first, the game's
+   data next (stages, sprites, badniks, items, bosses, Emerl, the story), the game last. */
+(function () {
+  var mods = ["voxkit", "icons", "settings", "adventure-stages", "adventure-sprites", "adventure-badniks", "adventure-items",
+              "adventure-bosses", "adventure-emerl", "adventure-story", "adventure"];
+  for (var i = 0; i < mods.length; i++) document.write('<script src="' + mods[i] + '.js?v=' + V + '"><\/script>');
+})();
+</script>
+<script>
+  window.addEventListener("load", function () {
+    var el = document.getElementById("game");
+    if (!window.Adventure || !Adventure.ok || !Adventure.open(el, {})) {
+      el.innerHTML = '<div id="nogame">Red Ring Circuit needs WebGL and three.js (from the internet) to draw its voxels.<br>Try another browser, or check the connection.</div>';
+    }
+  });
+</script>
+</body>
+</html>
