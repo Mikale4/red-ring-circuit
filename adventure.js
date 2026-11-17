@@ -332,9 +332,9 @@
       airtrap:  { body: "airtrap", fps: 18, at: 3, trap: "mine", toss: true } },
     amy: {
       /* Pink Typhoon: a tornado off her hammer -- wind, so you can see through it */
-      shot:     { body: "shot", fps: 24, at: 7, wave: "fx.shot", speed: 15, life: 0.8, ghost: 1.5, trail: 0xffa0d0,
+      shot:     { body: "shot", fps: 24, at: 7, wave: "fx.shot", speed: 15, life: 0.8, ghost: 1.5, trail: 0xffa0d0, twister: true,
                   charge: 0xff80c0, pow: { c: 0xff80c0, flash: 2.2, shake: 0.14, recoil: 2.5 } },
-      airshot:  { body: "airshot", fps: 22, at: 4, fly: "fx.airshot", speed: 16, down: 0.6, life: 0.6, ghost: 1.5, trail: 0xffa0d0,
+      airshot:  { body: "airshot", fps: 22, at: 4, fly: "fx.airshot", speed: 16, down: 0.6, life: 0.6, ghost: 1.5, trail: 0xffa0d0, twister: true,
                   pow: { c: 0xff80c0, flash: 2.2, shake: 0.14, recoil: 2.5 } },
       power:    { body: "shot", fps: 22, at: 4, tornado: [4, 7], charge: 0xff80c0, pow: { c: 0xff80c0, flash: 2.2, shake: 0.1 } }, // Girl Tornado: frames 4-7, six times round
       airpower: { body: "airshot", fps: 22, at: 4, tornado: [4, 6], pow: { c: 0xff80c0, flash: 2.2, shake: 0.1 } },
@@ -434,7 +434,7 @@
       /* Mighty Cyclone, a tornado along the ground (a ring of fire from the air); Hammer Spin,
          curled and spinning on, three times round; Hammer Drop (Sonic Mania Plus), straight
          down, through cracked rock, a shockwave both ways where he lands; Peacemaker */
-      shot:     { body: "shot", fps: 24, at: 7, wave: "fx.shot", speed: 11, life: 1.0, k: 1.15, trail: 0xffc080,
+      shot:     { body: "shot", fps: 24, at: 7, wave: "fx.shot", speed: 11, life: 1.0, k: 1.15, trail: 0xffc080, twister: true,
                   pow: { c: 0xffa060, flash: 2.2, shake: 0.14, recoil: 2 } },
       airshot:  { body: "airshot", fps: 22, at: 2, fly: "fx.airshot", speed: 14, down: 0.5, life: 0.75, k: 1.2, trail: 0xff8040,
                   pow: { c: 0xffa060, flash: 2.2, shake: 0.14, recoil: 2 } },
@@ -463,7 +463,7 @@
     cream:  { from: 2, loop: [5, 6], boom: "fx.trapboom", bmid: true, bk: 1.6 },     // an Omochao flies off; the Cream Cracker
     chaos:  { loop: [0, 3], boom: "fx.trap", bfrom: 4, bk: 1.7 },                    // a puddle, that throws up tentacles
     eggman: { from: 2, loop: [4, 10] },                                              // his bomb, the fuse burning down
-    mighty: { k: 2 },                                                                  // Peacemaker's bomb, spinning
+    mighty: { k: 2, rest: 0 },                                                         // Peacemaker's bomb: spinning as it flies, still once it lands
     silver: { loop: [5, 11] },                                                       // the orb gathers, then hangs there
   };
 
@@ -574,9 +574,10 @@
     for (const [slot] of EM_SLOTS) if (e.loadout[slot] && !e.learned.includes(e.loadout[slot] + "." + slot)) delete e.loadout[slot];
     return e;
   }
-  /** One move learned, after a win: at random, of those he does not know yet. Null when he knows them all. */
-  function emerlLearn() {
-    const e = emerlSave(), left = emerlAll().filter(k => !e.learned.includes(k));
+  /** One move learned, after a win in his episode: at random, of those he does not know yet (of
+      `from`'s, with one given). Null when he knows them all. */
+  function emerlLearn(from) {
+    const e = emerlSave(), left = emerlAll().filter(k => !e.learned.includes(k) && (!from || k.split(".")[0] === from));
     if (!left.length) return null;
     const k = left[Math.floor(Math.random() * left.length)];
     e.learned.push(k); save(saveData);
@@ -3159,7 +3160,7 @@
   function strike(x0, x1, y0, y1, kick) {
     let n = 0;
     const at = (a0, a1, b0, b1) => { if (!n) world.hitAt = { x: (Math.max(x0, a0) + Math.min(x1, a1)) / 2, y: (Math.max(y0, b0) + Math.min(y1, b1)) / 2 }; };
-    world.hitAt = null;
+    world.hitAt = null; world.hitBig = false; world.guarded = false;
     for (const e of world.enemies) if (e.alive && !e.hidden && e.x + e.w / 2 > x0 && e.x - e.w / 2 < x1 && e.y + e.h > y0 && e.y < y1) {
       at(e.x - e.w / 2, e.x + e.w / 2, e.y, e.y + e.h);
       /* a blow (not a blast) glances off spikes, a spin, Pierrot's ball and Gao-gao's face */
@@ -3172,13 +3173,13 @@
       if ((t === "X" || t === "B") && breakTile(i, j)) { at(i, i + 1, j, j + 1); n++; }
     }
     for (const b of world.solids) if (b.alive && b.x1 > x0 && b.x0 < x1 && b.y1 > y0 && b.y0 < y1) { at(b.x0, b.x1, b.y0, b.y1); smashHurdle(b); n++; }
-    if (world.boss && !battle) n += bossStrike(x0, x1, y0, y1);
+    if (world.boss && !battle) { const nb = bossStrike(x0, x1, y0, y1); if (nb) world.hitBig = true; n += nb; }
     /* in a battle, the other side's fighters (not one's own team) */
     if (battle && actor) for (const q of battle.fs) {
       if (!rivals(actor, q) || q.ko || q.out) continue;
       const qx0 = q.x - q.c.w / 2, qx1 = q.x + q.c.w / 2;
       if (qx1 <= x0 || qx0 >= x1 || q.y + q.hh <= y0 || q.y >= y1) continue;
-      if (hitFighter(q, kick, (x0 + x1) / 2)) { at(qx0, qx1, q.y, q.y + q.hh); n++; }
+      if (hitFighter(q, kick, (x0 + x1) / 2)) { at(qx0, qx1, q.y, q.y + q.hh); n++; world.hitBig = true; }
     }
     return n;
   }
@@ -3826,6 +3827,7 @@
     const h = world.hitAt || { x: p.x + p.face * (p.c.w / 2 + m.reach * 0.6), y: p.y + p.hh * 0.55 };
     hitSpark(h.x, h.y, H.spark * k, col);
     flash(h.x, h.y, H.spark * 1.5 * k, col);
+    if (fin && m.name === "heavy" && framesOf(srcOf(p, "heavy"), "fx.punch")) effect(srcOf(p, "heavy"), "fx.punch", h.x + p.face * 0.2, h.y, p.face, 20, true, "fx", 1.4);   // Mighty's Explosive Punch
     hitStop(H.stop * k * (battle ? 1 : 0.6)); shakeCam(H.shake * k);
     SFX.hit(); if (H.heavy && fin) SFX.impact();
     if (!battle) return;
@@ -4102,13 +4104,13 @@
     }
     const k = s.k || s.ghost || 1;
     if (s.wave) shoot(who, { fx: s.wave, x: p.x + f * 0.7, y: p.y, vx: f * s.speed, vy: 0, life: s.life, ground: true,
-                             w: 1.0 * k, h: 1.3 * k, k, face: f, ghost: s.ghost, trail: s.trail });
+                             w: 1.0 * k, h: 1.3 * k, k, face: f, ghost: s.ghost, trail: s.trail, twister: s.twister });
     else if (s.fly) {
       const held = s.hold && input.C ? s.hold : 0;
       shoot(who, { fx: s.fly, x: mz ? p.x + f * (mz[0] + 0.3 * k) : p.x + f * (0.6 + (s.ahead || 0)), y: mz ? p.y + mz[1] : p.y + p.hh * 0.55,
                    vx: f * s.speed, vy: -(s.down || 0) * s.speed,
                    life: s.life + held, loop: s.loop, mid: true, w: 0.8 * k, h: 0.8 * k, k, face: f, ghost: s.ghost, trail: s.trail,
-                   range: s.range, bursts: s.bursts, boom: s.boom, land: s.land });
+                   range: s.range, bursts: s.bursts, boom: s.boom, land: s.land, twister: s.twister });
       if (!s.ghost) SFX.shot();
     } else if (s.lob) {
       shoot(who, { fx: s.lob, x: p.x + f * 0.5, y: p.y + p.hh + 0.5, vx: f * s.speed, vy: s.rise, g: 26, life: 3, loop: true, mid: true,
@@ -4275,9 +4277,23 @@
       if (t === "X" || t === "B") breakTile(Math.floor(s.x), Math.floor(ty));
       else if (solid(t) || (s.mid && (t === "/" || t === "\\"))) { if (s.bursts) boomAt(s.x, s.y, s.bursts, s); s.life = 0; }
       if (s.life > 0) {
-        const n = strike(s.x - s.w / 2, s.x + s.w / 2, s.mid ? s.y - s.h / 2 : s.y, s.mid ? s.y + s.h / 2 : s.y + s.h, s.bursts ? null : { vx: sgn(s.vx) * 11, vy: 5 });
-        if (n) { SFX.hit(); if (!s.bursts) { impact(s.x, s.mid ? s.y : s.y + 0.5, { c: s.trail || 0xffffff, flash: 1.3, shake: 0.06 }); hitStop(0.03); } }
-        if (n && s.bursts) { boomAt(s.x, s.y, s.bursts, s); s.life = 0; }
+        /* a tornado (Pink Typhoon, Mighty Cyclone) throws them straight up, as the launcher does */
+        const n = strike(s.x - s.w / 2, s.x + s.w / 2, s.mid ? s.y - s.h / 2 : s.y, s.mid ? s.y + s.h / 2 : s.y + s.h,
+                         s.bursts ? null : s.twister ? { vx: sgn(s.vx) * 1.5, vy: LAUNCH.vy, launch: true } : { vx: sgn(s.vx) * 11, vy: 5 });
+        /* a shot lands with weight: it stops in whoever it hits (a fighter, a boss) with a freeze,
+           a jolt, a flash ring and sparks blown on the way it was going; a guard catches it.
+           (Badniks and blocks it breaks, it goes on through.) */
+        const big = world.hitBig, hx = world.hitAt ? world.hitAt.x : s.x, hy = world.hitAt ? world.hitAt.y : s.mid ? s.y : s.y + 0.5;
+        if (n && s.bursts) { SFX.hit(); boomAt(s.x, s.y, s.bursts, s); s.life = 0; }
+        else if (n && big) {
+          const col = s.trail || HIT_C[s.who] || 0xffffff;
+          impact(hx, hy, { c: col, flash: 2.4, shake: 0.16, stop: s.twister ? 0.09 : 0.07 });
+          impact(hx, hy, { c: col, flash: 1.6, cone: sgn(s.vx) || 1 });
+          ring(hx, hy, col, s.twister ? 2.2 : 1.6); hitSpark(hx, hy, 1.3, col);
+          if (battle && battle.fs.length === 2) camPunch(hx, hy, 0.22, 0.3);
+          SFX.hit(); SFX.impact(); s.life = 0;
+        } else if (n) { SFX.hit(); impact(s.x, s.mid ? s.y : s.y + 0.5, { c: s.trail || 0xffffff, flash: 1.3, shake: 0.06 }); hitStop(0.03); }
+        else if (world.guarded) { burst(s.x, s.mid ? s.y : s.y + 0.5, [s.trail || 0xffffff, 0xbfe8ff, 0xffffff], 10, 4); s.life = 0; }
       }
       if (s.ring) { const o = s.owner || player; if (Math.abs(o.x - s.x) < 0.7 && o.state === "roll") s.life = 0; }
       if (s.trail && s.bits !== 0 && Math.random() < 0.7) world.parts.list.push({ x: s.x - sgn(s.vx) * 0.35 * (s.k || 1), y: (s.mid ? s.y : s.y + 0.3 + Math.random() * 0.8) + (Math.random() - 0.5) * 0.3,
@@ -4847,6 +4863,7 @@
       }
       const L = TRAP_LOOK[t.who];
       if (L && !set) { const a = L.from || 0, lp = L.loop || [a, n - 1], j = a + k; i = j < lp[0] ? j : lp[0] + (j - lp[0]) % (lp[1] - lp[0] + 1); }
+      if (L && L.rest != null && t.grounded) i = L.rest;
       setFrame(t.card, name, i, t.face, t.x, t.y, t.flies || t.kind === "orbit", 0.15, L && L.k);
       t.card.visible = !(t.life < 1.6 && Math.sin(t.t * 30) > 0.3);
     }
@@ -4999,6 +5016,9 @@
   const fr = name => (BSH && BSH.f[name]) || [[0, 0, 1, 1, 0, 0]];
   /* a sprite's size in metres, at the boss's scale */
   const bw = (b, name, i) => fr(name)[i || 0][2] * PX * b.C.k, bh = (b, name, i) => fr(name)[i || 0][3] * PX * b.C.k;
+  /* the animal capsule stands the same height after every boss, low enough for anyone's plain
+     jump to land on its top (the lowest, Knuckles' and Chaos', peaks about 2.1 m up) */
+  const CAP_H = 1.75, capK = b => CAP_H / bh(b, "flee.capsule");
 
   function newBoss(key, w) {
     const C = BOSS[key], x0 = w.arena.x0, chase = !!C.chase;
@@ -5397,7 +5417,7 @@
       b.mx += 7 * dt; b.my += 3.2 * dt;
       const c = b.cap;
       if (!c.landed) { c.vy -= GRAV * 0.6 * dt; c.y = Math.max(b.gy, c.y + c.vy * dt); if (c.y <= b.gy) { c.landed = true; shakeCam(0.12); SFX.impact(); b.state = "capsule"; } }
-      const cw = bw(b, "flee.capsule") * 0.42, ch = bh(b, "flee.capsule");
+      const cw = bw(b, "flee.capsule") * capK(b) * 0.42, ch = CAP_H;
       if (!c.open) {
         /* its walls: a runner stands on it, or is stopped by its sides */
         if (p.x + p.c.w / 2 > c.x - cw && p.x - p.c.w / 2 < c.x + cw && p.y < c.y + ch - 0.3 && p.y + p.hh > c.y) { p.x = p.x < c.x ? c.x - cw - p.c.w / 2 : c.x + cw + p.c.w / 2; p.vx = 0; }
@@ -5469,7 +5489,7 @@
     if (b.state === "boom" && !flick) BRAIN[b.key].draw(b, (id, name, i, face, x, y, mid, body, k, z) => show(id, name, i, face, x, y, mid, false, k, z));
     if (b.cap) {
       show("mobile", "flee.mobile", Math.floor(world.t * 8) % 4, 1, b.mx, b.my, true, false);
-      show("cap", b.cap.open ? "flee.open" : "flee.capsule", 0, 1, b.cap.x, b.cap.y, false, false);
+      show("cap", b.cap.open ? "flee.open" : "flee.capsule", 0, 1, b.cap.x, b.cap.y, false, false, capK(b));
     }
   }
 
@@ -5721,6 +5741,12 @@
      theirs is (Rouge's quick, Gamma's Guard Mode long, the Chaos Guard strong). A blow that meets
      it in its first eighth of a second is parried: it does nothing, the one who threw it reels
      (Attack blocked) open to anything, and the parrier's burst gauge fills; later in it, a block. */
+  /* Health, by the fighter: the match's figure (Battle's setup: 200, 300 or 400) times their own,
+     the heavy and sturdy more (Gamma, Eggman, Knuckles, Mighty), the light and quick less (Cream,
+     Tails); whatever it is, healing and Training's refill come back at the same share of it. */
+  const HP_K = { sonic: 1, shadow: 1, emerl: 1, metal: 1.05, chaos: 1.1, knuckles: 1.15, mighty: 1.15, eggman: 1.2, gamma: 1.25,
+                 amy: 0.95, rouge: 0.95, silver: 0.95, tails: 0.9, cream: 0.85 };
+  const hpOf = (c, base) => Math.round(base * (HP_K[c.id] || 1) / 10) * 10;
   const GUARD = { rouge: 0.22, shadow: 0.28, sonic: 0.3, emerl: 0.3, cream: 0.32, silver: 0.32, tails: 0.34, amy: 0.34,
                   knuckles: 0.36, metal: 0.36, mighty: 0.36, eggman: 0.4, chaos: 0.42, gamma: 0.45 };
   const guardOf = c => GUARD[c.id] || 0.32, PARRY_T = 0.12, GETUP_T = 0.32;
@@ -5751,6 +5777,7 @@
     if (hitTok) { if (q.hits.has(hitTok)) return false; q.hits.add(hitTok); }
     const by = actor, from = by ? by.x : cx, away = sgn(q.x - from) || -q.face;
     if (q.guardT > 0) {
+      world.guarded = true;
       const parry = (q.guard0 || 0) - q.guardT <= PARRY_T && !(q.ai && q.ai.dummy === "guard"), big = hitDmg >= 10;
       q.burst = Math.min(BURST_MAX, (q.burst || 0) + (parry ? 1 : 0.4) * (big ? 30 : 12));
       q.blocked++;
@@ -5880,7 +5907,7 @@
     if (!p.crouchT && !(p.guardCd > 0)) { p.guardT = p.guard0 = guardOf(p.c); SFX.set(); }
     p.crouchT = (p.crouchT || 0) + dt;
     p.healing = p.crouchT > 0.8 && p.hp < p.hpMax;
-    if (p.healing) p.hp = Math.min(p.hpMax, p.hp + (HEAL[p.c.id] || 6) * dt);
+    if (p.healing) p.hp = Math.min(p.hpMax, p.hp + (HEAL[p.c.id] || 6) * p.hpMax / 100 * dt);
   }
   /* the shield, a bubble of light round them; healing, green sparks rising */
   function drawAura(f, dt) {
@@ -5954,7 +5981,7 @@
     burst(p.x, p.y + 0.5, [0xffffff, 0xfff3a0], 10, 3);
   }
   /* Bodies: a fighter curled, rolling, homing, gliding or diving hurts the other side's when they
-     meet, as a badnik is beaten; one dropping on a head bounces off it, and hurts a little.
+     meet, as a badnik is beaten (dropping on a head does nothing here: stomping is the stages').
      Fighters standing in each other are eased apart. */
   function contacts(dt) {
     const fs = battle.fs.filter(f => !f.ko && !f.out);
@@ -5976,10 +6003,7 @@
             else if (p.curl && !p.ground && p.vy < 0) p.vy = 9;
             else if (p.state === "roll" || p.state === "dash") p.vx *= 0.4;
           }
-        } else if (p.vy < -2 && !p.ground && p.y > q.y + q.hh * 0.55 && p.state !== "hurt") {
-          tok(p.bodyTok, 4, 0.3);
-          if (hitFighter(q, { vx: 0, vy: 0 }, p.x)) { p.vy = p.inp.J ? 12 : 9.5; p.airMove = false; p.airUses = 0; hitSpark(p.x, q.y + q.hh, 0.8, 0xffffff); SFX.stomp(); }
-        }
+        }   // (dropping on a head does nothing in a battle: stomping is for the stages)
         actor = null;
       }
     }
@@ -6072,7 +6096,7 @@
       const who = s.who === "random" ? CAST[Math.floor(Math.random() * CAST.length)].id : s.who;   // Random: anyone, new each fight
       const f = makePlayer(castOf(who)), x = xs[i];
       return Object.assign(f, { x, y: floorAt(x), face: x < W / 2 ? 1 : -1, slot: i, ctl: s.ctl, lvl: s.lvl == null ? 1 : s.lvl, team: cfg.teams ? s.team : i,
-        inp: newInput(), hits: new WeakSet(), hpMax: cfg.hp, hp: cfg.hp, score: 0, lives: cfg.rule === "stock" ? cfg.goal : 0, kos: 0, downs: 0, dealt: 0,
+        inp: newInput(), hits: new WeakSet(), hpMax: hpOf(f.c, cfg.hp), hp: hpOf(f.c, cfg.hp), score: 0, lives: cfg.rule === "stock" ? cfg.goal : 0, kos: 0, downs: 0, dealt: 0,
         landed: 0, blocked: 0, cmb: { n: 0, dmg: 0 }, sinceHit: 9, burst: BURST_MAX, callT: 0, ai: aiNew(s), alive: true, h: f.hh, guardT: 0, guardCd: 0, check: { x, y: 6 } });
     });
     const humans = fs.filter(f => f.ctl !== "cpu");
@@ -6120,7 +6144,7 @@
       if (f.ctl === "cpu") aiThink(f, h);
       else if (B.live && !B.over) readInput(f.inp, f.ctl === "p2" ? 1 : 0);
       else { const I = f.inp; I.L = I.R = I.U = I.D = I.J = I.Z = I.X = I.C = 0; }
-      if (B.cfg.kind === "training" && !TUT && f.sinceHit > 1.6 && f.hp < f.hpMax) f.hp = Math.min(f.hpMax, f.hp + 40 * h);   // health comes back, between strings (the tutorial keeps its own)
+      if (B.cfg.kind === "training" && !TUT && f.sinceHit > 1.6 && f.hp < f.hpMax) f.hp = Math.min(f.hpMax, f.hp + 0.4 * f.hpMax * h);   // health comes back, between strings (the tutorial keeps its own)
     }
     for (const f of B.fs) { if (f.out) continue; player = f; input = f.inp; actor = f; step(h); }
     actor = null; input = INPUT0; player = B.lead;
@@ -6178,11 +6202,11 @@
      Hard never. It guards (and so may parry) what it sees coming, bursts out of long combos,
      chases its own launches and picks up its own knockdowns (OTG), and heals when hurt and far. */
   const AI_LV = [
-    { think: 0.5, guard: 0.12, sp: 0.1, aim: 0.05, jumpIn: 0.15, air: 2, chase: 0.35, launch: 0.2, sj: 0, burstN: 9, burst: 0.3, drop: 0.14, punish: 0.4, aa: 0.25,
+    { think: 0.5, guard: 0.12, shotGuard: 0.4, lead: 0.22, sp: 0.1, aim: 0.05, jumpIn: 0.15, air: 2, chase: 0.35, launch: 0.2, sj: 0, burstN: 9, burst: 0.3, drop: 0.14, punish: 0.4, aa: 0.25,
       routes: [0.05, 0.25, 0.3, 0.2, 0.1, 0.1] },
-    { think: 0.28, guard: 0.38, sp: 0.18, aim: 0.1, jumpIn: 0.22, air: 5, chase: 0.7, launch: 0.4, sj: 0.25, burstN: 6, burst: 0.55, drop: 0.04, punish: 0.75, aa: 0.55,
+    { think: 0.28, guard: 0.38, shotGuard: 0.75, lead: 0.13, sp: 0.18, aim: 0.1, jumpIn: 0.22, air: 5, chase: 0.7, launch: 0.4, sj: 0.25, burstN: 6, burst: 0.55, drop: 0.04, punish: 0.75, aa: 0.55,
       routes: [0.3, 0.25, 0.2, 0.1, 0.1, 0.05] },
-    { think: 0.15, guard: 0.62, sp: 0.24, aim: 0.14, jumpIn: 0.26, air: 9, chase: 0.95, launch: 0.55, sj: 0.55, burstN: 4, burst: 0.8, drop: 0, punish: 0.95, aa: 0.85,
+    { think: 0.15, guard: 0.62, shotGuard: 0.92, lead: 0.07, sp: 0.24, aim: 0.14, jumpIn: 0.26, air: 9, chase: 0.95, launch: 0.55, sj: 0.55, burstN: 4, burst: 0.8, drop: 0, punish: 0.95, aa: 0.85,
       routes: [0.55, 0.15, 0.15, 0.05, 0.05, 0.05] },
   ];
   const AI_STYLE = { sonic: "rush", shadow: "rush", knuckles: "rush", amy: "rush", mighty: "rush", metal: "rush", emerl: "rush",
@@ -6203,15 +6227,29 @@
     for (const q of battle.fs) if (rivals(f, q) && !q.ko && !q.out) { const d = Math.abs(q.x - f.x) + Math.abs(q.y - f.y) * 1.5 - (q === f.ai.tgt ? 2 : 0); if (d < bd) { bd = d; best = q; } }
     return (f.ai.tgt = best);
   }
-  /* a blow or a shot on its way to f */
-  function danger(f) {
+  /* a shot on its way to f, and how soon it gets there (seconds; 9 for none) */
+  function shotComing(f) {
+    let tti = 9, wave = false;
+    for (const s of world.shots) {
+      if (s.gone || !s.owner || !rivals(s.owner, f) || Math.abs(s.vx) < 0.5) continue;
+      const y0 = s.mid ? s.y - s.h / 2 : s.y, y1 = s.mid ? s.y + s.h / 2 : s.y + s.h;
+      if (y1 < f.y + 0.05 || y0 > f.y + f.hh + 0.2) continue;                     // passing over or under
+      const gap = (f.x - s.x) * sgn(s.vx) - f.c.w / 2 - s.w / 2;                    // still to come
+      if (gap < -0.3) continue;
+      const t = Math.max(0, gap) / Math.abs(s.vx);
+      if (t < tti) { tti = t; wave = !!s.ground; }
+    }
+    return { tti, wave };
+  }
+  /* a blow (or, with `shots`, a shot) on its way to f */
+  function danger(f, shots) {
     for (const q of battle.fs) {
       if (!rivals(q, f) || q.ko || q.out) continue;
       const dx = f.x - q.x;
       if (Math.abs(dx) < 2.7 && Math.abs(f.y - q.y) < 1.6 && sgn(dx) === q.face &&
           (q.state === "atk" || q.state === "seek" || q.state === "special" || q.state === "tornado" || attacking(q))) return true;
     }
-    for (const s of world.shots) if (!s.gone && s.owner && rivals(s.owner, f) && Math.abs(s.x - f.x) < 4 && sgn(f.x - s.x) === sgn(s.vx) && Math.abs(s.y - (f.y + 0.6)) < 1.6) return true;
+    if (shots) for (const s of world.shots) if (!s.gone && s.owner && rivals(s.owner, f) && Math.abs(s.x - f.x) < 4 && sgn(f.x - s.x) === sgn(s.vx) && Math.abs(s.y - (f.y + 0.6)) < 1.6) return true;
     return false;
   }
   /** whether f's blows reach q from here (with `extra` metres more): close, and on its level */
@@ -6303,7 +6341,20 @@
     if (aiRunPlan(f, dt, tgt, L)) return;
     if (!A.style) A.style = Math.random() < 0.7 ? AI_STYLE[f.c.id] || "rush" : ["rush", "zone", "counter"][Math.floor(Math.random() * 3)];
     const dx = tgt.x - f.x, dy = tgt.y - f.y, adx = Math.abs(dx), toward = sgn(dx) || f.face, free = f.state === "run" || f.state === "crouch";
-    // a blow or a shot coming: it may see it in time and guard (a counter-fighter most of all)
+    /* a shot coming: it guards as it gets there -- Hard right as it touches (a parry), Normal a
+       little early (a block), Easy earlier and less often */
+    if (f.ground && free) {
+      const sc = shotComing(f);
+      if (sc.tti < L.lead + 0.03 && !A.shotSeen) {
+        A.shotSeen = true;
+        if (Math.random() < L.shotGuard) {
+          A.plan = null; A.q = []; A.dir = 0;
+          A.D = 1; A.hold = 0.35; A.t = 0.4;
+          return;
+        }
+      } else if (sc.tti > 0.6) A.shotSeen = false;
+    }
+    // a blow coming: it may see it in time and guard (a counter-fighter most of all)
     const threat = danger(f);
     if (threat && !A.seen) {
       A.seen = true;
@@ -6404,7 +6455,7 @@
   const DUMMY = [["stand", "Stand"], ["guard", "Guard"], ["walk", "Walk"], ["jump", "Jump"], ["fight", "Fight"]];
   function dummyThink(f, dt) {
     const A = f.ai;
-    if (A.dummy === "guard") { if (danger(f) && f.ground && !(f.guardCd > 0) && f.state !== "crouch" && f.state !== "hurt") { A.D = 1; A.hold = 0.42; } }
+    if (A.dummy === "guard") { if ((danger(f) || shotComing(f).tti < 0.2) && f.ground && !(f.guardCd > 0) && f.state !== "crouch" && f.state !== "hurt") { A.D = 1; A.hold = 0.42; } }
     else if (A.dummy === "walk") {
       A.wt += dt;
       if (A.wt > 2.4 || f.x < 5 || f.x > world.W - 5) { if (A.wt > 0.5) { A.wander = f.x < 5 ? 1 : f.x > world.W - 5 ? -1 : -A.wander; A.wt = 0; } }
@@ -6556,10 +6607,10 @@
     storyRun = null;
     const ov = screenOn("main");
     ensureStageWorld();
-    const list = STORY(), done = storyDone();
+    const eps = EPS(), epc = epsCleared();
     const items = [
-      ["story", "book", "Story", `The Red Star Rings: ${list.length} chapters, thirteen stages of its own, the whole cast`,
-        done >= list.length ? "Cleared" : done ? `Chapter ${done + 1}` : ""],
+      ["story", "book", "Story", `The Red Star Rings, from every side: an episode for each of the ${eps.length}`,
+        epc ? `${epc}/${eps.length}` : ""],
       ["exhibition", "flag", "Free Exhibition", "Any runner in any zone you've opened, Act 1 or Act 2 and its boss: for time, rings and Red Star Rings",
         `${stages().filter((st, i) => cleared(i)).length}/${stages().length}`],
       ["battle", "trophy", "Battle", "Up to four fighters with health, players or CPUs, in any runner's arena", ""],
@@ -6607,9 +6658,10 @@
   function bset() {
     const d = { slots: [{ who: castId, ctl: "p1", lvl: 1, team: 0 }, { who: "shadow", ctl: "cpu", lvl: 1, team: 1 },
                         { who: "knuckles", ctl: "off", lvl: 1, team: 0 }, { who: "amy", ctl: "off", lvl: 1, team: 1 }],
-                teams: false, arena: 0, rule: "stock", goal: 3, time: 180, hp: 100 };
+                teams: false, arena: 0, rule: "stock", goal: 3, time: 180, hp: 300 };
     const b = saveData.battle = Object.assign(d, saveData.battle || {});
-    if (!b.v2) { b.rule = "stock"; b.v2 = 1; }               // Survival is the default now (a setup kept from before was on KOs by default)
+    if (!b.v2) { b.rule = "stock"; b.v2 = 1; }
+    if (!b.v3) { b.hp = { 60: 200, 100: 300, 150: 400 }[b.hp] || 300; b.v3 = 1; }   // three times the health now (a setup kept from before)               // Survival is the default now (a setup kept from before was on KOs by default)
     b.slots = d.slots.map((s, i) => Object.assign({}, s, (b.slots || [])[i] || {}));
     return b;
   }
@@ -6651,7 +6703,7 @@
             ${row("Rule", b.rule === "stock" ? "Each fighter has lives; the last side standing wins." : "The first to so many KOs wins.", seg("rule", [["ko", "KO match"], ["stock", "Survival"]], b.rule))}
             ${row(b.rule === "stock" ? "Lives" : "KOs to win", "", seg("goal", [[1, "1"], [3, "3"], [5, "5"]], b.goal))}
             ${row("Time", "", seg("time", [[120, "2:00"], [180, "3:00"], [300, "5:00"], [0, "None"]], b.time))}
-            ${row("Health", "", seg("hp", [[60, "60"], [100, "100"], [150, "150"]], b.hp))}
+            ${row("Health", "Each fighter's own share of it: the heavy have more, the light less.", seg("hp", [[200, "200"], [300, "300"], [400, "400"]], b.hp))}
           </div>
           <div class="adv-go">
             <button class="btn lg" id="advFight" data-enter data-focus data-k="fight" ${n < 2 ? "disabled" : ""}>${ico("flag")}Fight</button>
@@ -6749,7 +6801,7 @@
   function startTraining() {
     const t = tset();
     startBattle({ kind: "training", slots: [{ who: t.you, ctl: "p1", team: 0 }, { who: t.dummy, ctl: "cpu", lvl: 1, team: 1, dummy: t.act }],
-                  teams: true, arena: t.arena, rule: "ko", goal: 99, time: 0, hp: 100 });
+                  teams: true, arena: t.arena, rule: "ko", goal: 99, time: 0, hp: 300 });
   }
   // ---------------------------------------------------------------- the tutorial
   /* The TUTORIAL, Training's first choice: an in-game one, played for real, the way KNOCK//BACK's
@@ -6898,7 +6950,7 @@
       on(k, d) { if (k === "burst" && byMe(d) && !d.blue) { if (d.hit) return true; TUT.note = "It missed: burst right next to the dummy."; tMe().burst = BURST_MAX; } } },
     { id: "finish", title: "Now For Real", need: 1, final: true,
       text: () => `The dummy fights back now, and its health is low. Everything you've learned: KO it. (Long combos run down: each hit after the third does less, and at eighteen they break out.)`,
-      setup() { tutPlace(10, 17); const d = tDum(); d.ai.dummy = "fight"; d.lvl = 0; d.hp = d.hpMax * 0.45; tMe().burst = BURST_MAX; },   // (an Easy CPU)
+      setup() { tutPlace(10, 17); const d = tDum(); d.ai.dummy = "fight"; d.lvl = 0; d.hp = d.hpMax * 0.22; tMe().burst = BURST_MAX; },   // (an Easy CPU)
       on(k, d) { if (k === "ko" && d.q === tDum()) return true; } },
   ];
   const tutLessons = () => LESSONS.filter(l => !l.skip || !l.skip());     // (the lessons this fighter gets)
@@ -6907,7 +6959,7 @@
   function tutorialStart() {
     const t = tset(), you = t.you, dum = you === "knuckles" ? "sonic" : "knuckles";
     startBattle({ kind: "training", tutorial: true, slots: [{ who: you, ctl: "p1", team: 0 }, { who: dum, ctl: "cpu", lvl: 1, team: 1, dummy: "stand" }],
-                  teams: true, arena: 0, rule: "ko", goal: 99, time: 0, hp: 100 });
+                  teams: true, arena: 0, rule: "ko", goal: 99, time: 0, hp: 300 });
     TUT = { i: -1, got: 0, note: "", ok: null, okT: 0, cueT: 0, stats: { combo: 0, bounces: 0, parries: 0, bursts: 0, done: 0 } };
     tutNext();
   }
@@ -7071,6 +7123,7 @@
       ${R("Twice left or right", "Dash")}
       ${R("Down", "Guard (a tap); just as a blow lands, a parry: it reels, open. Held still, heal")}
       ${R("Z + X", "Burst, with the gauge full: out of a combo it throws everyone off; otherwise it hits")}
+      ${R("Health", (HP_K[c.id] || 1) === 1 ? "As much as the match gives" : `${Math.round((HP_K[c.id] || 1) * 100)}% of what the match gives (${(HP_K[c.id] || 1) > 1 ? "sturdier" : "lighter"} than most)`)}
       ${c.spinDash ? R("Down + Space", "Spin Dash: tap Space to rev, let go of Down") : ""}
       <p>${esc(c.text)}</p>
     </div>`;
@@ -7133,19 +7186,12 @@
     if (B.cfg.kind === "story") return storyBattleOver(B);
     mode = "results"; bgm("competition-results");
     host.querySelector(".adv-hud").classList.remove("on");
-    /* a player's Emerl on the winning side learns one move of someone else's (Sonic Battle's skill card) */
-    const won = B.winner != null && B.fs.some(f => f.team === B.winner && f.c.id === "emerl" && f.ctl !== "cpu");
-    const got = won && !B.taught ? (B.taught = emerlLearn() || "all") : null;
+    /* (Emerl learns in his own story episode, not here) */
     const order = B.fs.slice().sort((a, b) => (b.team === B.winner) - (a.team === B.winner) || b.score - a.score || b.lives - a.lives || b.dealt - a.dealt);
     const ov = host.querySelector(".adv-ov");
     ov.innerHTML = `
       <div class="panel adv-small adv-bres pop">
         <div class="panel-hd gold">${ico("trophy")}${B.winner == null ? "A draw" : esc(winnerLine(B.winner).replace(/!$/, ""))}</div>
-        ${got && got !== "all" ? `
-        <div class="adv-skill">
-          <canvas width="88" height="72" data-face="${got.src}"></canvas>
-          <div><em>New skill</em><b>${esc(got.name)}</b><i>${esc(castOf(got.src).name)}'s ${esc(got.slotName.toLowerCase())}: Emerl copied it. Set it in Emerl's Skills.</i></div>
-        </div>` : got === "all" ? `<p class="adv-note">Emerl knows every move there is to learn.</p>` : ""}
         <div class="adv-board">
           <div class="adv-row adv-bhd"><span></span><em>KOs</em><em>Down</em><em>Damage</em></div>
           ${order.map(f => `
@@ -7156,7 +7202,6 @@
         </div>
         <div class="adv-btns">
           <button class="btn" id="advAgainB" data-focus data-k="again">${ico("flag")}Rematch</button>
-          ${got && got !== "all" ? `<button class="btn ghost" id="advBSkill" data-k="skill">Emerl's Skills</button>` : ""}
           <button class="btn ghost" id="advBSet" data-k="set">Battle setup</button>
           <button class="btn ghost" id="advBMain" data-back data-k="main">${ico("back")}Main menu</button>
         </div>
@@ -7165,7 +7210,6 @@
     ov.querySelector("#advAgainB").onclick = () => startBattle(B.cfg);
     ov.querySelector("#advBSet").onclick = () => battleSetup(true);
     ov.querySelector("#advBMain").onclick = () => mainMenu();
-    if (ov.querySelector("#advBSkill")) ov.querySelector("#advBSkill").onclick = () => emerlSkills(() => battleSetup(true));
     setTimeout(autoFocus, 0);
   }
 
@@ -7294,66 +7338,112 @@
   }
 
   // ---------------------------------------------------------------- story
-  /* The story: chapters in adventure-story.js, each a scene of talk, then a stage to run (the
-     story's own) or a battle to win as one of the cast, then the talk after. Clearing one opens
-     the next; a cleared one can be played again. */
-  const STORY = () => (root.AdventureStory && AdventureStory.CHAPTERS) || [];
+  /* The story: The Red Star Rings, told as an episode for each of the cast, the way Sonic
+     Battle tells its story (adventure-story.js and its two parts). An episode is chapters, each a
+     scene of talk, then a stage to run (the story's own, or a zone's Act 1) or a battle to win as
+     the episode's own runner, then the talk after. Every episode is open from the start; in one,
+     clearing a chapter opens the next, and a cleared one can be played again. In Emerl's, a
+     battle won teaches him moves of the one he beat (a chapter's `teach`), and nowhere else. */
+  const EPS = () => (root.AdventureStory && AdventureStory.EPISODES) || [];
+  const epOf = who => EPS().find(e => e.who === who);
+  const chOf = (ep, i) => ep && ep.chapters[i] ? Object.assign({ who: ep.who }, ep.chapters[i]) : null;
   let storyRun = null, talk = null;
-  const storyDone = () => (saveData.story && saveData.story.done) || 0;
+  const epDone = who => (saveData.story && saveData.story.eps && saveData.story.eps[who]) || 0;
+  const poss = name => name + (/s$/.test(name) ? "'" : "'s");   // Tails', Knuckles'; Sonic's
+  const epsCleared = () => EPS().filter(e => epDone(e.who) >= e.chapters.length).length;
   function chapterLine(ch) {
     const who = castOf(ch.who).name;
-    if (ch.kind === "run") return `${who}: ${storyDef(ch).name}`;
+    if (ch.kind === "run") { const d = storyDef(ch); return `${who}: ${d.name}${d.actN ? " Act " + d.actN : ""}`; }
     const foes = ch.foes.map(f => castOf(f.who).name).join(" & "), with_ = (ch.allies || []).map(a => castOf(a).name);
     return `${[who].concat(with_).join(" & ")} against ${foes}, at ${stages()[stageAt(ch.arena)].name}`;
   }
-  function storyMenu() {
+  /** The story's first screen: whose episode. (With `who`, or from a chapter, that episode's chapters.) */
+  function storyMenu(who) {
+    if (who === undefined && storyRun) who = storyRun.who;
     storyRun = null;
+    if (who && epOf(who)) return storyEpisode(who);
     const ov = screenOn("story");
     ensureStageWorld();
-    const list = STORY(), done = storyDone(), next = Math.min(done, list.length - 1);
+    const list = EPS(), last = (saveData.story && saveData.story.last) || (list[0] && list[0].who);
     ov.innerHTML = `
       <div class="adv-menu pop">
         <div class="panel adv-panel">
           <div class="panel-hd">${ico("book")}Story: ${esc((root.AdventureStory && AdventureStory.TITLE) || "")}</div>
+          <p class="adv-note">One story, told from every side. Whose episode?</p>
           <div class="adv-stages adv-chs">
-            ${list.map((ch, i) => { const open = i <= done; return `
-              <button class="adv-st ${i === next ? "on" : ""} ${open ? "" : "locked"}" data-ch="${i}" data-k="ch-${i}" ${open ? "" : "disabled"}>
-                <span class="adv-n">${i + 1}</span>
-                <canvas class="adv-st-who" width="36" height="38" data-face="${ch.who}"></canvas>
-                <span class="adv-st-tx"><b>${esc(ch.title)}</b><i>${esc(chapterLine(ch))}</i></span>
-                <span class="adv-chk">${!open ? `${ico("lock")}Locked` : i < done ? `${ico("check")}Cleared` : ch.kind === "battle" ? "Battle" : "Stage"}</span>
+            ${list.map(ep => { const n = ep.chapters.length, d = Math.min(epDone(ep.who), n); return `
+              <button class="adv-st ${ep.who === last ? "on" : ""}" data-ep="${ep.who}" data-k="ep-${ep.who}" ${ep.who === last ? "data-focus" : ""}>
+                <canvas class="adv-st-who" width="36" height="38" data-face="${ep.who}"></canvas>
+                <span class="adv-st-tx"><b>${esc(castOf(ep.who).name)}: ${esc(ep.title)}</b><i>${esc(ep.blurb)}</i></span>
+                <span class="adv-chk">${d >= n ? `${ico("check")}Cleared` : d ? `${d}/${n}` : `${n} chapters`}</span>
               </button>`; }).join("")}
           </div>
           <div class="adv-go">
-            <button class="btn lg" id="advCont" data-enter data-focus data-k="cont">${ico("book")}${done >= list.length ? `Play chapter ${list.length} again` : done ? `Go on: chapter ${next + 1}` : "Begin the story"}</button>
             <button class="btn ghost" id="advSBack" data-back data-k="back">${ico("back")}Main menu</button>
           </div>
         </div>
       </div>`;
     ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "idle", 1));
-    ov.querySelectorAll("[data-ch]").forEach(b => b.onclick = () => { if (+b.dataset.ch <= done) playChapter(+b.dataset.ch); });
-    ov.querySelector("#advCont").onclick = () => playChapter(next);
+    ov.querySelectorAll("[data-ep]").forEach(b => b.onclick = () => storyEpisode(b.dataset.ep));
     ov.querySelector("#advSBack").onclick = () => mainMenu();
     autoFocus();
     const on = ov.querySelector(".adv-st.on"); if (on) on.scrollIntoView({ block: "nearest" });
   }
-  function playChapter(i) {
-    const ch = STORY()[i]; if (!ch) return;
+  /** One runner's episode: its chapters. */
+  function storyEpisode(who) {
+    storyRun = null;
+    const ep = epOf(who); if (!ep) return storyMenu(null);
+    saveData.story = saveData.story || {}; saveData.story.last = who; save(saveData);
+    const ov = screenOn("story");
+    ensureStageWorld();
+    const list = ep.chapters.map((c, i) => chOf(ep, i)), done = epDone(who), next = Math.min(done, list.length - 1);
+    ov.innerHTML = `
+      <div class="adv-menu pop">
+        <div class="panel adv-panel">
+          <div class="panel-hd">${ico("book")}${esc(castOf(who).name)}: ${esc(ep.title)}</div>
+          <p class="adv-note">${esc(ep.blurb)}${who === "emerl" ? " Each battle he wins here teaches him one or two moves of the one he beat; set them in Emerl's Skills." : ""}</p>
+          <div class="adv-stages adv-chs">
+            ${list.map((ch, i) => { const open = i <= done; return `
+              <button class="adv-st ${i === next ? "on" : ""} ${open ? "" : "locked"}" data-ch="${i}" data-k="ch-${i}" ${open ? "" : "disabled"}>
+                <span class="adv-n">${i + 1}</span>
+                <canvas class="adv-st-who" width="36" height="38" data-face="${ch.kind === "battle" ? ch.foes[0].who : ch.who}"></canvas>
+                <span class="adv-st-tx"><b>${esc(ch.title)}</b><i>${esc(chapterLine(ch))}</i></span>
+                <span class="adv-chk">${!open ? `${ico("lock")}Locked` : i < done ? `${ico("check")}Cleared` : ch.kind === "battle" ? "Battle" : "Stage"}</span>
+              </button>`; }).join("")}
+          </div>
+          <div class="adv-go">
+            <button class="btn lg" id="advCont" data-enter data-focus data-k="cont">${ico("book")}${done >= list.length ? `Play chapter ${list.length} again` : done ? `Go on: chapter ${next + 1}` : "Begin the episode"}</button>
+            ${who === "emerl" ? `<button class="btn ghost" id="advEpSkill" data-k="skill">Emerl's Skills</button>` : ""}
+            <button class="btn ghost" id="advSBack" data-back data-k="back">${ico("back")}Episodes</button>
+          </div>
+        </div>
+      </div>`;
+    ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "idle", 1));
+    ov.querySelectorAll("[data-ch]").forEach(b => b.onclick = () => { if (+b.dataset.ch <= done) playChapter(who, +b.dataset.ch); });
+    ov.querySelector("#advCont").onclick = () => playChapter(who, next);
+    if (ov.querySelector("#advEpSkill")) ov.querySelector("#advEpSkill").onclick = () => emerlSkills(() => storyEpisode(who));
+    ov.querySelector("#advSBack").onclick = () => storyMenu(null);
+    autoFocus();
+    const on = ov.querySelector(".adv-st.on"); if (on) on.scrollIntoView({ block: "nearest" });
+  }
+  function playChapter(who, i) {
+    const ep = epOf(who), ch = chOf(ep, i); if (!ch) return;
     endBattle();
-    storyRun = { i, ch };
+    storyRun = { who, ep, i, ch };
     if (ch.kind === "run") { storyRun.def = storyDef(ch); loadDef(storyRun.def); glideX = 12; camX = 15; }
     else { disposeWorld(); world = buildWorld(arenaDef(stageAt(ch.arena))); player = makePlayer(castOf(ch.who)); glideX = world.W / 2; snapCamera(); }
     music();
-    playScene(ch.before, () => storyAction(i));
+    playScene(ch.before, () => storyAction());
   }
-  function storyAction(i) {
-    const ch = STORY()[i];
+  function storyAction() {
+    const ch = storyRun.ch;
     if (ch.kind === "run") { play(); return; }
     const slots = [{ who: ch.who, ctl: "p1", team: 0 }].concat((ch.allies || []).map(a => ({ who: a, ctl: "cpu", lvl: 1, team: 0 })),
                   ch.foes.map(f => ({ who: f.who, ctl: "cpu", lvl: f.lvl == null ? 1 : f.lvl, team: 1 })));
-    startBattle({ kind: "story", slots, teams: true, arena: stageAt(ch.arena), rule: "stock", goal: 1, time: 0, hp: 100 });
+    startBattle({ kind: "story", slots, teams: true, arena: stageAt(ch.arena), rule: "stock", goal: 1, time: 0, hp: 300 });
   }
-  const storyDef = ch => storyStages().find(s => s.id === ch.stage) || stages()[stageAt(ch.stage)];
+  /* a run's stage: one of the story's own, or a zone's first Act (no boss) */
+  const storyDef = ch => storyStages().find(s => s.id === ch.stage) || actDef(stageAt(ch.stage), 0);
   /* A word from someone mid-run: a chapter's `beats` are [how far along (0 to 1), who, words];
      each comes once a run, in a speech box up top, while the running goes on. */
   function storyBeats(dt) {
@@ -7374,18 +7464,26 @@
     el.classList.add("on"); R.commT = 2.4 + text.length * 0.05;
   }
   function storyBattleOver(B) {
-    const won = B.winner === B.fs[0].team;
-    if (won) { storyAfter(storyRun.i); return; }
+    const R = storyRun, won = B.winner === B.fs[0].team;
+    if (won) {
+      /* Emerl's episode: he copies one or two moves of the one he beat (Sonic Battle's skill cards) */
+      R.got = null;
+      if (R.ch.teach && R.ch.who === "emerl") {
+        R.got = [];
+        for (let k = 0, n = Math.random() < 0.5 ? 2 : 1; k < n; k++) { const g = emerlLearn(R.ch.teach); if (g) R.got.push(g); }
+      }
+      storyAfter(); return;
+    }
     mode = "results";
     host.querySelector(".adv-hud").classList.remove("on");
     const ov = host.querySelector(".adv-ov");
     ov.innerHTML = `
       <div class="panel adv-small pop">
         <div class="panel-hd">${ico("info")}Beaten</div>
-        <p class="adv-note">${esc(castOf(storyRun.ch.who).name)} is down. Down guards, and held still heals; the move list is in Training.</p>
+        <p class="adv-note">${esc(castOf(R.ch.who).name)} is down. Down guards, and held still heals; the move list is in Training.</p>
         <div class="adv-btns">
           <button class="btn" id="advTry" data-focus data-k="try">${ico("flag")}Try again</button>
-          <button class="btn ghost" id="advSt" data-back data-k="st">${ico("book")}Story</button>
+          <button class="btn ghost" id="advSt" data-back data-k="st">${ico("book")}Episode</button>
         </div>
       </div>`;
     ov.querySelector("#advTry").onclick = () => startBattle(B.cfg);
@@ -7393,29 +7491,41 @@
     setTimeout(autoFocus, 0);
   }
   /* the talk after a cleared chapter, over the stage or the arena it was won in */
-  function storyAfter(i) {
-    const ch = STORY()[i];
+  function storyAfter() {
+    const R = storyRun; if (!R) return;
     endBattle();
     if (world && world.def.arena) glideX = world.W / 2;
     else if (world) { glideX = Math.max(12, Math.min(world.W - 31, (world.goal ? world.goal.x : world.W) - 22)); camX = glideX + 3; }
-    playScene(ch.after, () => chapterClear(i));
+    playScene(R.ch.after, () => chapterClear());
   }
-  function chapterClear(i) {
+  function chapterClear() {
+    const R = storyRun, ep = R.ep, i = R.i;
     saveData.story = saveData.story || {};
-    saveData.story.done = Math.max(storyDone(), i + 1); save(saveData);
-    const list = STORY(), next = i + 1 < list.length ? i + 1 : -1, ch = list[i];
+    const eps = saveData.story.eps = saveData.story.eps || {};
+    eps[R.who] = Math.max(eps[R.who] || 0, i + 1); saveData.story.last = R.who; save(saveData);
+    const n = ep.chapters.length, next = i + 1 < n ? i + 1 : -1, nch = next >= 0 ? chOf(ep, next) : null, all = epsCleared();
     const ov = screenOn("story");
+    const skills = !R.got ? "" : R.got.length ? R.got.map(g => `
+        <div class="adv-skill">
+          <canvas width="88" height="72" data-face="${g.src}"></canvas>
+          <div><em>New skill</em><b>${esc(g.name)}</b><i>${esc(poss(castOf(g.src).name))} ${esc(g.slotName.toLowerCase())}: Emerl copied it. Set it in Emerl's Skills.</i></div>
+        </div>`).join("") : `<p class="adv-note">Emerl already knows every move ${esc(castOf(R.ch.teach).name)} has to teach.</p>`;
     ov.innerHTML = `
       <div class="panel adv-small pop">
-        <div class="panel-hd gold">${ico("check")}Chapter ${i + 1}: ${esc(ch.title)}</div>
-        <p class="adv-note">${next >= 0 ? `Next, chapter ${next + 1}: <b>${esc(list[next].title)}</b>. ${esc(chapterLine(list[next]))}.` : "The end of the story. Thank you for playing."}</p>
+        <div class="panel-hd gold">${ico("check")}Chapter ${i + 1}: ${esc(R.ch.title)}</div>
+        ${skills}
+        <p class="adv-note">${next >= 0 ? `Next, chapter ${next + 1}: <b>${esc(nch.title)}</b>. ${esc(chapterLine(nch))}.`
+          : `The end of ${esc(poss(castOf(R.who).name))} episode. ${all} of ${EPS().length} episodes cleared. ${all < EPS().length ? "The other sides of the story are waiting." : "Every side of the story is told. Thank you for playing."}`}</p>
         <div class="adv-btns">
           ${next >= 0 ? `<button class="btn" id="advNextCh" data-focus data-enter data-k="next">${ico("next")}Chapter ${next + 1}</button>` : ""}
-          <button class="btn ${next >= 0 ? "ghost" : ""}" id="advToStory" data-back data-k="story" ${next >= 0 ? "" : "data-focus"}>${ico("book")}Story</button>
+          ${R.got && R.got.length ? `<button class="btn ghost" id="advChSkill" data-k="skill">Emerl's Skills</button>` : ""}
+          <button class="btn ${next >= 0 ? "ghost" : ""}" id="advToStory" data-back data-k="story" ${next >= 0 ? "" : "data-focus"}>${ico("book")}${next >= 0 ? "Episode" : "Episodes"}</button>
         </div>
       </div>`;
-    if (next >= 0) ov.querySelector("#advNextCh").onclick = () => playChapter(next);
-    ov.querySelector("#advToStory").onclick = () => storyMenu();
+    ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 1));
+    if (next >= 0) ov.querySelector("#advNextCh").onclick = () => playChapter(R.who, next);
+    if (ov.querySelector("#advChSkill")) ov.querySelector("#advChSkill").onclick = () => emerlSkills(() => storyEpisode(R.who));
+    ov.querySelector("#advToStory").onclick = () => next >= 0 ? storyEpisode(R.who) : storyMenu(null);
     autoFocus();
   }
 
@@ -7648,7 +7758,7 @@
               return `
               <button class="adv-st ${i === stageIdx ? "on" : ""} ${open ? "" : "locked"}" data-st="${i}" ${open ? "" : "disabled"}>
                 <span class="adv-n">${i + 1}</span>
-                ${s.who ? `<canvas class="adv-st-who" width="36" height="38" data-face="${s.who}" title="${esc(castOf(s.who).name)}'s stage"></canvas>` : ""}
+                ${s.who ? `<canvas class="adv-st-who" width="36" height="38" data-face="${s.who}" title="${esc(poss(castOf(s.who).name))} stage"></canvas>` : ""}
                 <span class="adv-st-tx"><b>${esc(s.name)}</b><i>${esc(s.sub)}</i></span>
                 ${open ? `
                   <span class="adv-shoes">${[0, 1, 2].map(k => `<em class="${sh[k] ? "got" : ""}">${RED_I}</em>`).join("")}</span>
@@ -7709,7 +7819,7 @@
     if (battle) {
       const cfg = battle.cfg;
       if (cfg.kind === "training") return bgm("training");
-      if (storyRun && storyRun.i === STORY().length - 1) return bgm("story-final");      // the story's last fight
+      if (storyRun && storyRun.i === storyRun.ep.chapters.length - 1) return bgm("story-final");      // the story's last fight
       return bgm(BATTLE_BGM[(cfg.arena || 0) % BATTLE_BGM.length]);
     }
     if (mode === "play" || mode === "goal") {
@@ -7834,7 +7944,7 @@
     setTimeout(autoFocus, 0);
     go("#advAgain").onclick = () => play();
     go("#advSel").onclick = () => { if (storyRun) { storyMenu(); return; } if (next >= 0) { stageIdx = next; actIdx = nextAct; } load3d(stageIdx); menu(); };
-    if (go("#advSCont")) go("#advSCont").onclick = () => storyAfter(storyRun.i);
+    if (go("#advSCont")) go("#advSCont").onclick = () => storyAfter();
   }
 
   // ---------------------------------------------------------------- open / close
@@ -7888,7 +7998,7 @@
   root.Adventure = { ok: true, open, close, CAST, THEMES,
     _debug: { get world() { return world; }, get player() { return player; }, step: (s, n) => { for (let k = 0; k < (n || 1); k++) { readInput(); step(s); worldStep(s); input.jp = input.zp = input.xp = input.cp = 0; } },
               play: (i, id, a) => { if (id) castId = id; if (i != null) stageIdx = i; actIdx = a || 0; play(); }, draw: dt => draw(dt || 1 / 60), input: INPUT0, keys, touch, parse,
-              get battle() { return battle; }, get mode() { return mode; }, get talk() { return talk; }, startBattle, mainMenu, storyMenu, playChapter, battleSetup,
+              get battle() { return battle; }, get mode() { return mode; }, get talk() { return talk; }, startBattle, mainMenu, storyMenu, storyEpisode, playChapter, battleSetup, get storyRun() { return storyRun; }, EPS,
               trainingSetup, optionsScreen, arenaDef, emerlLearn, emerlSkills, emerlCast, get saveData() { return saveData; },
               bossWeak: () => world && world.boss && BRAIN[world.boss.key].weak(world.boss),
               get tut() { return TUT; }, tutorialStart, trainingMenu, tutLessons: () => tutLessons().map(l => l.id),
