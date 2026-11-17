@@ -42,7 +42,10 @@
  * attacker reels (Attack blocked), open to a counter. Z + X with the burst gauge full is Guilty
  * Gear's Psych Burst: blue out of a combo (it throws everyone off), gold otherwise (it hits).
  * Every hurt has its own frames off the sheets: knocked upward, knocked back, hitting a wall,
- * hitting the ground, getting up; and the guard and healing their own.
+ * hitting the ground, getting up; and the guard and healing their own. A KO'd fighter tumbles,
+ * lies on the ground, flickers and is gone.
+ * Training holds the TUTORIAL (tutorialStart): twenty-three lessons played for real on a dummy,
+ * a card over the fight teaching one thing at a time in your own keys, KNOCK//BACK's way.
  *   C           special: the shot; Up + C the power; Down + C the trap, and again to set it
  *               off. In the air each is its air version. (Sonic Battle has the player slot
  *               one special for the ground and one for the air before a match; here all
@@ -98,7 +101,8 @@
  *             Normal, Hard), everyone for themselves or Red against Blue, in any runner's
  *             arena; a KO match or Survival, a time limit. Down guards, and held still heals.
  *             Two players share the keyboard (Options sets their keys) or a pad each.
- *   Training  The same fight on a dummy that stands, guards, walks, jumps or fights back.
+ *   Training  The Tutorial (lessons played for real, one at a time, see tutorialStart), and Free
+ *             Training: the same fight on a dummy that stands, guards, walks, jumps or fights back.
  *   Options   Music, sound, dialogue speed and screen shake (the game's own settings), and the
  *             two players' keys.
  *
@@ -2852,6 +2856,9 @@
      the fighter whose blow, shot or trap is landing now; `hitTok` the blow itself, so it lands
      on each fighter once; `hitDmg` and `hitKnock` how hard. */
   let battle = null, actor = null, hitTok = null, hitDmg = 8, hitKnock = 0.85;
+  /* the tutorial running (see tutorialStart), and what the fight tells it */
+  let TUT = null;
+  const emit = (k, d) => { if (TUT && battle && battle.cfg.tutorial) tutHear(k, d); };
 
   function stages() { return (root.AdventureStages && AdventureStages.LIST) || []; }
 
@@ -3242,7 +3249,7 @@
     if (battle && p.state === "hurt" && p.juggle) {
       if (p.smashT > 0 && p.spike && !p.cmb.gb && fell < -4) return floorBounce(p);
       p.juggle = false;
-      if (p.cmb.n >= 3 || fell < -11) { p.state = "down"; p.st = 0.6; p.vx *= 0.5; burst(p.x, p.y + 0.05, [0xd8d0c0, 0xc8c0b0], 8, 3); SFX.stomp(); }
+      if (p.cmb.n >= 3 || fell < -11) { p.state = "down"; p.st = 0.6; p.vx *= 0.5; burst(p.x, p.y + 0.05, [0xd8d0c0, 0xc8c0b0], 8, 3); SFX.stomp(); emit("down", { q: p }); }
       else p.st = Math.min(p.st, 0.1);
     }
     if (p.state !== "roll") p.curl = false;
@@ -3357,7 +3364,7 @@
         p.rev = Math.min(1, p.rev + dt * 0.5);
         if (input.jp) { p.rev = Math.min(1, p.rev + 0.2); p.revKick = 1; SFX.rev(p.rev); if (p.rev > 0.45) revSpark(p); }
         if (!input.D) {
-          p.state = "roll"; p.vx = p.face * (13 + p.rev * 10) * (p.inWater ? 0.7 : 1); p.rev = 0;
+          p.state = "roll"; p.vx = p.face * (13 + p.rev * 10) * (p.inWater ? 0.7 : 1); p.rev = 0; emit("spindash", { p });
           SFX.roll(); effect(c.id, "fx.dust", p.x - p.face * 0.6, p.y, -p.face, 22, false);
         }
         if (!p.ground) p.state = "run";
@@ -3463,7 +3470,7 @@
       case "psy": g = 0; p.vy = lerp(p.vy, 0, Math.min(1, dt * 10)); break;
       case "atk": if (p.mv.air) g *= p.hang > 0 ? 0.3 : 0.6; break;
       case "hurt":
-        if (p.hang > 0 && p.juggle) g *= 0.4 * (1 + Math.min(0.8, p.cmb.n * 0.05));   // an air combo: falling slowly (a long one less so)
+        if (p.hang > 0 && p.juggle) g *= 0.3 * (1 + Math.min(0.8, p.cmb.n * 0.05));   // an air combo: falling slowly, with the one hitting them (a long one less so)
         else if (p.smashT > 0 && !p.spike) g *= 0.45;                             // smashed: flying, low and far
         else if (p.juggle && p.cmb) g *= 1 + Math.min(0.8, p.cmb.n * 0.05);       // a long juggle falls faster and faster
         break;
@@ -3498,11 +3505,12 @@
     p.ground = false; p.coyote = 0; p.jumping = true; p.on = null;
     p.curl = p.state === "roll";                         // out of a Spin Dash or a roll: still a ball
     if (p.state !== "roll") p.state = "run";
-    SFX.jump();
+    SFX.jump(); emit("jump", { p });
   }
   /** Space again in the air: the runner's air action. */
   function airAction(p) {
     const c = p.c;
+    emit("airaction", { p });
     if (p.inWater && c.swims) {                          // Chaos swims: a stroke for every press, as long as he likes
       p.vy = Math.max(p.vy, 6.5); p.jumping = false; p.curl = false; SFX.flap();
       burst(p.x, p.y + 0.2, [0xffffff, mixC(world.T.water, 0xffffff, 0.6)], 4, 2);
@@ -3601,7 +3609,7 @@
     p.vx = d * c.run * dashK(c);
     if (dashFrom(c) === "sonic" || dashFrom(c) === "tails") { p.vy = 4.5; p.ground = false; p.on = null; }    // Sonic Dash and Tails Hop are hops
     if (dashFrom(c) === "shadow" || c.dashInv) p.inv = Math.max(p.inv, p.st);                        // gone while he dashes; Chaos a puddle
-    SFX.dash();
+    SFX.dash(); emit("dash", { p });
   }
   function startClimb(p, wall) { p.state = "climb"; p.wall = wall; p.face = wall; p.vx = 0; p.vy = 0; p.curl = false; p.grabT = 0.14; SFX.grab(); }
   /* Knuckles on a wall: Up and Down climb, over the top when it ends; Space leaps off. */
@@ -3651,7 +3659,8 @@
       if (p.airMove) return;
       p.airMove = true;
       if (kind === "heavy" && D) return startSeek(p);
-      if (kind === "light" && srcOf(p, "airatk") === "shadow") {         // his Homing Attack
+      const inCombo = battle && (j => j && Math.hypot(j.x - p.x, j.y - p.y) < 2.4)(juggled(p));
+      if (kind === "light" && srcOf(p, "airatk") === "shadow" && !inCombo) {   // his Homing Attack (in an air combo, right by them, the air attack)
         const t = homingTarget(p, 7.5);
         if (t) { p.state = "homing"; p.target = t; p.st = 0.6; p.curl = true; SFX.homing(); return; }
       }
@@ -3685,8 +3694,13 @@
     return null;
   }
   function doLink(p, nx, q) {
+    emit("link", { p, nx });
     if (nx === "special") return startSpecial(p, q.U, q.D);
-    if (nx === "aim") return startSeek(p);
+    if (nx === "aim") {                                   // (its dash takes a moment: the one reeling on the ground waits for it)
+      startSeek(p);
+      const v = p.lastVic; if (battle && v && v.state === "hurt" && !v.juggle) v.st = Math.max(v.st, 0.45);
+      return;
+    }
     if (nx === "airatk") { p.airChain = (p.airChain || 0) + 1; p.airMove = true; }
     startBlow(p, nx);
     /* a link is a link: the one this string is on, still reeling on the ground, reels until the
@@ -3718,6 +3732,8 @@
     }
     if (!runs.length) { const h0 = Math.floor(n * 0.3); runs = [[h0, Math.max(h0, Math.ceil(n * 0.7) - 1)]]; by = null; }
     if (runs.length > 3) runs = [runs[0], runs[runs.length >> 1], runs[runs.length - 1]];
+    /* a dash attack is one rush: live from early on to its blow, its whole body in it */
+    if (name === "dashatk") runs = [[Math.min(runs[0][0], Math.max(1, Math.floor(n * 0.3))), Math.max(runs[runs.length - 1][1], Math.ceil(n * 0.7) - 1)]];
     return (SHAPES[key] = { runs, by, ext, ht, e0 });
   }
   function startBlow(p, name) {
@@ -3729,7 +3745,9 @@
              cur: -1, landed: -1, lk: {}, speed: Math.max(Math.abs(p.vx), p.c.run * 0.9) };
     if (name === "airatk") {                                // near one in a juggle: going with them, level; else a lift
       const j = battle && juggled(p);
-      p.vy = j && Math.hypot(j.x - p.x, j.y - p.y) < 2.2 ? clamp(j.vy + (j.y - p.y) * 4, -1, 16) : Math.max(p.vy, 4);
+      const near = j && Math.hypot(j.x - p.x, j.y - p.y) < 2.4;
+      p.vy = near ? clamp(j.vy + (j.y - p.y) * 4, -1, 16) : Math.max(p.vy, 4);
+      if (near) { p.face = sgn(j.x - p.x) || p.face; p.vx = clamp((j.x - p.face * 0.9 - p.x) * 5 + j.vx, -7, 7); }   // and in reach, along with them
     }
     /* Cream's blows are Cheese's: out in front of her, keeping time with her */
     if (p.mv.cheese) {
@@ -3761,8 +3779,9 @@
       /* the box the blow fills: from the runner's middle to the sprite's front edge on this
          frame (and over the head, for an upper); the chase's above and below as well */
       const fwd = m.cheese || !S.by ? c.w / 2 + m.reach : Math.max(S.ext[f], S.e0, c.w / 2 + 0.3) + 0.3;
-      const top = p.y + (m.name === "upper" ? Math.max(p.hh, S.by ? S.ht[f] : 0) + (S.by ? 0.4 : 0.9) : p.hh), lo = m.chase ? 0.7 : 0;
-      const x0 = p.face > 0 ? p.x - 0.1 : p.x - fwd, x1 = p.face > 0 ? p.x + fwd : p.x + 0.1;
+      const top = p.y + (m.name === "upper" ? Math.max(p.hh, S.by ? S.ht[f] : 0) + (S.by ? 0.4 : 0.9) : p.hh), lo = m.chase ? 0.7 : m.air ? 0.35 : 0;   // (an air blow: a little above and below too)
+      const back = m.name === "dashatk" ? c.w / 2 : 0.1;                                   // (a dash attack: the whole body)
+      const x0 = p.face > 0 ? p.x - back : p.x - fwd, x1 = p.face > 0 ? p.x + fwd : p.x + back;
       tok(m.tk, runDmg(p, m, fin), !fin ? 0.3 : m.name === "atk1" || m.name === "atk2" ? 0.35 : 0.85);
       if (strike(x0, x1, p.y + 0.08 - lo, top + lo, blowKick(p, fin))) landBlow(p, fin);
     }
@@ -3770,10 +3789,11 @@
        the freeze over) the next link cuts in; missed, it comes when the blow is done */
     if (p.buf && i >= 1) { m.queue = p.buf; p.buf = null; }
     const q = m.queue, done = m.struck && m.t - m.struckAt >= 0.05 && (m.landed === last || i > m.h1);
-    if (q && done) { const nx = linkFrom(p, m, q); if (nx) { p.mv = null; p.state = "run"; doLink(p, nx, q); return; } }
-    // Space in the launcher (any time in it): once it has launched someone, a super jump after them
+    /* Space in the launcher (any time in it): once it has launched someone, a super jump after them
+       -- before any other link; a press waiting comes out up there, an air attack */
     if (m.name === "upper" && p.jbuf > 0) m.jq = true;
-    if (done && m.jq && m.name === "upper" && juggled(p)) { p.jbuf = 0; p.mv = null; p.state = "run"; superJump(p); return; }
+    if (done && m.jq && m.name === "upper" && juggled(p)) { p.jbuf = 0; p.mv = null; p.state = "run"; superJump(p); if (q && q.k !== "c") p.buf = Object.assign({}, q, { t: 0.35 }); return; }
+    if (q && done) { const nx = linkFrom(p, m, q); if (nx) { p.mv = null; p.state = "run"; doLink(p, nx, q); return; } }
     if (i >= m.n) {
       p.mv = null; p.state = "run";
       if (q) { const nx = linkFrom(p, m, q); if (nx) doLink(p, nx, q); else freshPress(p, q); }
@@ -3841,7 +3861,7 @@
     p.vy = vy; p.ground = false; p.on = null; p.onTile = null; p.coyote = 0; p.jumping = false; p.curl = false;
     p.airMove = false; p.airChain = 0; p.airUses = 0;
     if (t) { p.face = sgn(t.x - p.x) || p.face; p.vx = clamp((t.x - p.x - p.face * 0.8) / Math.max(0.2, vy / GRAV) + t.vx, -8, 8); }   // to just short of them
-    burst(p.x, p.y + 0.05, [0xd8d0c0, 0xffffff], 8, 3); SFX.jump(); SFX.dash();
+    burst(p.x, p.y + 0.05, [0xd8d0c0, 0xffffff], 8, 3); SFX.jump(); SFX.dash(); emit("superjump", { p });
   }
   /** the nearest rival in the air and helpless (a juggle), within 16 m */
   function juggled(p) {
@@ -3905,6 +3925,7 @@
     let S = SPECIALS[c.id] && SPECIALS[c.id][slot];
     if (c.emerl) S = emerlSpecial(p, slot);           // Emerl: the move he copied in that slot, in his own frames
     p.cd[kind] = kind === "power" ? 1.4 : kind === "trap" ? 0.7 : 0.45;
+    emit("special", { p, kind, air });
     p.state = "special"; p.curl = false; p.jumping = false;
     p.sp = Object.assign({ t: 0, fired: false, air, kind }, S, { n: (framesOf(c.sheet || c.id, S.body) || [0]).length * (S.loops || 1) });
     if (air && !S.dive) p.vy = Math.max(p.vy, 1);
@@ -4218,7 +4239,7 @@
   }
   function boomTrap(t) {
     if (t.gone) return;
-    t.gone = true; world.group.remove(t.card); t.card.geometry.dispose();
+    t.gone = true; world.group.remove(t.card); t.card.geometry.dispose(); emit("trapboom", { p: t.owner });
     const by = t.y + (t.flies || t.kind === "orbit" ? 0 : 0.5), knux = t.who === "knuckles";   // his Mole Bomb: the blast alone
     const L = TRAP_LOOK[t.who] || {}, col = L.boom ? HIT_C[t.who] : 0xffb040;
     if (L.boom) effect(t.who, L.boom, t.x, L.bmid ? by : t.y, 1, 18, !!L.bmid, "fx", L.bk || 1.4, L.bfrom);   // Cream Cracker, Chaos Splash
@@ -4686,7 +4707,14 @@
     p.balT = Math.max(0, (p.balT || 0) - dt); p.catchT = Math.max(0, (p.catchT || 0) - dt); p.grabT = Math.max(0, (p.grabT || 0) - dt);
     const count = nm => framesOf(id, nm).length;
     let name, fps = 10, loop = true, face = p.face, pick = null;
-    if (p.dead || p.ko) { name = "out"; fps = 8; loop = false; }
+    if (p.ko && battle) {
+      /* KO'd: thrown, tumbling; down on the ground, flat out (the hitting-the-ground frames, held on
+         the last; for one whose sheet has none, getting up's first, lying there) */
+      if (!p.ground) { name = framesOf(id, "back") ? "back" : "out"; fps = 14; loop = true; }
+      else if (framesOf(id, "floor")) { name = "floor"; fps = 16; loop = false; }
+      else { name = framesOf(id, "getup") ? "getup" : "out"; pick = () => 0; }
+    }
+    else if (p.dead || p.ko) { name = "out"; fps = 8; loop = false; }
     else switch (p.state) {
       case "hurt": case "stumble":                         // hurt: off a wall, off the floor, flung tumbling, thrown up, or a blow
         name = "hit"; fps = 12; loop = false;
@@ -4779,7 +4807,9 @@
     p.whiteT = Math.max(0, (p.whiteT || 0) - dt);
     p.spr.material = wm || sheetMats(p.spr.userData.who).mat;
     if (stopT > 0 && p.state === "hurt" && p.sinceHit < 0.02) { p.spr.position.x += (Math.random() - 0.5) * 0.14; p.spr.position.y += (Math.random() - 0.5) * 0.06; }
-    p.spr.visible = !GLIDE[mode] && !p.out && !(p.hideT > 0) && !(p.inv > 0 && !p.dead && p.state !== "dash" && p.state !== "teleport" && !(p.sp && p.sp.shield) && Math.sin(world.t * 40) > 0.4);
+    /* KO'd: down a while, then flickering, then gone (till they come back in from above) */
+    const koGone = p.ko && battle && (p.koT < 0.12 || (p.koT < 1.1 && Math.sin(world.t * 38) > 0));
+    p.spr.visible = !GLIDE[mode] && !p.out && !koGone && !(p.hideT > 0) && !(p.inv > 0 && !p.dead && !p.ko && p.state !== "dash" && p.state !== "teleport" && !(p.sp && p.sp.shield) && Math.sin(world.t * 40) > 0.4);
   }
   /* The dust behind a rev: Sonic Advance's spray, looping faster and swelling as the rev
      builds (each tap of Space kicks it up), at the runner's heels, trailing away from them. */
@@ -5724,7 +5754,8 @@
       const parry = (q.guard0 || 0) - q.guardT <= PARRY_T && !(q.ai && q.ai.dummy === "guard"), big = hitDmg >= 10;
       q.burst = Math.min(BURST_MAX, (q.burst || 0) + (parry ? 1 : 0.4) * (big ? 30 : 12));
       q.blocked++;
-      if (parry) { parried(q, by); return false; }
+      if (parry) { parried(q, by); emit("parry", { q, by }); return false; }
+      emit("block", { q, by });
       q.vx = away * 3.5;
       hitSpark(q.x - away * 0.35, q.y + q.hh * 0.55, 0.85, 0xbfe8ff); SFX.grab(); hitStop(0.03);
       return false;
@@ -5740,14 +5771,19 @@
       vx = dx / d * kick.r * 0.8 + (sgn(dx) || away) * 1.5; vy = Math.max(5, dy / d * kick.r * 0.8 + 4);
     } else if (kick && kick.launch) { vx = (sgn(kick.vx) || away) * LAUNCH.vx; vy = LAUNCH.vy; }   // the upper: straight up, everyone's alike
     else if (down) { vx = (sgn(kick.vx) || away) * 1.5; vy = 9; }                              // OTG: up off the floor into the air
-    else if (kick && kick.hold) { vx = kick.vx; vy = q.ground ? 0 : 4.5; }                     // an early swing: held there for the next
+    else if (kick && kick.hold) {                                                               // an early swing: held there for the next
+      const air = by && !by.ground;
+      vx = air ? by.vx * 0.8 + kick.vx * 0.5 : kick.vx; vy = q.ground ? 0 : air ? 2.6 : 4.5;
+    }
     else if (kick) {
       vx = kick.vx * k; vy = kick.vy * k;
       if (kick.smash && kick.spike) vx *= 1.3;                                                  // the chase: down hard
       else if (kick.smash) { vx = (sgn(vx) || away) * Math.max(Math.abs(vx) * 1.3, 18); vy = Math.max(vy, 6.5); }   // a smash: hard and far, flying
       else if (wasUp) {                                                                          // up in the air already: kept up, with whoever hit them
         const air = by && !by.ground;
-        vx = air ? by.vx * 0.5 + (sgn(vx) || away) * 1.2 : clamp(vx, -3.5, 3.5); vy = Math.max((air ? 4.5 : 6.5) - 0.15 * n, 2.5);
+        /* an air combo: they go along with whoever hit them, just ahead and a touch higher, so the next
+           air blow is there to land (the attacker hangs at 2 m/s up after it lands) */
+        vx = air ? by.vx * 0.8 + (sgn(vx) || away) * 1.0 : clamp(vx, -3.5, 3.5); vy = air ? Math.max(2.6 - 0.05 * n, 1.8) : Math.max(6.5 - 0.15 * n, 2.5);
       }
     } else { vx = away * 6; vy = 5; }
     q.cmb = stunned ? Object.assign(q.cmb, { n, dmg: q.cmb.dmg + dmg }) : { n: 1, dmg };
@@ -5765,8 +5801,10 @@
     q.st = (q.juggle ? Math.min(1.6, airTime(q, q.smashT > 0 && !q.spike ? 0.45 : 0)) + 0.08 : 0.24 + hitDmg * 0.014) * decay;
     q.whiteT = kick && (kick.smash || kick.launch) ? 0.12 : 0.07;
     if (n >= 18) { q.inv = Math.max(q.inv, 0.6); q.st = Math.min(q.st, 0.3); }   // a long combo: they break out of it
+    emit("hit", { by, q, name: by ? (by.mv ? (by.mv.chase ? "chase" : by.mv.name) : by.state) : "", n, juggle: q.juggle, otg: down, counter,
+                  launch: !!(kick && kick.launch), smash: !!(kick && kick.smash) });
     if (q.hp <= 0) {
-      if (battle.cfg.kind === "training") { q.hp = q.hpMax; caption("KO!"); }   // the dummy never goes down for good
+      if (battle.cfg.kind === "training") { q.hp = q.hpMax; caption("KO!"); emit("ko", { q, by }); }   // the dummy never goes down for good
       else koFighter(q, by);
     }
     return true;
@@ -5785,6 +5823,7 @@
     const x = p.x + d * p.c.w / 2, y = p.y + p.hh * 0.5;
     impact(x, y, { c: 0xffffff, flash: 2.4, shake: 0.24 }); burst(x, y, [0xd8d0c0, 0xffffff, 0xa8a090], 16, 6);
     hitStop(0.09); camPunch(x, y, 0.6, 0.5); SFX.impact(); SFX.stomp();
+    emit("wall", { q: p });
   }
   function floorBounce(p) {
     p.cmb.gb = true; p.smashT = 0; p.spike = false; p.floorT = 0.3;
@@ -5792,6 +5831,7 @@
     p.juggle = true; p.st = Math.min(1.4, airTime(p)) + 0.08;
     impact(p.x, p.y + 0.1, { c: 0xffffff, flash: 2.4, shake: 0.24 }); burst(p.x, p.y + 0.1, [0xd8d0c0, 0xffffff, 0xa8a090], 18, 6);
     hitStop(0.08); camPunch(p.x, p.y + 0.6, 0.6, 0.5); SFX.impact(); SFX.stomp();
+    emit("floor", { q: p });
   }
   /** a guard met a blow in its first moment: nothing comes of the blow, and one who threw it from
       close reels, open (Attack blocked) */
@@ -5826,6 +5866,7 @@
     hitStop(0.16); slowMo(0.25); shakeCam(0.32); camPunch(cx, cy, 0.7, 0.6);
     SFX.blast(); SFX.boom();
     call(p, "Burst!");
+    emit("burst", { p, blue, hit: !!hit });
   }
   /** a word over a fighter's head a moment: Parry!, Burst!, Counter! */
   function call(f, text) { f.callTx = text; f.callT = 0.9; f.callN = (f.callN || 0) + 1; }
@@ -6048,11 +6089,12 @@
     host.querySelector(".adv-ov").innerHTML = "";
     host.classList.add("playing");
     buildBattleHud();
-    caption(cfg.kind === "training" ? "Training" : "Ready");
+    caption(cfg.tutorial ? "Tutorial" : cfg.kind === "training" ? "Training" : "Ready");
     music();
   }
   /* the fighters off the stage: the world stays (a story scene goes on in front of it) */
   function endBattle() {
+    TUT = null;
     if (!battle) return;
     for (const f of battle.fs) for (const m of [f.spr, f.dust, f.aura, f.shCard, ...(f.spCards || [])]) if (m) world.group.remove(m);
     battle = null; actor = null; input = INPUT0;
@@ -6078,11 +6120,12 @@
       if (f.ctl === "cpu") aiThink(f, h);
       else if (B.live && !B.over) readInput(f.inp, f.ctl === "p2" ? 1 : 0);
       else { const I = f.inp; I.L = I.R = I.U = I.D = I.J = I.Z = I.X = I.C = 0; }
-      if (B.cfg.kind === "training" && f.sinceHit > 1.6 && f.hp < f.hpMax) f.hp = Math.min(f.hpMax, f.hp + 40 * h);   // health comes back, between strings
+      if (B.cfg.kind === "training" && !TUT && f.sinceHit > 1.6 && f.hp < f.hpMax) f.hp = Math.min(f.hpMax, f.hp + 40 * h);   // health comes back, between strings (the tutorial keeps its own)
     }
     for (const f of B.fs) { if (f.out) continue; player = f; input = f.inp; actor = f; step(h); }
     actor = null; input = INPUT0; player = B.lead;
     contacts(h);
+    if (TUT && B.cfg.tutorial && B.live) tutTick(h);
     worldStep(h);
     for (const f of B.fs) { const I = f.inp; I.jp = I.zp = I.xp = I.cp = 0; I.dash = 0; }
   }
@@ -6119,18 +6162,33 @@
   }
 
   // ---------------------------------------------------------------- the CPU
-  /* A CPU fighter reads the fight a few times a second (Easy slowest, Hard quickest): far off it
-     closes in, dashing, or fires its shot across; nearer it jumps in with an air attack or
-     springs its aim attack; close up it turns to face its mark and strings jabs into a heavy,
-     an upper, its power or a trap. When a blow or a shot is coming it may see it in time and
-     guard; hurt and out of reach it may stop to heal. */
+  /* A CPU fighter reads the fight a few times a second (Easy slowest, Hard quickest), and never
+     throws a blow at nothing: it attacks only with its mark in reach, on its level and open to
+     it (not untouchable, not lying down but for an OTG). It goes where its mark is -- up after
+     one on a plank above (a jump, and its air action at the top), down off its own plank after
+     one below; one it can't reach up there it waits for under the plank, its launcher ready.
+     Each has a way of fighting (its style, mostly its runner's): RUSH, in close and combo;
+     ZONE, keep off at shot range and fire, backing away from one who comes close (traps for
+     them); COUNTER, hover just outside reach, guard and parry, and punish. Anyone left open --
+     parried, reeling, whiffing a blow up close -- is punished, whatever the style.
+     Its combos are planned and played as a player plays them: the next press only once the
+     last blow has landed (the routes: jabs into the launcher, a super jump, an air combo and the
+     chase; the auto combo into the smash; jabs into the heavy, a special or the aim attack); a
+     blow that misses ends the plan. Easy drops its combos now and then, Normal now and again,
+     Hard never. It guards (and so may parry) what it sees coming, bursts out of long combos,
+     chases its own launches and picks up its own knockdowns (OTG), and heals when hurt and far. */
   const AI_LV = [
-    { think: 0.5, guard: 0.12, sp: 0.1, combo: [1, 2], fin: 0.25, aim: 0.05, jumpIn: 0.15, air: 2, chase: 0.35, launch: 0.2, sj: 0, burstN: 9, burst: 0.3 },
-    { think: 0.28, guard: 0.38, sp: 0.18, combo: [2, 3], fin: 0.55, aim: 0.1, jumpIn: 0.22, air: 5, chase: 0.7, launch: 0.4, sj: 0.25, burstN: 6, burst: 0.55 },
-    { think: 0.15, guard: 0.62, sp: 0.24, combo: [3, 3], fin: 0.85, aim: 0.14, jumpIn: 0.26, air: 9, chase: 0.95, launch: 0.55, sj: 0.55, burstN: 4, burst: 0.8 },
+    { think: 0.5, guard: 0.12, sp: 0.1, aim: 0.05, jumpIn: 0.15, air: 2, chase: 0.35, launch: 0.2, sj: 0, burstN: 9, burst: 0.3, drop: 0.14, punish: 0.4, aa: 0.25,
+      routes: [0.05, 0.25, 0.3, 0.2, 0.1, 0.1] },
+    { think: 0.28, guard: 0.38, sp: 0.18, aim: 0.1, jumpIn: 0.22, air: 5, chase: 0.7, launch: 0.4, sj: 0.25, burstN: 6, burst: 0.55, drop: 0.04, punish: 0.75, aa: 0.55,
+      routes: [0.3, 0.25, 0.2, 0.1, 0.1, 0.05] },
+    { think: 0.15, guard: 0.62, sp: 0.24, aim: 0.14, jumpIn: 0.26, air: 9, chase: 0.95, launch: 0.55, sj: 0.55, burstN: 4, burst: 0.8, drop: 0, punish: 0.95, aa: 0.85,
+      routes: [0.55, 0.15, 0.15, 0.05, 0.05, 0.05] },
   ];
+  const AI_STYLE = { sonic: "rush", shadow: "rush", knuckles: "rush", amy: "rush", mighty: "rush", metal: "rush", emerl: "rush",
+                     tails: "zone", cream: "zone", gamma: "zone", eggman: "zone", silver: "zone", rouge: "counter", chaos: "counter" };
   const aiNew = s => ({ t: 0.4 + Math.random() * 0.4, q: [], qt: 0, dir: 0, hold: 0, D: 0, U: 0, mU: 0, mD: 0, mod: 0, jt: 0, ct: 0,
-                        dummy: s.dummy || null, wander: Math.random() < 0.5 ? -1 : 1, wt: 0 });
+                        dummy: s.dummy || null, wander: Math.random() < 0.5 ? -1 : 1, wt: 0, style: null, plan: null, climbCd: 0, climbs: 0, wait: 0 });
   function press(f, a) {
     const I = f.inp, A = f.ai;
     if (a.U) { A.mU = 1; I.U = 1; } if (a.D) { A.mD = 1; I.D = 1; }
@@ -6156,81 +6214,189 @@
     for (const s of world.shots) if (!s.gone && s.owner && rivals(s.owner, f) && Math.abs(s.x - f.x) < 4 && sgn(f.x - s.x) === sgn(s.vx) && Math.abs(s.y - (f.y + 0.6)) < 1.6) return true;
     return false;
   }
+  /** whether f's blows reach q from here (with `extra` metres more): close, and on its level */
+  const aiReach = (f, q, extra) => Math.abs(q.x - f.x) < f.c.w / 2 + q.c.w / 2 + 0.85 + (extra || 0) && q.y - f.y > -0.9 && q.y - f.y < 1.25;
+  /** whether q can be hit at all now (not untouchable, not lying down, not out) */
+  const aiOpen = q => !(q.inv > 0.12) && q.state !== "down" && q.state !== "getup" && q.state !== "teleport" && !q.ko && !(q.sp && q.sp.shield);
+  /** the plank under q's feet, as [x0, x1] of its run of planks; null on the ground */
+  function plankUnder(q) {
+    const j = Math.floor(q.y - 0.1), i = Math.floor(q.x);
+    if (!q.ground || tile(i, j) !== "-") return null;
+    let a = i, b = i; while (tile(a - 1, j) === "-") a--; while (tile(b + 1, j) === "-") b++;
+    return [a, b + 1];
+  }
+  /* The combo routes (weighted per level in AI_LV.routes): steps pressed one at a time, each once
+     the last blow has landed. `sj` the super jump (Space as the launcher lands), `air` a step up
+     there (pressed once in the air, near them, or as the last air blow lands). */
+  const AI_ROUTES = [
+    () => [{ k: "z" }, { k: "z" }, { k: "x", U: 1 }, { k: "j", sj: 1 }, { k: "z", air: 1 }, { k: "z", air: 1 }, { k: "z", air: 1 }, { k: "x", D: 1, air: 1 }],
+    () => [{ k: "z" }, { k: "z" }, { k: "x", U: 1 }, { k: "x", D: 1 }],
+    () => [{ k: "z" }, { k: "z" }, { k: "z" }, { k: "z" }],
+    () => [{ k: "z" }, { k: "z" }, { k: "z" }, { k: "x" }],
+    () => [{ k: "z" }, { k: "z" }, { k: "c" }],
+    () => [{ k: "z" }, { k: "z" }, { k: "x", D: 1 }],
+  ];
+  function aiPlan(f, L, steps) {
+    if (!steps) {
+      let r = Math.random(), k = 0;
+      while (k < L.routes.length - 1 && r >= L.routes[k]) { r -= L.routes[k]; k++; }
+      steps = AI_ROUTES[k]();
+    }
+    f.ai.plan = { steps, i: 0, t: 0, pressed: false };
+    f.ai.q = [];
+  }
+  /** a combo plan, played: true while it is going (the rest of the thinking waits) */
+  function aiRunPlan(f, dt, tgt, L) {
+    const A = f.ai, P = A.plan;
+    if (!P) return false;
+    const end = () => { A.plan = null; return false; };
+    if (!tgt || tgt.ko || f.state === "hurt" || f.state === "down" || f.state === "getup" || f.state === "blocked" || f.ko) return end();
+    const s = P.steps[P.i]; if (!s) return end();
+    if ((P.t += dt) > 1.3) return end();                                   // stuck: let it go
+    const m = f.mv, pending = f.buf || (m && m.queue);
+    if (pending) return true;
+    const open = tgt.state === "hurt" || tgt.state === "blocked";
+    /* the last blow is over and they aren't reeling: the combo dropped (or never started) */
+    if (P.pressed && !m && f.state !== "seek" && f.state !== "special" && !open && !(s.air && !f.ground)) return end();
+    const linkable = m && m.struck && m.t - m.struckAt >= 0.02;
+    let go;
+    if (s.sj) go = m && m.name === "upper" && m.struck;
+    else if (s.air) { if (f.ground && P.pressed && !(m && m.name === "upper")) return end(); go = !f.ground && ((f.state === "run" && Math.hypot(tgt.x - f.x, tgt.y - f.y) < 2.4) || linkable); }
+    else if (P.i === 0 && s.aa) { const ddy = tgt.y - f.y; go = (f.state === "run" || f.state === "crouch") && f.ground && Math.abs(tgt.x - f.x) < 1.6 && ddy > 0.5 && ddy < 2.8 && aiOpen(tgt); }
+    else if (P.i === 0) go = (f.state === "run" || f.state === "crouch") && f.ground && aiReach(f, tgt) && aiOpen(tgt);
+    else go = linkable;
+    if (!go) return true;
+    if (P.i > 0 && Math.random() < L.drop) return end();                 // (Easy and Normal let some go)
+    if (P.i === 0 && f.face !== (sgn(tgt.x - f.x) || f.face)) { f.ai.dir = sgn(tgt.x - f.x); f.ai.hold = 0.03; return true; }   // face them first
+    press(f, s.k === "j" ? { k: "j", hold: 0.3 } : s);
+    P.i++; P.t = 0; P.pressed = true;
+    return true;
+  }
   function aiThink(f, dt) {
     const I = f.inp, A = f.ai, B = battle, L = AI_LV[clamp(f.lvl, 0, 2)];
     I.jp = I.zp = I.xp = I.cp = 0; I.dash = 0;
-    if (!B.live || B.over || f.ko) { I.L = I.R = I.U = I.D = I.J = I.Z = I.X = I.C = 0; A.q = []; A.hold = 0; return; }
+    if (!B.live || B.over || f.ko) { I.L = I.R = I.U = I.D = I.J = I.Z = I.X = I.C = 0; A.q = []; A.plan = null; A.hold = 0; return; }
     if (A.hold > 0) A.hold -= dt; else { A.dir = 0; A.D = 0; A.U = 0; }
     if (A.mod > 0) A.mod -= dt; else { A.mU = 0; A.mD = 0; }
     if (A.jt > 0) A.jt -= dt;
     if (A.ct > 0) A.ct -= dt;
+    A.climbCd = Math.max(0, A.climbCd - dt); A.wait = Math.max(0, A.wait - dt);
     I.L = A.dir < 0 ? 1 : 0; I.R = A.dir > 0 ? 1 : 0; I.U = A.U || A.mU ? 1 : 0; I.D = A.D || A.mD ? 1 : 0; I.J = A.jt > 0 ? 1 : 0;
     I.Z = 0; I.X = 0; I.C = A.ct > 0 ? 1 : 0;
     /* caught in a long combo with the gauge full: the burst, once a combo (if it thinks of it) */
     if (!A.dummy && f.burst >= BURST_MAX && (f.state === "hurt" || f.state === "down") && f.cmb.n >= L.burstN && A.burstFor !== f.cmb) {
       A.burstFor = f.cmb;
-      if (Math.random() < L.burst) { I.zp = I.xp = 1; I.Z = I.X = 1; return; }
+      if (Math.random() < L.burst) { I.zp = I.xp = 1; I.Z = I.X = 1; A.plan = null; return; }
     }
-    if (A.q.length) { A.qt += dt; while (A.q.length && A.qt >= A.q[0].at) press(f, A.q.shift()); }
     const tgt = aiTarget(f);
+    /* timed presses (a jump, a jump-in): an attack in one with nothing there to hit is dropped */
+    if (A.q.length) {
+      A.qt += dt;
+      while (A.q.length && A.qt >= A.q[0].at) {
+        const a = A.q[0];
+        if ((a.k === "z" || a.k === "x") && !a.free && tgt && !(f.ground ? aiReach(f, tgt, 0.4) : Math.hypot(tgt.x - f.x, tgt.y - f.y) < 2.2)) { A.q = []; break; }
+        press(f, A.q.shift());
+      }
+    }
     if (A.dummy && A.dummy !== "fight") return dummyThink(f, dt);
     if (!tgt) return;
-    const dx = tgt.x - f.x, dy = tgt.y - f.y, adx = Math.abs(dx), toward = sgn(dx) || f.face;
-    // a blow or a shot coming: it may see it in time and guard
+    if (aiRunPlan(f, dt, tgt, L)) return;
+    if (!A.style) A.style = Math.random() < 0.7 ? AI_STYLE[f.c.id] || "rush" : ["rush", "zone", "counter"][Math.floor(Math.random() * 3)];
+    const dx = tgt.x - f.x, dy = tgt.y - f.y, adx = Math.abs(dx), toward = sgn(dx) || f.face, free = f.state === "run" || f.state === "crouch";
+    // a blow or a shot coming: it may see it in time and guard (a counter-fighter most of all)
     const threat = danger(f);
     if (threat && !A.seen) {
       A.seen = true;
-      if (f.ground && f.state !== "atk" && f.state !== "special" && Math.random() < L.guard) { A.q = []; A.dir = 0; A.D = 1; A.hold = 0.42; A.t = 0.45; return; }
+      if (f.ground && free && Math.random() < L.guard + (A.style === "counter" ? 0.2 : 0)) { A.q = []; A.dir = 0; A.D = 1; A.hold = 0.42; A.t = 0.45; return; }
     } else if (!threat) A.seen = false;
-    /* its own combo going: a rival it has put in the air, after them (the chase, or after a
-       launch a super jump and air attacks first); one it has knocked down, picked up (OTG) */
+    /* its own combo going without a plan: a rival it put in the air, after them; one it knocked
+       down, picked up (OTG) */
     const up = juggled(f);
     if (up && up.jBy === f && A.chased !== up.cmb) {
       A.chased = up.cmb;
       if (Math.random() < L.chase) {
-        A.q = f.state === "atk" && f.mv && f.mv.name === "upper" && Math.random() < L.sj
-          ? [{ at: 0.04, k: "j", hold: 0.3 }, { at: 0.3, k: "z" }, { at: 0.48, k: "z" }, { at: 0.66, k: "x", D: 1 }]
-          : [{ at: 0.08, k: "x", D: 1 }];
-        A.qt = 0; return;
+        if (f.state === "atk" && f.mv && f.mv.name === "upper" && Math.random() < L.sj) aiPlan(f, L, [{ k: "j", sj: 1 }, { k: "z", air: 1 }, { k: "z", air: 1 }, { k: "z", air: 1 }, { k: "x", D: 1, air: 1 }]);
+        else { A.q = [{ at: 0.08, k: "x", D: 1, free: true }]; A.qt = 0; }
+        return;
       }
     }
     const low = battle.fs.find(q => q.state === "down" && q.jBy === f && !q.cmb.otg && rivals(f, q) && Math.abs(q.x - f.x) < 3.5);
-    if (low && A.otg !== low.cmb) { A.otg = low.cmb; if (Math.random() < L.chase) { A.dir = sgn(low.x - f.x); A.hold = 0.05; A.q = [{ at: 0.05, k: "x", D: 1 }]; A.qt = 0; return; } }
-    // in the air near its mark: the air attack
-    if (!f.ground && !f.airMove && f.state === "run" && adx < 1.9 && Math.abs(dy) < 1.4 && Math.random() < dt * L.air) press(f, { k: "z" });
+    if (low && A.otg !== low.cmb) { A.otg = low.cmb; if (Math.random() < L.chase) { A.dir = sgn(low.x - f.x); A.hold = 0.05; A.q = [{ at: 0.05, k: "x", D: 1, free: true }]; A.qt = 0; return; } }
+    // in the air beside its mark: the air attack
+    if (!f.ground && !f.airMove && f.state === "run" && adx < 1.9 && Math.abs(dy) < 1.3 && aiOpen(tgt) && Math.random() < dt * L.air) press(f, { k: "z" });
     // a wall in the way: over it
     if (A.dir && f.ground && Math.abs(f.vx) < 0.5 && solid(tile(Math.floor(f.x + A.dir * (f.c.w / 2 + 0.3)), Math.floor(f.y + 0.5))) && !A.q.length) press(f, { k: "j", hold: 0.3 });
+    /* steering while it climbs: over the plank it's going for */
+    if (!f.ground && A.climbX != null && f.state !== "atk") { A.dir = sgn(A.climbX - f.x) || 0; A.hold = 0.05; }
+    if (f.ground) A.climbX = null;
     A.t -= dt;
-    if (A.t > 0 || A.q.length || A.hold > 0) return;
+    if (A.t > 0 || A.q.length || A.hold > 0 || !free) return;
     A.t = L.think * (0.7 + Math.random() * 0.6);
     A.qt = 0;
-    const r = Math.random(), faced = f.face === toward, level = Math.abs(dy) < 1;
-    if (f.hp < f.hpMax * 0.3 && adx > 9 && f.ground && r < 0.35) { A.dir = 0; A.D = 1; A.hold = 1.4; return; }   // out of reach and hurt: heal
-    if (adx > 6) {
-      A.dir = toward; A.hold = A.t + 0.05;
-      if (f.ground && faced && level && r < L.sp) { A.dir = 0; A.q = [{ at: 0, k: "c" }]; }                  // a shot across the arena
-      else if (f.ground && r > 0.86) I.dash = toward;
-      if (dy > 1.5 && f.ground && !A.q.length) A.q = [{ at: 0, k: "j", hold: 0.3 }];
-    } else if (adx > 2.2) {
-      A.dir = toward; A.hold = A.t + 0.05;
-      if (r < L.aim && faced) A.q = [{ at: 0, k: "x", D: 1 }];                                                // the aim attack
-      else if (r < L.aim + L.jumpIn && f.ground) A.q = [{ at: 0, k: "j", hold: 0.3 }, { at: 0.3, k: "z" }];  // jump in
-      else if (r < L.aim + L.jumpIn + L.sp * 0.5 && faced && level) { A.dir = 0; A.q = [{ at: 0, k: "c" }]; }
-      else if (dy > 1.5 && f.ground) A.q = [{ at: 0, k: "j", hold: 0.3 }];
-    } else {
-      if (!faced) { A.dir = toward; A.hold = 0.04; A.t = 0.05; return; }                                      // turn to it first
-      A.dir = 0;
-      if (dy > 1.3) A.q = r < 0.6 ? [{ at: 0, k: "x", U: 1 }] : [{ at: 0, k: "j", hold: 0.25 }, { at: 0.22, k: "z" }];
-      else if (r < L.sp * 0.6) A.q = [{ at: 0, k: "c", U: 1 }];                                              // the power
-      else if (r < L.sp * 0.6 + 0.06) A.q = [{ at: 0, k: "c", D: 1 }];                                       // a trap
-      else {
-        const n = L.combo[0] + Math.floor(Math.random() * (L.combo[1] - L.combo[0] + 1));
-        for (let k = 0; k < n; k++) A.q.push({ at: k * 0.12, k: "z" });
-        if (n >= 3 || Math.random() < L.fin) {                                   // the ender: the launcher, the auto-combo's heavy, or X's
-          const r2 = Math.random(), at = n * 0.12;
-          A.q.push(r2 < L.launch ? { at, k: "x", U: 1 } : r2 < L.launch + 0.3 && n >= 3 ? { at, k: "z" } : { at, k: "x" });
-        }
+    const r = Math.random(), level = Math.abs(dy) < 1, faced = f.face === toward, open = aiOpen(tgt);
+    const reach = aiReach(f, tgt), W = world.W, cornered = (f.x < 3.5 && toward > 0) || (f.x > W - 3.5 && toward < 0);
+    const shotReady = !(f.cd && f.cd.shot > 0), rec = tgt.state === "atk" && tgt.mv && !tgt.mv.struck && Math.floor(tgt.mv.t * tgt.mv.fps) > tgt.mv.h1;
+    /* hurt, and out of reach: heal */
+    if (f.hp < f.hpMax * 0.3 && adx > 9 && f.ground && r < 0.35) { A.dir = 0; A.D = 1; A.hold = 1.4; return; }
+    /* open: parried, reeling, or whiffing a blow up close -- punish it */
+    if (open && level && adx < 3.4 && (tgt.state === "blocked" || rec) && Math.random() < L.punish) {
+      if (reach) return aiPlan(f, L);
+      A.dir = toward; A.hold = 0.2; if (adx > 2.2) I.dash = toward; return;
+    }
+    /* they're up on a plank: up after them (a jump, the air action at the top), or wait below */
+    if (dy > 1.3 && tgt.ground && f.ground) {
+      const pl = plankUnder(tgt);
+      if (A.climbs >= 3 && A.wait <= 0) { A.wait = 4; A.climbs = 0; }
+      if (A.wait > 0) {                                              // can't get up there: wait under its end, launcher ready
+        const ux = pl ? (Math.abs(f.x - pl[0]) < Math.abs(f.x - pl[1]) ? pl[0] - 0.8 : pl[1] + 0.8) : tgt.x;
+        if (Math.abs(ux - f.x) > 0.8) { A.dir = sgn(ux - f.x); A.hold = 0.15; }
+        else if (A.style === "zone" && shotReady && r < L.sp) A.q = [{ at: 0, k: "c", U: 1 }];
+        return;
       }
+      const gx = pl ? clamp(f.x, pl[0] - 0.9, pl[1] + 0.9) : tgt.x;          // under the plank's near end
+      if (Math.abs(gx - f.x) > 1.0) { A.dir = sgn(gx - f.x); A.hold = 0.12; if (Math.abs(gx - f.x) > 6 && r < 0.4) I.dash = sgn(gx - f.x); return; }
+      if (A.climbCd <= 0) {
+        A.climbCd = 1.7; A.climbs++; A.climbX = pl ? clamp(tgt.x, pl[0] + 0.6, pl[1] - 0.6) : tgt.x;
+        A.q = [{ at: 0, k: "j", hold: 0.45 }, { at: 0.36, k: "j", hold: 0.35 }, { at: 0.62, k: "j", hold: 0.3 }];
+      }
+      return;
+    }
+    if (dy > -0.6) A.climbs = Math.max(0, A.climbs - (level ? 1 : 0));
+    /* they're below and it's on a plank: down to them (through the plank, or off its end) */
+    if (dy < -1.3 && f.ground) {
+      if (plankUnder(f) && adx < 4 && r < 0.6) { A.q = [{ at: 0, k: "j", D: 1 }]; return; }
+      A.dir = toward; A.hold = 0.2; return;
+    }
+    /* right above it in the air, coming down: the launcher (anti-air) */
+    if (!tgt.ground && dy > 0.6 && dy < 2.1 && adx < 1.4 && tgt.vy < 0.5 && f.ground && open && r < L.aa) { if (!faced) { A.dir = toward; A.hold = 0.03; } return aiPlan(f, L, [{ k: "x", U: 1, aa: 1 }, { k: "x", D: 1 }]); }
+    /* in reach and open: a combo (or now and then the power or a trap, close in) */
+    if (reach && open) {
+      if (r < L.sp * 0.5 && faced) { A.q = [{ at: 0, k: "c", U: 1 }]; return; }
+      if (A.style === "zone" && r < 0.3 && !cornered) { A.dir = -toward; A.hold = 0.3; if (r < 0.15) I.dash = -toward; return; }   // a zoner gets out
+      return aiPlan(f, L);
+    }
+    if (reach && !open) { A.dir = adx < 1.2 ? -toward : 0; A.hold = 0.12; return; }   // lying down, untouchable: give them room
+    /* by style, out of reach */
+    if (A.style === "zone") {
+      if (adx < 3.6 && !cornered && level) { A.dir = -toward; A.hold = A.t + 0.1; if (r < 0.25) I.dash = -toward; else if (r < 0.32 && f.ground) A.q = [{ at: 0, k: "c", D: 1 }]; return; }
+      if (adx <= 8.5 && level && faced && shotReady && r < 0.55) { A.dir = 0; A.q = [{ at: 0, k: "c" }]; return; }
+      if (adx <= 8.5 && level && !faced) { A.dir = toward; A.hold = 0.03; return; }
+      A.dir = toward; A.hold = A.t + 0.05; if (adx > 9 && r < 0.3) I.dash = toward;
+      return;
+    }
+    if (A.style === "counter" && adx < 4.5 && level && r < 0.75) {
+      const want = 2.9 + Math.sin(world.t * 1.7 + f.slot) * 0.4;            // hovering just out of reach
+      A.dir = adx > want + 0.3 ? toward : adx < want - 0.3 ? -toward : 0; A.hold = A.t + 0.05;
+      if (!A.dir && !faced) { A.dir = toward; A.hold = 0.03; }
+      return;
+    }
+    // rush (and the others, once they close): in, with a jump-in or the aim attack from mid range
+    A.dir = toward; A.hold = A.t + 0.05;
+    if (adx > 6) { if (f.ground && r > 0.7) I.dash = toward; else if (f.ground && faced && level && shotReady && r < L.sp) { A.dir = 0; A.q = [{ at: 0, k: "c" }]; } return; }
+    if (adx > 2.0 && level && open) {
+      if (r < L.aim && faced) A.q = [{ at: 0, k: "x", D: 1, free: true }];                                        // the aim attack
+      else if (r < L.aim + L.jumpIn && f.ground && adx < 4) A.q = [{ at: 0, k: "j", hold: 0.3 }, { at: 0.28, k: "z" }];   // jump in
+      else if (r > 0.82 && f.ground) I.dash = toward;
     }
   }
   /* Training's dummy: stands, guards whatever comes, walks to and fro, jumps, or fights (as a
@@ -6313,10 +6479,12 @@
         <button class="adv-pause" title="Pause (Enter)" aria-label="Pause">II</button>
       </div>
       <div class="adv-combo"><b class="num"></b><i></i></div>
+      ${B.cfg.tutorial ? `<div class="adv-tut"></div>` : ""}
       <div class="adv-cap"></div>
       <div class="adv-tags">${B.fs.map(f => `<span class="adv-tag" style="--tc:${tagCol(f)}">${tagText(f)}</span>`).join("")}</div>
       <div class="adv-calls">${B.fs.map(() => `<b class="adv-call"></b>`).join("")}</div>
       ${TOUCH && B.fs.some(f => f.ctl === "p1") ? padHtml() : ""}`;
+    h.classList.toggle("tut", !!B.cfg.tutorial);
     h.querySelectorAll(".adv-fc-face").forEach((cv, i) => paintCard(cv, B.fs[i].c.id, "portrait", 1));
     h.querySelector(".adv-pause").onclick = () => togglePause();
     wirePad(h);
@@ -6395,7 +6563,7 @@
       ["exhibition", "flag", "Free Exhibition", "Any runner in any zone you've opened, Act 1 or Act 2 and its boss: for time, rings and Red Star Rings",
         `${stages().filter((st, i) => cleared(i)).length}/${stages().length}`],
       ["battle", "trophy", "Battle", "Up to four fighters with health, players or CPUs, in any runner's arena", ""],
-      ["training", "dumbbell", "Training", "Every move on a dummy that does as it's told", ""],
+      ["training", "dumbbell", "Training", "The tutorial, lesson by lesson; and a dummy that does as it's told", saveData.tutorial && saveData.tutorial.done ? "" : "New"],
       ["options", "gear", "Options", "Music, sound, screen shake and the two-player keys", ""],
       ["exit", "door", "Exit", "Back to the hall", ""],
     ].filter(it => it[0] !== "exit" || (opts0 && opts0.onExit));
@@ -6415,7 +6583,7 @@
         </div>
         <button hidden data-back id="advMMBack"></button>
       </div>`;
-    const go = { story: storyMenu, exhibition: () => { load3d(stageIdx); menu(); }, battle: () => battleSetup(true), training: () => trainingSetup(true), options: () => optionsScreen(true), exit: () => exit() };
+    const go = { story: storyMenu, exhibition: () => { load3d(stageIdx); menu(); }, battle: () => battleSetup(true), training: () => trainingMenu(), options: () => optionsScreen(true), exit: () => exit() };
     ov.querySelectorAll("[data-mm]").forEach(b => b.onclick = () => go[b.dataset.mm]());
     ov.querySelector("#advMMBack").onclick = () => title();
     autoFocus();
@@ -6558,7 +6726,7 @@
           <div class="adv-go">
             <button class="btn lg" id="advTrain" data-enter data-focus data-k="train">${ico("flag")}Start training</button>
             <button class="btn ghost" id="advTSk" data-k="emskill">Emerl's Skills</button>
-            <button class="btn ghost" id="advTBack2" data-back data-k="back">${ico("back")}Main menu</button>
+            <button class="btn ghost" id="advTBack2" data-back data-k="back">${ico("back")}Training</button>
           </div>
           <div class="adv-keys">Health comes back between strings, and nobody goes down for good. Pause for the move list.</div>
         </div>
@@ -6574,7 +6742,7 @@
     });
     ov.querySelectorAll("[data-seg]").forEach(el => el.onclick = () => { t.act = el.dataset.v; redo(); });
     ov.querySelector("#advTrain").onclick = () => startTraining();
-    ov.querySelector("#advTBack2").onclick = () => mainMenu();
+    ov.querySelector("#advTBack2").onclick = () => trainingMenu();
     ov.querySelector("#advTSk").onclick = () => emerlSkills(() => trainingSetup(true));
     if (first) autoFocus();
   }
@@ -6582,6 +6750,306 @@
     const t = tset();
     startBattle({ kind: "training", slots: [{ who: t.you, ctl: "p1", team: 0 }, { who: t.dummy, ctl: "cpu", lvl: 1, team: 1, dummy: t.act }],
                   teams: true, arena: t.arena, rule: "ko", goal: 99, time: 0, hp: 100 });
+  }
+  // ---------------------------------------------------------------- the tutorial
+  /* The TUTORIAL, Training's first choice: an in-game one, played for real, the way KNOCK//BACK's
+     is. A fight in Seabreeze Cape's arena against a dummy that does nothing until a lesson wants it
+     to. A card over the fight gives one lesson at a time, in your own keys (or the pad's buttons,
+     or the touch pad's), and the next opens once you have done it (or skipped it). Nobody loses
+     anything: your health comes back (but in the healing lesson), the dummy's never runs out (but
+     in the last round, when it fights back and is there to be KO'd), and a dummy knocked far off
+     is brought back in front of you. The lessons hear the fight through emit(): hits (whose, which
+     blow, how many in the combo, a launch, a chase, an OTG, a counter), bounces, knockdowns,
+     guards and parries, bursts, specials, links, jumps, dashes and Spin Dashes. Done (or each lesson
+     skipped to the end), its own last screen, with what you did. */
+  const usingPad = () => { try { return Array.from(navigator.getGamepads ? navigator.getGamepads() : []).some(g => g && g.connected); } catch (e) { return false; } };
+  const TUT_KEYS = { key: { J: "Space", Z: "Z", X: "X", C: "C" }, pad: { J: "A", Z: "X", X: "Y", C: "B" }, touch: { J: "Jump", Z: "Light", X: "Heavy", C: "Special" } };
+  const tk = a => `<kbd>${(TOUCH ? TUT_KEYS.touch : usingPad() ? TUT_KEYS.pad : TUT_KEYS.key)[a]}</kbd>`;
+  const td = d => `<kbd>${{ L: "&larr;", R: "&rarr;", U: "&uarr;", D: "&darr;" }[d]}</kbd>`;
+  const tMe = () => battle.fs[0], tDum = () => battle.fs[1];
+  const byMe = d => !!d && (d.by === tMe() || d.p === tMe());
+  const nameOf = () => esc(tMe().c.name);
+  /* both on the floor, x along the arena, facing each other, out of whatever they were in */
+  function tutPlace(px, dx) {
+    for (const [f, x] of [[tMe(), px], [tDum(), dx]]) {
+      Object.assign(f, { x, y: floorAt(x), vx: 0, vy: 0, ground: true, on: null, onTile: null, state: "run", mv: null, sp: null, tor: null, er: null,
+                         curl: false, juggle: false, smashT: 0, spike: false, hang: 0, guardT: 0, crouchT: 0, healing: false, target: null, chase: false,
+                         buf: null, inv: 0, airMove: false, airChain: 0, cmb: { n: 0, dmg: 0 } });
+    }
+    tMe().face = sgn(dx - px) || 1; tDum().face = -tMe().face;
+    const A = tDum().ai; A.q = []; A.dir = 0; A.hold = 0;
+  }
+  /* a lesson's combo dropped: back to its start, with a word on why */
+  function tutDrop(note, air) {
+    const v = tDum(), a = tMe();
+    if (TUT.got > 0 && v.state !== "hurt" && v.state !== "down" && a.state !== "atk" && a.state !== "seek" && (!air || a.ground)) { TUT.got = 0; TUT.note = note; return "redraw"; }
+  }
+  /* The lessons. text: what the card says (once it has started, by how far in it is); need: how
+     many to do; on(kind, data): what counts (true for one more, or a number for the progress
+     itself); tick(dt): each frame while it is open; setup(): as it opens; cue: the dummy swings
+     at you, this string every `gap` seconds; keepHp: your health is left alone; final: the last
+     round; skip(): not this fighter's lesson. */
+  const LESSONS = [
+    { id: "move", title: "Move", need: 1, noHome: true,
+      text: () => `Run with ${td("L")} ${td("R")} (or A and D). Run into the yellow ring.`,
+      setup() { tutPlace(8, 24); TUT.spot = 15; TUT.ringT = 0; },
+      tick(dt) {
+        if ((TUT.ringT -= dt) <= 0) { TUT.ringT = 0.55; ring(TUT.spot, floorAt(TUT.spot) + 0.55, 0xffd21a, 1.3); }
+        const a = tMe(); if (Math.abs(a.x - TUT.spot) < 0.6 && a.ground) return true;
+      } },
+    { id: "jump", title: "Jump and Air Action", need: 2, noHome: true,
+      text: () => TUT.got < 1 ? `${tk("J")} jumps (hold it to go higher).` : `Now ${tk("J")} again in the air: ${nameOf()}'s air action, ${airDesc(tMe().c)}.`,
+      on(k, d) { if (k === "jump" && byMe(d)) return Math.max(TUT.got, 1); if (k === "airaction" && byMe(d) && TUT.got >= 1) return 2; } },
+    { id: "dash", title: "Dash", need: 1, noHome: true,
+      text: () => `Tap ${td("L")} or ${td("R")} twice, quickly: ${nameOf()}'s dash.`,
+      on(k, d) { if (k === "dash" && byMe(d)) return true; } },
+    { id: "spin", title: "Spin Dash", need: 1, noHome: true, skip: () => !tMe().c.spinDash,
+      text: () => `Hold ${td("D")} and tap ${tk("J")} to rev a Spin Dash (each tap revs it harder), then let go of ${td("D")}: off you go, curled, and whatever you run into is hit.`,
+      on(k, d) { if (k === "spindash" && byMe(d)) return true; } },
+    { id: "jabs", title: "Your 1-2-3", need: 3,
+      text: () => `Walk up to the dummy and tap ${tk("Z")} three times: your 1st, 2nd and 3rd attacks. Press again as each one lands and they link (a press is kept till its moment).`,
+      setup() { tutPlace(12, 13.3); },
+      on(k, d) { if (k === "hit" && byMe(d) && d.q === tDum()) { const r = { atk1: 1, atk2: 2, atk3: 3 }[d.name]; if (r && d.n >= r) return r; } },
+      tick() { return tutDrop("The string dropped. Start it again, and press as each hit lands."); } },
+    { id: "auto", title: "Auto Combo", need: 1,
+      text: () => `Keep on: mash ${tk("Z")}. After the 3rd attack comes your heavy, a SMASH that throws them far. Every hit freezes the picture a moment; a combo's smash slows the world, and one on one the camera leans in.`,
+      setup() { tutPlace(12, 13.3); },
+      on(k, d) { if (k === "hit" && byMe(d) && d.name === "heavy" && d.n >= 4) return true; } },
+    { id: "enders", title: "Three Enders", need: 3,
+      text: () => `After a jab or two: ${tk("X")} is the heavy; ${td("U")} + ${tk("X")} the LAUNCHER; ${td("D")} + ${tk("X")} the AIM ATTACK, a dash and a blow. Land each of the three after a ${tk("Z")}.`,
+      setup() { tutPlace(12, 13.3); TUT.set = new Set(); },
+      on(k, d) { if (k === "hit" && byMe(d) && (d.n >= 2 || d.name === "aim") && /^(heavy|upper|aim|chase)$/.test(d.name)) { TUT.set.add(d.name === "chase" ? "aim" : d.name); return TUT.set.size; } } },
+    { id: "dashatk", title: "Dash Attack", need: 1,
+      text: () => `Dash (${td("L")} or ${td("R")} twice) and press ${tk("X")} as you go: the DASH ATTACK, a smash on the run.`,
+      setup() { tutPlace(10, 17); },
+      on(k, d) { if (k === "hit" && byMe(d) && d.name === "dashatk") return true; } },
+    { id: "launch", title: "Launcher and Chase", need: 2,
+      text: () => TUT.got < 1 ? `${td("U")} + ${tk("X")}: the LAUNCHER. Every fighter's throws them straight up, the same height, helpless till they land.`
+        : `Now ${td("D")} + ${tk("X")}: the CHASE. You fly up after them and drive them down.`,
+      setup() { tutPlace(12, 13.3); },
+      on(k, d) { if (k === "hit" && byMe(d) && d.launch) return Math.max(TUT.got, 1); if (k === "hit" && byMe(d) && d.name === "chase" && TUT.got >= 1) return 2; },
+      tick() { return tutDrop("They landed first. Launch them again, then Down + X straight away.", true); } },
+    { id: "air", title: "Super Jump and Air Combo", need: 3,
+      text: () => TUT.got < 1 ? `${td("U")} + ${tk("X")} to launch, then ${tk("J")} as it lands: a SUPER JUMP, up after them.`
+        : TUT.got < 2 ? `${tk("Z")} in the air: air attacks, three to a jump. While they land you both fall slowly, the fighting games' air-combo gravity.`
+        : `Finish with ${td("D")} + ${tk("X")}: the chase smashes them down.`,
+      setup() { tutPlace(12, 13.3); },
+      on(k, d) {
+        if (k === "superjump" && byMe(d)) return Math.max(TUT.got, 1);
+        if (k === "hit" && byMe(d) && TUT.got >= 1 && (d.name === "airatk" || d.name === "homing")) return Math.max(TUT.got, 2);
+        if (k === "hit" && byMe(d) && TUT.got >= 2 && d.name === "chase") return 3;
+      },
+      tick() { return tutDrop("They landed. Launch again: Up + X, then Space straight away.", true); } },
+    { id: "wall", title: "Wall Bounce", need: 1,
+      text: () => `The dummy is by the arena's wall. Smash it into the wall (${tk("X")}, or mash ${tk("Z")} into your heavy): off the wall it bounces back up, for more. Once a combo.`,
+      setup() { const W = world.W; tutPlace(W - 6.6, W - 5.3); },
+      on(k, d) { if (k === "wall" && d.q === tDum()) return true; } },
+    { id: "floor", title: "Ground Bounce", need: 1,
+      text: () => `Launch it (${td("U")} + ${tk("X")}) and chase it (${td("D")} + ${tk("X")}): the chase drives it into the floor, and it bounces back up. Once a combo.`,
+      setup() { tutPlace(12, 13.3); },
+      on(k, d) { if (k === "floor" && d.q === tDum()) return true; } },
+    { id: "otg", title: "Knockdown and OTG", need: 2,
+      text: () => TUT.got < 1 ? `Land a combo of three or more that brings it down (the launcher and the chase will do): it's KNOCKED DOWN, a moment on the floor.`
+        : `While it lies there: ${td("D")} + ${tk("X")}, the OTG, picks it up off the floor for more. Once a combo; then it gets up, untouchable a moment.`,
+      setup() { tutPlace(12, 13.3); },
+      on(k, d) { if (k === "down" && d.q === tDum()) return Math.max(TUT.got, 1); if (k === "hit" && byMe(d) && d.otg) return 2; },
+      tick() { const v = tDum(); if (TUT.got === 1 && v.state === "run" && v.ground) { TUT.got = 0; TUT.note = "It got up. Knock it down again, and Down + X while it lies there."; return "redraw"; } } },
+    { id: "specials", title: "Specials", need: 3, noHome: true,
+      text: () => `${tk("C")} is your shot; ${td("U")} + ${tk("C")} your power; ${td("D")} + ${tk("C")} sets your trap (${td("D")} + ${tk("C")} again sets it off). Use all three.`,
+      setup() { tutPlace(10, 17); TUT.set = new Set(); },
+      on(k, d) { if (k === "special" && byMe(d) && !d.air) { TUT.set.add(d.kind); return TUT.set.size; } } },
+    { id: "airsp", title: "Air Specials", need: 1, noHome: true,
+      text: () => `In the air, ${tk("C")} (and ${td("U")} or ${td("D")} with it) is each special's air version. Jump and use one.`,
+      on(k, d) { if (k === "special" && byMe(d) && d.air) return true; } },
+    { id: "cancel", title: "Special Cancel", need: 1,
+      text: () => `Any blow that lands can go straight into a special: ${tk("Z")}, then ${tk("C")} as it lands.`,
+      setup() { tutPlace(12, 13.3); },
+      on(k, d) { if (k === "link" && byMe(d) && d.nx === "special") return true; } },
+    { id: "guard", title: "Guard", need: 1, cue: { seq: ["z"], gap: 1.5 },
+      text: () => `Now the dummy swings at you. Tap ${td("D")} as it comes: ${nameOf()}'s guard, as long as theirs is in Sonic Battle. A blow on it does nothing.`,
+      setup() { tutPlace(12, 14.5); },
+      on(k, d) { if ((k === "block" || k === "parry") && d.q === tMe()) return true; if (k === "hit" && d.q === tMe()) TUT.note = "It got through: tap Down as its blow comes."; } },
+    { id: "parry", title: "Parry", need: 2, cue: { seq: ["z"], gap: 1.7 },
+      text: () => `Tap ${td("D")} just as the blow lands: the first eighth of a second of the guard is a PARRY. Nothing comes of the blow, and the dummy reels, open. Parry it twice.`,
+      setup() { tutPlace(12, 14.5); },
+      on(k, d) {
+        if (k === "parry" && d.q === tMe()) return TUT.got + 1;
+        if (k === "block" && d.q === tMe()) TUT.note = "A block, not a parry: tap a touch later, as the blow is about to land.";
+        if (k === "hit" && d.q === tMe()) TUT.note = "Too late: tap Down a moment before its blow reaches you.";
+      } },
+    { id: "counter", title: "Counter", need: 1, cue: { seq: ["z"], gap: 1.7 },
+      text: () => `Parry it, then hit it while it reels: a COUNTER, a quarter more damage.`,
+      setup() { tutPlace(12, 14.5); },
+      on(k, d) { if (k === "hit" && byMe(d) && d.counter) return true; } },
+    { id: "heal", title: "Heal", need: 1, keepHp: true, noHome: true,
+      text: () => `Your health is down. Hold ${td("D")} and stand still: after a moment you heal, in ${nameOf()}'s healing frames (each fighter at their own speed; Knuckles and Cream fastest). Heal a tenth of it back.`,
+      setup() { tutPlace(12, 20); tMe().hp = tMe().hpMax * 0.5; },
+      tick() { const a = tMe(); if (a.hp >= a.hpMax * 0.6) return true; } },
+    { id: "blue", title: "Burst: Blue", need: 1, cue: { seq: ["z", "z", "z", "z", "z", "z"], gap: 2.8 },
+      text: () => `The dummy will combo you. Caught in it, press ${tk("Z")} + ${tk("X")} together: a BLUE BURST. It throws everyone off, does no damage, and ends the combo. The burst gauge is under your health: full, it flashes gold.`,
+      setup() { tutPlace(12, 14.5); tMe().burst = BURST_MAX; },
+      on(k, d) {
+        if (k === "burst" && byMe(d) && d.blue) return true;
+        if (k === "burst" && byMe(d)) { TUT.note = "That one was gold: wait till its combo has you, then burst."; tMe().burst = BURST_MAX; }
+      } },
+    { id: "gold", title: "Burst: Gold", need: 1,
+      text: () => `Out of a combo, ${tk("Z")} + ${tk("X")} is a GOLD BURST: it hits, and landing it gives a third of the gauge back. Burst right next to the dummy.`,
+      setup() { tutPlace(12, 13.3); tMe().burst = BURST_MAX; },
+      on(k, d) { if (k === "burst" && byMe(d) && !d.blue) { if (d.hit) return true; TUT.note = "It missed: burst right next to the dummy."; tMe().burst = BURST_MAX; } } },
+    { id: "finish", title: "Now For Real", need: 1, final: true,
+      text: () => `The dummy fights back now, and its health is low. Everything you've learned: KO it. (Long combos run down: each hit after the third does less, and at eighteen they break out.)`,
+      setup() { tutPlace(10, 17); const d = tDum(); d.ai.dummy = "fight"; d.lvl = 0; d.hp = d.hpMax * 0.45; tMe().burst = BURST_MAX; },   // (an Easy CPU)
+      on(k, d) { if (k === "ko" && d.q === tDum()) return true; } },
+  ];
+  const tutLessons = () => LESSONS.filter(l => !l.skip || !l.skip());     // (the lessons this fighter gets)
+  const PRAISE = ["Nice!", "Clean.", "That's it.", "Sharp.", "Exactly.", "Good."];
+
+  function tutorialStart() {
+    const t = tset(), you = t.you, dum = you === "knuckles" ? "sonic" : "knuckles";
+    startBattle({ kind: "training", tutorial: true, slots: [{ who: you, ctl: "p1", team: 0 }, { who: dum, ctl: "cpu", lvl: 1, team: 1, dummy: "stand" }],
+                  teams: true, arena: 0, rule: "ko", goal: 99, time: 0, hp: 100 });
+    TUT = { i: -1, got: 0, note: "", ok: null, okT: 0, cueT: 0, stats: { combo: 0, bounces: 0, parries: 0, bursts: 0, done: 0 } };
+    tutNext();
+  }
+  function tutNext() {
+    if (!TUT) return;
+    TUT.i++; TUT.got = 0; TUT.note = ""; TUT.ok = null; TUT.cueT = 0.9;
+    while (LESSONS[TUT.i] && LESSONS[TUT.i].skip && LESSONS[TUT.i].skip()) TUT.i++;
+    const L = LESSONS[TUT.i];
+    if (!L) return tutFinish();
+    const A = tDum().ai; A.dummy = "stand"; A.q = []; A.dir = 0;
+    if (L.setup) L.setup.call(L);
+    tutDraw("new");
+  }
+  function tutComplete() {
+    const L = LESSONS[TUT.i]; let j = TUT.i + 1;
+    while (LESSONS[j] && LESSONS[j].skip && LESSONS[j].skip()) j++;
+    const nx = LESSONS[j];
+    TUT.ok = PRAISE[Math.floor(Math.random() * PRAISE.length)] + " " + (nx ? "Next: " + nx.title + "." : "That's the tutorial!");
+    TUT.okT = 1.4; TUT.stats.done++;
+    SFX.check(); tutDraw("ok");
+    if (L.final) { const d = tDum(); d.ai.dummy = "stand"; d.ai.q = []; }
+  }
+  function tutProgress(r) {
+    const L = LESSONS[TUT.i], got = typeof r === "number" ? r : TUT.got + 1;
+    if (got !== TUT.got) { TUT.got = got; TUT.note = ""; if (TUT.got < L.need) SFX.coin(); }
+    if (TUT.got >= L.need) tutComplete(); else tutDraw();
+  }
+  /** what the fight tells the tutorial (see emit) */
+  function tutHear(kind, d) {
+    const st = TUT.stats;
+    if (kind === "hit" && byMe(d) && d.q === tDum()) st.combo = Math.max(st.combo, d.n);
+    if (kind === "wall" && d.q === tDum()) st.bounces++;
+    if (kind === "parry" && d.q === tMe()) st.parries++;
+    if (kind === "burst" && byMe(d)) st.bursts++;
+    const L = LESSONS[TUT.i]; if (!L || TUT.ok || !L.on) return;
+    const before = TUT.note, r = L.on.call(L, kind, d);
+    if (r === true || (typeof r === "number" && r > TUT.got)) tutProgress(r);
+    else if (TUT.note !== before || r === "redraw") tutDraw();
+  }
+  /** each tick of the fight: the gentle world, the dummy's cues, the lesson's own checks */
+  function tutTick(dt) {
+    const L = LESSONS[TUT.i]; if (!L) return;
+    const a = tMe(), v = tDum();
+    if (!L.keepHp && !L.final) a.hp = a.hpMax;
+    if (!L.final) v.hp = Math.max(v.hp, v.hpMax * 0.4);
+    if (TUT.ok) { if ((TUT.okT -= dt) <= 0) tutNext(); return; }
+    /* a dummy knocked far off comes back, in front of you, once it's on its feet */
+    if (!L.noHome && !L.final && v.state === "run" && v.ground && Math.abs(v.x - a.x) > 7 && a.ground) {
+      if ((TUT.homeT = (TUT.homeT || 0) + dt) > 0.9) {
+        TUT.homeT = 0;
+        const x = clamp(a.x + a.face * 1.8, 3, world.W - 3);
+        burst(v.x, v.y + 0.6, [0xffffff, 0xbfe8ff], 10, 3);
+        Object.assign(v, { x, y: floorAt(x), vx: 0, vy: 0, face: -a.face });
+        burst(x, v.y + 0.6, [0xffffff, 0xbfe8ff], 10, 3); SFX.dash();
+      }
+    } else TUT.homeT = 0;
+    /* the dummy's cue: up to you, then its string, every so often */
+    if (L.cue) {
+      const A = v.ai, dx = a.x - v.x;
+      TUT.cueT -= dt;
+      if (v.state === "run" && v.ground && !A.q.length) {
+        if (Math.abs(dx) > 1.3) { A.dir = sgn(dx); A.hold = 0.06; }
+        else { v.face = sgn(dx) || v.face; if (TUT.cueT <= 0) { TUT.cueT = L.cue.gap; A.q = L.cue.seq.map((k, i) => ({ at: A.qt + i * 0.13, k })); } }
+      }
+    }
+    if (!L.tick) return;
+    const before = TUT.note, r = L.tick.call(L, dt);
+    if (r === true || (typeof r === "number" && r > TUT.got)) tutProgress(r);
+    else if (r === "redraw" || TUT.note !== before) tutDraw();
+  }
+  /** the card over the fight */
+  function tutDraw(flash) {
+    const c = host && host.querySelector(".adv-tut"), L = TUT && LESSONS[TUT.i]; if (!c || !L) return;
+    const list = tutLessons();
+    c.className = "adv-tut" + (flash ? " " + flash : "");
+    c.innerHTML = `
+      <div class="adv-tut-n"><span>Tutorial &middot; Lesson ${list.indexOf(L) + 1} / ${list.length}</span><i>${TOUCH ? "" : "Enter: pause"}</i></div>
+      <h3>${TUT.ok ? "&#10003; " : ""}${esc(L.title)}</h3>
+      <p>${TUT.ok ? esc(TUT.ok) : L.text.call(L)}</p>
+      ${L.need > 1 ? `<div class="adv-tut-pips">${Array.from({ length: L.need }, (_, k) => `<i class="${k < TUT.got ? "on" : ""}"></i>`).join("")}</div>` : ""}
+      ${TUT.note && !TUT.ok ? `<div class="adv-tut-try">${esc(TUT.note)}</div>` : ""}
+      <div class="adv-tut-row"><button data-tut="skip">${L.final ? "Skip" : "Skip lesson"} ${ico("next")}</button><button data-tut="leave">Leave</button></div>`;
+    c.querySelector('[data-tut="skip"]').onclick = () => { if (TUT && !TUT.ok) { SFX.pop(); tutNext(); } };
+    c.querySelector('[data-tut="leave"]').onclick = () => tutLeave();
+  }
+  function tutLeave() { TUT = null; paused = false; trainingMenu(); }
+  /* every lesson done (or skipped through): the tutorial's own last screen */
+  function tutFinish() {
+    const st = TUT.stats;
+    saveData.tutorial = { done: true, at: Date.now() }; save(saveData);
+    TUT = null; paused = false; mode = "results";
+    bgm("competition-results");
+    host.querySelector(".adv-hud").classList.remove("on");
+    const ov = host.querySelector(".adv-ov"), R = (k, v) => `<div class="adv-row"><span>${k}</span><b class="num">${v}</b></div>`;
+    ov.innerHTML = `
+      <div class="panel adv-small pop adv-tutdone">
+        <div class="panel-hd">${ico("dumbbell")}Tutorial complete</div>
+        <div class="adv-tutdone-b">
+          ${R("Lessons done", st.done)}${R("Longest combo", st.combo + (st.combo === 1 ? " hit" : " hits"))}${R("Wall bounces", st.bounces)}${R("Parries", st.parries)}${R("Bursts", st.bursts)}
+          <p>Everyone plays by the same buttons; what each fighter's moves are is in the move list (pause in a fight). Every key can be changed in Options, and Free Training has a dummy to practise on any time.</p>
+        </div>
+        <div class="adv-btns">
+          <button class="btn" id="advTutBack" data-focus data-k="tback">${ico("back")}Training</button>
+          <button class="btn ghost" id="advTutAgain" data-k="tagain">${ico("flag")}Again</button>
+        </div>
+      </div>`;
+    ov.querySelector("#advTutBack").onclick = () => trainingMenu();
+    ov.querySelector("#advTutAgain").onclick = () => tutorialStart();
+    autoFocus();
+  }
+  /* Training's two: the tutorial, and free training (its setup) */
+  function trainingMenu() {
+    const ov = screenOn("setup");
+    ensureStageWorld();
+    const done = !!(saveData.tutorial && saveData.tutorial.done), who = esc(castOf(tset().you).name);
+    ov.innerHTML = `
+      <div class="adv-main pop">
+        <div class="adv-brand">
+          <div class="adv-kicker">SONIC &amp; FRIENDS</div>
+          <div class="adv-logo">TRAINING</div>
+        </div>
+        <div class="adv-mm">
+          <button class="adv-mi" data-tm="tutorial" data-k="tm-tutorial" data-focus>
+            <span class="adv-mi-ic">${ico("book")}</span>
+            <span class="adv-mi-tx"><b>Tutorial</b><i>Every part of the fighting, lesson by lesson, in a real fight, as ${who}: combos, launchers and air combos, bounces, OTGs, specials, the guard and parry, the burst</i></span>
+            <em>${done ? "Done" : "New"}</em>
+          </button>
+          <button class="adv-mi" data-tm="free" data-k="tm-free">
+            <span class="adv-mi-ic">${ico("dumbbell")}</span>
+            <span class="adv-mi-tx"><b>Free Training</b><i>Every move on a dummy that does as it's told (pick your runner here)</i></span>
+          </button>
+          <button class="adv-mi" data-tm="back" data-k="tm-back">
+            <span class="adv-mi-ic">${ico("door")}</span>
+            <span class="adv-mi-tx"><b>Main menu</b><i>Back to the main menu</i></span>
+          </button>
+        </div>
+        <button hidden data-back id="advTMBack"></button>
+      </div>`;
+    const go = { tutorial: () => tutorialStart(), free: () => trainingSetup(true), back: () => mainMenu() };
+    ov.querySelectorAll("[data-tm]").forEach(b => b.onclick = () => go[b.dataset.tm]());
+    ov.querySelector("#advTMBack").onclick = () => mainMenu();
+    autoFocus();
   }
   /* the move list: the same buttons for everyone; what the air action and the moves are, the
      runner's own */
@@ -6609,6 +7077,28 @@
   }
   function battlePause(ov) {
     const B = battle, tr = B.cfg.kind === "training", story = B.cfg.kind === "story";
+    if (B.cfg.tutorial && TUT) {
+      const L = LESSONS[TUT.i];
+      ov.innerHTML = `
+        <div class="panel adv-small pop">
+          <div class="panel-hd">${ico("info")}Paused: Tutorial</div>
+          <div class="adv-btns">
+            <button class="btn" id="advRes" data-k="res">${ico("next")}Keep going</button>
+            <button class="btn ghost" id="advTutRe" data-k="tre">Start this lesson again</button>
+            <button class="btn ghost" id="advTutSkip" data-k="tskip">Skip this lesson</button>
+            <button class="btn ghost" id="advMoves" data-k="moves">Move list</button>
+            <button class="btn ghost" id="advTutLeave" data-k="tleave">${ico("back")}Leave the tutorial</button>
+          </div>
+          <div class="adv-mwrap" hidden>${movesHtml(B.lead.c)}</div>
+        </div>`;
+      const q = s => ov.querySelector(s);
+      q("#advRes").onclick = () => togglePause();
+      q("#advTutRe").onclick = () => { togglePause(); TUT.i--; tutNext(); };
+      q("#advTutSkip").onclick = () => { togglePause(); if (TUT && !TUT.ok) tutNext(); };
+      q("#advMoves").onclick = () => { const m = q(".adv-mwrap"); m.hidden = !m.hidden; };
+      q("#advTutLeave").onclick = () => tutLeave();
+      return autoFocus();
+    }
     const dum = tr ? B.fs[1].ai.dummy : null;
     ov.innerHTML = `
       <div class="panel adv-small pop ${tr ? "adv-tpause" : ""}">
@@ -7401,5 +7891,7 @@
               get battle() { return battle; }, get mode() { return mode; }, get talk() { return talk; }, startBattle, mainMenu, storyMenu, playChapter, battleSetup,
               trainingSetup, optionsScreen, arenaDef, emerlLearn, emerlSkills, emerlCast, get saveData() { return saveData; },
               bossWeak: () => world && world.boss && BRAIN[world.boss.key].weak(world.boss),
+              get tut() { return TUT; }, tutorialStart, trainingMenu, tutLessons: () => tutLessons().map(l => l.id),
+              tutJump: id => { if (!TUT) return; TUT.i = LESSONS.findIndex(l => l.id === id) - 1; TUT.ok = null; tutNext(); },
               get bgm() { return BGM; }, get samples() { return Object.keys(SAMPLES); }, sfx: SFX, tick: (n, h) => { for (let k = 0; k < (n || 1); k++) { if (battle) battleTick(h || 1 / 120); } } } };
 })(typeof globalThis !== "undefined" ? globalThis : this);

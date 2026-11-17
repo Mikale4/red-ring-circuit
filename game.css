@@ -435,3 +435,33 @@
   .adv-name b{padding:8px 34px 10px 34px}
   .adv-comm span{font-size:13px}
 }
+
+/* ---- the tutorial: a lesson card over the fight, its pips and notes; its last screen */
+.adv-tut{position:absolute;left:50%;top:92px;transform:translateX(-50%);width:min(580px,calc(100% - 24px));pointer-events:auto;padding:9px 14px 11px;
+  background:repeating-linear-gradient(135deg,rgba(255,255,255,.045) 0 14px,rgba(255,255,255,0) 14px 28px),var(--sx-navy);border:3px solid var(--sx-ink);border-radius:12px;
+  box-shadow:inset 0 0 0 2px var(--sx-blue),0 6px 0 rgba(5,10,34,.55);color:#fff}
+.adv-tut.new{animation:adv-tutin .28s ease-out}
+.adv-tut.ok{box-shadow:inset 0 0 0 2px var(--sx-grn),0 6px 0 rgba(5,10,34,.55)}
+@keyframes adv-tutin{0%{opacity:0;margin-top:-10px}100%{opacity:1;margin-top:0}}
+.adv-tut-n{display:flex;justify-content:space-between;gap:10px;font:700 11px/1 var(--sx-pix);letter-spacing:.08em;text-transform:uppercase;color:var(--sx-yel)}
+.adv-tut-n i{font-style:normal;color:#9fb4e8}
+.adv-tut h3{margin:5px 0 3px;font:italic 900 22px/1.05 var(--sx-big);color:#fff;paint-order:stroke fill;-webkit-text-stroke:5px var(--sx-ink);text-transform:uppercase}
+.adv-tut.ok h3{color:#9af0a6}
+.adv-tut p{margin:0;font:600 14px/1.45 var(--sx-pix)}
+.adv-tut kbd{display:inline-block;min-width:1.4em;margin:0 1px;padding:1px 6px 0;text-align:center;font:700 13px/1.25 var(--sx-pix);color:var(--sx-ink);background:#fff;
+  border:2px solid var(--sx-ink);border-radius:5px;box-shadow:0 2px 0 var(--sx-ink)}
+.adv-tut-pips{display:flex;gap:6px;margin-top:8px}
+.adv-tut-pips i{width:16px;height:16px;border-radius:50%;border:3px solid #ffd21a;background:var(--sx-ink);box-shadow:0 0 0 2px var(--sx-ink)}
+.adv-tut-pips i.on{background:#ffd21a}
+.adv-tut-try{margin-top:7px;padding:4px 8px;font:600 13px/1.35 var(--sx-pix);color:#ffd27a;background:rgba(232,64,58,.22);border-left:4px solid var(--sx-red);border-radius:4px}
+.adv-tut-row{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+.adv-tut-row button{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;font:700 12px/1 var(--sx-pix);color:#fff;background:var(--sx-blue);
+  border:2px solid var(--sx-ink);border-radius:6px;cursor:pointer}
+.adv-tut-row button:hover{filter:brightness(1.15)}
+.adv-tut-row button:last-child{background:transparent;border-color:#9fb4e8}
+.adv-tut-row svg{width:13px;height:13px}
+.adv-hud.tut .adv-combo{top:auto;bottom:110px}
+.adv-tutdone-b{padding:6px 4px 2px}
+.adv-tutdone-b .adv-row{display:flex;justify-content:space-between;padding:5px 2px;border-bottom:1px solid rgba(255,255,255,.12)}
+.adv-tutdone-b p{margin:10px 2px 4px;font:600 13px/1.45 var(--sx-pix);color:#cfe0ff}
+@media (max-width:640px){.adv-tut{top:84px;padding:7px 10px 9px}.adv-tut h3{font-size:18px}.adv-tut p{font-size:12.5px}}

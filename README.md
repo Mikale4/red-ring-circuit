@@ -110,8 +110,26 @@ runner, each a player or a CPU (Easy, Normal or Hard): 1P vs CPU, 1P vs 2P, CPU 
 vs CPU, three-way, four-way, or 2 vs 2; everyone for themselves or Red against Blue; Survival
 (lives; the default) or a KO match; a time limit or none; in any runner's arena, which the setup shows
 in a picture (built from that arena's own world, once, and kept). Down guards (just as a blow
-lands, a parry), and held still heals; Z + X bursts. **Training** is the same fight on a dummy that stands, guards, walks, jumps or
-fights back, and never ends. **Options** set the music, sounds, screen shake and the two
+lands, a parry), and held still heals; Z + X bursts. **Training** holds the **Tutorial** and **Free
+Training**, the same fight on a dummy that stands, guards, walks, jumps or fights back, and
+never ends.
+
+**The Tutorial** (Training's first choice) is played for real: a fight in Seabreeze Cape's arena,
+as your Free Training runner, against a dummy that does nothing until a lesson wants it to. A
+card over the fight gives one lesson at a time, in your own keys (a pad's buttons, or the touch
+pad's), with pips for each step; the next opens once you've done it, or **Skip lesson** (the
+pause menu also starts a lesson again, skips it, or leaves). Twenty-three lessons: running into
+a ring; the jump and your air action; the dash; the Spin Dash (for those who have one); your
+1-2-3; the auto combo into the smash; the three enders (heavy, launcher, aim attack); the dash
+attack; the launcher and the chase; the super jump into an air combo; a wall bounce (the dummy
+by the arena's wall); a ground bounce; a knockdown and the OTG; the shot, power and trap; an air
+special; a special cancel; then the dummy swings at you for the guard, two parries and a
+counter; healing; a blue burst out of its combo; a gold burst; and a last round where it fights
+back and you KO it. A string that drops, a block that should have been a parry, a burst at the
+wrong moment: the card says what went wrong. Your health comes back (but in the healing lesson),
+the dummy's never runs out (but in the last round), and a dummy knocked far off comes back in
+front of you. It ends on its own screen with what you did (lessons, longest combo, wall
+bounces, parries, bursts). **Options** set the music, sounds, screen shake and the two
 players' keys (any key can be rebound; a second gamepad is player 2's).
 
 **Emerl** (Sonic Battle's Gizoid) is the fourteenth runner. He fights with what he has
@@ -211,10 +229,24 @@ Capcom 3), borrowing their mechanics, not their look:
   fills its gauge.
 - **Every hurt has its frames,** from rows of the sheets the game had not used: knocked upward off
   a launch, knocked back (tumbling) off a smash, hitting a wall, hitting the ground, getting up,
-  the attack blocked. A knockdown ends in getting up, untouchable for a moment. "Parry!", "Burst!"
+  the attack blocked. A knockdown ends in getting up, untouchable for a moment. A fighter who loses
+  a life is thrown tumbling, lands flat out on the ground, flickers, and is gone till they drop
+  back in. "Parry!", "Burst!"
   and "Counter!" pop up over whoever did it, and the hit counter shows in every fight.
-- **The CPUs combo too:** jabs into the launcher or the heavy, then the chase, a super jump and
-  air attacks, the OTG; Hard most often.
+- **The CPUs play it properly.** A CPU never throws a blow at nothing: it attacks only with its
+  mark in reach, on its level and open (not untouchable, not lying down but for an OTG). It goes
+  where its mark is: up after one on a plank above (a jump and its air action at the top), down
+  through or off its own plank after one below; one it can't get up to it waits for under the
+  plank, its launcher ready for them coming down. Each fights in a style, mostly its runner's:
+  **rush** (in close and combo: Sonic, Shadow, Knuckles, Amy, Mighty, Metal, Emerl), **zone**
+  (keep off at shot range and fire, back away and leave traps: Tails, Cream, Gamma, Eggman,
+  Silver) or **counter** (hover just outside reach, guard and parry, punish: Rouge, Chaos);
+  anyone left open (parried, reeling, whiffing up close) is punished whatever the style. Its
+  combos are planned and pressed as a player presses them, the next blow only once the last has
+  landed: jabs into the launcher, a super jump, an air combo and the chase; the auto combo into
+  the smash; jabs into the heavy, a special or the aim attack. A blow that misses ends it. Easy
+  drops combos now and then, Normal now and again, Hard never; Hard guards and parries most, and
+  bursts out of long combos soonest.
 
 A double tap of a direction is the runner's own dash (Sonic Dash and Tails Hop are hops,
 Knuckles' cannot steer, Shadow's leaves him unseen). Down crouches (the landing frames, as
