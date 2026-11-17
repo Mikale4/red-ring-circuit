@@ -2670,7 +2670,7 @@
   // ---------------------------------------------------------------- sound
   /* Little synthesised effects, at the game's own sfx volume. The music is Sound's. */
   let AC = null;
-  function sfxVol() { try { const v = root.Settings && Settings.get("sfxVolume"); return v == null ? 0.7 : v; } catch (e) { return 0.7; } }
+  function sfxVol() { if (demo && mode === "title") return 0; try { const v = root.Settings && Settings.get("sfxVolume"); return v == null ? 0.7 : v; } catch (e) { return 0.7; } }
   function tone(f0, f1, dur, type, vol, delay) {
     try {
       AC = AC || new (root.AudioContext || root.webkitAudioContext)();
@@ -2859,6 +2859,7 @@
      the fighter whose blow, shot or trap is landing now; `hitTok` the blow itself, so it lands
      on each fighter once; `hitDmg` and `hitKnock` how hard. */
   let battle = null, actor = null, hitTok = null, hitDmg = 8, hitKnock = 0.85;
+  let demo = null;                                    // the title's demo run (see demoStart)
   /* the tutorial running (see tutorialStart), and what the fight tells it */
   let TUT = null;
   const emit = (k, d) => { if (TUT && battle && battle.cfg.tutorial) tutHear(k, d); };
@@ -3264,7 +3265,7 @@
   /* Hurt, the Sonic way: a shield takes the hit and goes; else the rings fly out; with no rings
      at all, the runner is down, and goes back to the last Star Post. */
   function hurt(p, fromX) {
-    if (p.inv > 0 || p.star > 0 || p.dead) return;
+    if (p.inv > 0 || p.star > 0 || p.dead || p.demo) return;
     p.inv = 1.6;
     p.vx = -sgn(fromX - p.x || p.face) * 7; p.vy = 8; p.ground = false;
     p.state = "hurt"; p.st = 0.45; p.curl = false; p.mv = null; p.sp = null;
@@ -3276,6 +3277,7 @@
   }
   function die(p, why) {
     if (p.dead) return;
+    if (p.demo) { p.demoFell = true; return; }           // (the title's demo: put back on the road instead)
     p.dead = 1.1; p.why = why; p.falls++;
     SFX.fall();
   }
@@ -3852,10 +3854,12 @@
     const cm = p.lastCmb, smash = fin && (m.chase || ((m.name === "heavy" || m.name === "dashatk") && cm && cm.n >= 3));
     if (m.chase) p.vy = -5;                                // the chase: down after them, for the bounce
     if (smash) {
-      hitStop(0.2); slowMo(0.32); camPunch(h.x, h.y, 1, 0.75);
+      hitStop(0.2); slowMo(0.32);
+      const v = p.lastVic;
+      if (cm && v && (cm.n >= 5 || cm.dmg >= v.hpMax * 0.16 || clutch(v))) camPunch(h.x, h.y, 1, 1.0);
       impact(h.x, h.y, { c: col, flash: 3.2, shake: 0.3 });
       SFX.boom();
-    } else if (fin && H.heavy) camPunch(h.x, h.y, m.name === "upper" ? 0.45 : 0.3, 0.4);
+    }
   }
   /* Down + X: the aim attack -- a dash at the nearest thing, then the blow. In a battle, with a
      rival thrown up by an upper, it is the chase: after them, wherever they are, faster, and
@@ -4329,7 +4333,6 @@
           impact(hx, hy, { c: col, flash: 2.4, shake: 0.16, stop: s.twister ? 0.09 : 0.07 });
           impact(hx, hy, { c: col, flash: 1.6, cone: sgn(s.vx) || 1 });
           ring(hx, hy, col, s.twister ? 2.2 : 1.6); hitSpark(hx, hy, 1.3, col);
-          if (battle && battle.fs.length === 2) camPunch(hx, hy, 0.22, 0.3);
           SFX.hit(); SFX.impact(); s.life = 0;
           /* it lands, and the combo can go on: the rest of the move cancels into the next press, and
              Space is a super jump after one it threw up */
@@ -4749,10 +4752,21 @@
   /** In a one-on-one battle, the camera leans in on a big hit: toward (x, y), closer the bigger
       `k` (1 the most), tilting a little, and eases back over `life` seconds. (With three or four
       fighters it keeps still, framing them all.) */
-  const camPunch = (x, y, k, life) => {
-    if (!battle || battle.fs.length !== 2 || (punch && punch.k > k && punch.t < punch.life * 0.5)) return;
-    punch = { x, y, k, life: life || 0.6, t: 0, roll: (Math.random() < 0.5 ? -1 : 1) * 0.05 * k };
+  /* The dynamic camera (one-on-one only): it leans in, tilted, on a moment worth it -- a KO (the
+     last, deciding one most of all), the smash or chase that ends a long or heavy combo, a bounce
+     deep in one, a parry or a burst in a tight spot -- and then not again for a while (`force`, a
+     KO, goes anyway); held inside the arena's walls, so a corner doesn't throw it about. */
+  let camCool = 0;
+  const camPunch = (x, y, k, life, force) => {
+    if (!battle || battle.fs.length !== 2) return;
+    if (punch && punch.t < punch.life && k <= punch.k) return;          // one on now, as big or bigger
+    if (camCool > 0 && !force) return;                                  // too soon after the last
+    life = life || 0.9;
+    punch = { x, y, k, life, t: 0, roll: (Math.random() < 0.5 ? -1 : 1) * 0.05 * Math.min(1, k) };
+    camCool = life + 2.4;
   };
+  /* a tight spot: low on health (on their last life, in Survival) */
+  const clutch = q => !!q && q.hp <= q.hpMax * 0.25;
   const shakeCam = s => { if (!root.Settings || Settings.get("shake") !== false) shake = Math.max(shake, s); };   // Options can turn it off
   const CAM_D = 17;
   function snapCamera() { if (!player) return; camX = player.x + 2; camY = Math.max(6.1, player.y + 2.1); }
@@ -4868,7 +4882,7 @@
     if (stopT > 0 && p.state === "hurt" && p.sinceHit < 0.02) { p.spr.position.x += (Math.random() - 0.5) * 0.14; p.spr.position.y += (Math.random() - 0.5) * 0.06; }
     /* KO'd: down a while, then flickering, then gone (till they come back in from above) */
     const koGone = p.ko && battle && (p.koT < 0.12 || (p.koT < 1.1 && Math.sin(world.t * 38) > 0));
-    p.spr.visible = !GLIDE[mode] && !p.out && !koGone && !(p.hideT > 0) && !(p.inv > 0 && !p.dead && !p.ko && p.state !== "dash" && p.state !== "teleport" && !(p.sp && p.sp.shield) && Math.sin(world.t * 40) > 0.4);
+    p.spr.visible = (!GLIDE[mode] || (mode === "title" && !!demo)) && !p.out && !koGone && !(p.hideT > 0) && !(p.inv > 0 && !p.dead && !p.ko && p.state !== "dash" && p.state !== "teleport" && !(p.sp && p.sp.shield) && Math.sin(world.t * 40) > 0.4);
   }
   /* The dust behind a rev: Sonic Advance's spray, looping faster and swelling as the rev
      builds (each tap of Space kicks it up), at the runner's heels, trailing away from them. */
@@ -5005,13 +5019,16 @@
     }
     /* a big hit in a battle: the camera leans in on it fast, tilted, then eases back */
     let cx = camX, cy = camY, roll = 0;
+    if (camCool > 0) camCool -= dt;
     if (punch) {
       punch.t += dt;
       const u = punch.t / punch.life;
       if (u >= 1 || !battle) punch = null;
       else {
-        const e0 = u < 0.14 ? u / 0.14 : 1 - (u - 0.14) / 0.86, e = e0 * e0 * (3 - 2 * e0);
-        D *= 1 - 0.34 * punch.k * e; cx = lerp(camX, punch.x, 0.55 * e); cy = lerp(camY, punch.y, 0.45 * e); roll = punch.roll * e;
+        const e0 = u < 0.16 ? u / 0.16 : u < 0.45 ? 1 : 1 - (u - 0.45) / 0.55, e = e0 * e0 * (3 - 2 * e0);   // in, held, out
+        D *= 1 - 0.3 * Math.min(1.25, punch.k) * e; cx = lerp(camX, punch.x, 0.5 * e); cy = lerp(camY, punch.y, 0.4 * e); roll = punch.roll * e;
+        const hw = Math.tan(17 * PI / 180) * D * aspect;                // (not past the arena's walls)
+        if (hw * 2 < w.W) cx = clamp(cx, hw - 0.5, w.W - hw + 0.5);
       }
     }
     camera.position.set(cx, cy + 1.9, D);
@@ -5760,7 +5777,9 @@
     } else if (GLIDE[mode]) {
       /* the title and the menus: the camera goes along the stage on its own (the cast parades
          below the title); a story scene's talk goes on over it */
-      world.t += dt; titleGlide(dt); worldStep(dt * 0.6); drawParade(dt);
+      if (mode === "title" && demo) demoTick(dt);
+      else { world.t += dt; titleGlide(dt); worldStep(dt * 0.6); }
+      drawParade(dt);
       if (mode === "scene") sceneTick(dt);
     } else {
       // the menu: she waits at the start, the world goes on around her
@@ -5921,7 +5940,7 @@
     p.juggle = true; p.st = Math.min(1.4, airTime(p)) + 0.08;
     const x = p.x + d * p.c.w / 2, y = p.y + p.hh * 0.5;
     impact(x, y, { c: 0xffffff, flash: 2.4, shake: 0.24 }); burst(x, y, [0xd8d0c0, 0xffffff, 0xa8a090], 16, 6);
-    hitStop(0.09); camPunch(x, y, 0.6, 0.5); SFX.impact(); SFX.stomp();
+    hitStop(0.09); if (p.cmb.n >= 6) camPunch(x, y, 0.6, 0.8); SFX.impact(); SFX.stomp();
     emit("wall", { q: p });
   }
   function floorBounce(p) {
@@ -5929,7 +5948,7 @@
     p.ground = false; p.on = null; p.onTile = null; p.vy = 10.5; p.vx *= 0.4;
     p.juggle = true; p.st = Math.min(1.4, airTime(p)) + 0.08;
     impact(p.x, p.y + 0.1, { c: 0xffffff, flash: 2.4, shake: 0.24 }); burst(p.x, p.y + 0.1, [0xd8d0c0, 0xffffff, 0xa8a090], 18, 6);
-    hitStop(0.08); camPunch(p.x, p.y + 0.6, 0.6, 0.5); SFX.impact(); SFX.stomp();
+    hitStop(0.08); if (p.cmb.n >= 6) camPunch(p.x, p.y + 0.6, 0.6, 0.8); SFX.impact(); SFX.stomp();
     emit("floor", { q: p });
   }
   /** a guard met a blow in its first moment: nothing comes of the blow, and one who threw it from
@@ -5937,7 +5956,7 @@
   function parried(q, by) {
     const x = by ? (q.x + by.x) / 2 : q.x + q.face * 0.5, y = q.y + q.hh * 0.6;
     hitSpark(x, y, 1.7, 0xffffff); flash(x, y, 2.6, 0x9ad8ff); ring(x, y, 0x9ad8ff, 1.6);
-    hitStop(0.14); shakeCam(0.1); camPunch(x, y, 0.45, 0.45);
+    hitStop(0.14); shakeCam(0.1); if (clutch(q)) camPunch(x, y, 0.55, 0.8);
     SFX.set(); SFX.hit();
     q.guardT = Math.max(q.guardT, 0.18); q.parries = (q.parries || 0) + 1;
     call(q, "Parry!");
@@ -5962,7 +5981,8 @@
     ring(cx, cy, col, 4.2); ring(cx, cy, 0xffffff, 2.6);
     flash(cx, cy, 6, col); flash(cx, cy, 3, 0xffffff);
     burst(cx, cy, [col, 0xffffff, mixC(col, 0xffffff, 0.5)], 40, 9);
-    hitStop(0.16); slowMo(0.25); shakeCam(0.32); camPunch(cx, cy, 0.7, 0.6);
+    hitStop(0.16); slowMo(0.25); shakeCam(0.32);
+    if (blue && ((p.cmb && p.cmb.n >= 6) || clutch(p))) camPunch(cx, cy, 0.7, 0.9);
     SFX.blast(); SFX.boom();
     call(p, "Burst!");
     emit("burst", { p, blue, hit: !!hit });
@@ -6016,6 +6036,9 @@
     q.ko = true; q.koT = 2.2; q.hp = 0; q.state = "run"; q.guardT = 0; q.healing = false; q.juggle = false;
     q.vy = Math.max(q.vy, 9); q.vx = (sgn(q.x - (by ? by.x : q.x)) || -q.face) * 5; q.ground = false; q.on = null;
     hitStop(0.22); shakeCam(0.3);
+    const last = B.cfg.rule === "stock" && q.lives <= 1 && B.fs.filter(f => !f.elim && f !== q && rivals(f, q)).length > 0 && B.fs.filter(f => !f.elim && f !== q && !rivals(f, q)).length === 0;
+    camPunch(q.x, q.y + q.hh * 0.5, last ? 1.25 : 0.9, last ? 1.5 : 1.0, true);
+    if (last) slowMo(0.6);
     flash(q.x, q.y + q.hh * 0.5, 3.6, HIT_C[by ? by.c.id : q.c.id] || 0xffffff);
     burst(q.x, q.y + q.hh * 0.5, [0xffffff, 0xf2d040, 0xe8403a], 22, 7);
     SFX.impact(); SFX.fall();
@@ -6542,17 +6565,51 @@
   /* the camera frames everyone in the fight, backing off as they spread out, the floor kept
      near the bottom of the picture */
   let camD = CAM_D;
+  /* The strip of the picture the fighters are kept in, from bottom to top (-1 to 1): under the
+     health cards, and with the touch pad up, over its buttons (else the floor sits a fifth of
+     the way up). Measured off the page now and then. */
+  let BAND = null;
+  function viewBand(dt) {
+    if (BAND && (BAND.t -= dt) > 0) return BAND;
+    const box = host.querySelector(".adv-3d"), r0 = box && box.getBoundingClientRect();
+    let sb = -0.62, st = 0.72;
+    if (r0 && r0.height) {
+      const cards = host.querySelector(".adv-fcards"), rc = cards && cards.getBoundingClientRect();
+      if (rc && rc.height) st = Math.min(st, 1 - 2 * (rc.bottom - r0.top + 8) / r0.height);
+      const keys = [...host.querySelectorAll(".adv-pad button")].map(b => b.getBoundingClientRect()).filter(r => r.height);
+      if (keys.length) { const top = Math.min(...keys.map(r => r.top)); sb = Math.max(sb, 1 - 2 * (top - r0.top - 4) / r0.height); }
+    }
+    if (st - sb < 0.5) st = sb + 0.5;
+    return (BAND = { sb, st, t: 0.5 });
+  }
   function battleView(aspect, dt) {
     const fs = battle.fs.filter(f => !f.out);
-    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
-    for (const f of fs) { x0 = Math.min(x0, f.x); x1 = Math.max(x1, f.x); y0 = Math.min(y0, f.y); y1 = Math.max(y1, f.y + f.hh); }
-    if (!fs.length) { x0 = x1 = world.W / 2; y0 = 4; y1 = 5; }
-    const T = Math.tan(17 * PI / 180), W = world.W;
-    const want = clamp(Math.max(((x1 - x0) / 2 + 4.5) / (T * aspect), ((y1 - y0) / 2 + 3.2) / T, 12.5 / (2 * T * aspect)), CAM_D, 34);
+    const T = Math.tan(17 * PI / 180), W = world.W, { sb, st } = viewBand(dt), band = (st - sb) / 2;
+    /* a narrow (upright) screen may back off much further; if everyone still won't fit, it keeps
+       to the players' own fighters and whoever is nearest each (the rest marked at the edge) */
+    const maxD = aspect < 1.2 ? 80 : 40, mx = 3.4, my = 2.2;
+    const box = list => {
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+      for (const f of list) { x0 = Math.min(x0, f.x); x1 = Math.max(x1, f.x); y0 = Math.min(y0, f.y); y1 = Math.max(y1, f.y + f.hh); }
+      return { x0, x1, y0, y1, d: Math.max(((x1 - x0) / 2 + mx) / (T * aspect), ((y1 - y0) / 2 + my) / (T * band), 12.5 / (2 * T * aspect)) };
+    };
+    let bx = fs.length ? box(fs) : { x0: W / 2, x1: W / 2, y0: 4, y1: 5, d: CAM_D };
+    const hum = fs.filter(f => f.ctl !== "cpu" && !f.ko);
+    if (bx.d > maxD) {
+      if (hum.length) {
+        const keep = new Set(hum);
+        for (const h of hum) { let nb = null, nd = 1e9; for (const f of fs) if (rivals(h, f) && !f.ko) { const d = Math.abs(f.x - h.x); if (d < nd) { nd = d; nb = f; } } if (nb) keep.add(nb); }
+        bx = box([...keep]);
+      }
+    }
+    const { x0, x1, y0, y1 } = bx;
+    const want = clamp(bx.d, CAM_D, maxD);
     camD = lerp(camD, want, 1 - Math.exp(-dt * 2.5));
     const halfW = T * camD * aspect, halfH = T * camD;
-    const tx = halfW * 2 > W ? W / 2 : clamp((x0 + x1) / 2, halfW - 0.5, W - halfW + 0.5);
-    const ty = Math.max((y0 + y1) / 2 + 0.6, 4 + halfH * 0.62);
+    let tx = (x0 + x1) / 2;
+    if (bx.d > maxD && hum.length) tx = clamp(tx, hum[0].x - halfW + 2.4, hum[0].x + halfW - 2.4);   // still too far apart: Player 1 kept in, leaning their foe's way
+    tx = halfW * 2 > W ? W / 2 : clamp(tx, halfW - 0.5, W - halfW + 0.5);
+    const ty = Math.max((y0 + y1) / 2 - halfH * (st + sb) / 2, 4 - sb * halfH);
     const fast = battle.fs.some(f => f.juggle || f.state === "seek");          // a juggle or a chase: the camera keeps right up with it
     camX = lerp(camX, tx, 1 - Math.exp(-dt * (fast ? 6 : 4))); camY = lerp(camY, ty, 1 - Math.exp(-dt * (fast ? 6.5 : 3)));
     return camD;
@@ -6569,8 +6626,14 @@
       if (f.out || f.ko) { el.style.display = "none"; return; }
       TV.set(f.x, f.y + f.hh + (f.c.lift || 0) + 0.3, 0).project(camera);
       el.style.display = "";
-      const sx = Math.round((TV.x + 1) / 2 * W), sy = Math.round((1 - TV.y) / 2 * Hh);
-      el.style.transform = `translate(${sx}px,${sy}px) translate(-50%,-100%)`;
+      let sx = Math.round((TV.x + 1) / 2 * W), sy = Math.round((1 - TV.y) / 2 * Hh);
+      /* out of the picture: held at its edge, pointing the way they are */
+      const offL = sx < 22, offR = sx > W - 22;
+      el.classList.toggle("offl", offL); el.classList.toggle("offr", offR);
+      if (offL || offR) {
+        sx = offL ? 14 : W - 14; sy = clamp(sy + 12, 70, Hh - 40);
+        el.style.transform = `translate(${sx}px,${sy}px) translate(${offL ? "0" : "-100%"},-50%)`;
+      } else el.style.transform = `translate(${sx}px,${sy}px) translate(-50%,-100%)`;
       if (calls[i]) calls[i].style.transform = `translate(${sx}px,${sy - 30}px) translate(-50%,-100%)`;   // a call over the tag
     });
   }
@@ -6665,7 +6728,7 @@
   // ---------------------------------------------------------------- the main menu
   const runnerId = () => storyRun ? storyRun.ch.who : castId;
   /* the menus glide over one of the stages, never an arena */
-  function ensureStageWorld() { if (!world || world.def !== actDef(stageIdx, actIdx)) load3d(stageIdx); }
+  function ensureStageWorld() { if (!world || world.demo || world.def !== actDef(stageIdx, actIdx)) { demo = null; load3d(stageIdx); } }
   function screenOn(m) {
     endBattle();
     /* a screen drawn again (a setting changed on it) stays where it was scrolled to; another
@@ -7714,15 +7777,16 @@
     R.domElement.__w = 0;
   }
 
-  /* The title screen: the stage going by behind, slowly, from its start to its end and round
-     again; the logo; Press Enter; the trainer's record on a little tote board; and along the
-     bottom the whole cast in a post parade -- the thirteen of them going by in a line along
-     a strip of checkered soil under grass, each in their own running frames. */
+  /* The title screen: behind it, a demo -- one of the cast, at random, playing a zone's first
+     Act, at random, to its goal post, then another, round and round; the logo; Press Enter; the
+     trainer's record on a little tote board; and along the bottom a strip of checkered soil under
+     grass where up to four of the cast at a time come on, at random, to do something of their own. */
   let glideX = 12, parade = null;
   function title() {
     endBattle(); storyRun = null; talk = null;
     if (mode !== "title" && mode !== "main" && world) { glideX = Math.max(12, world.start.x); camX = glideX + 3; }
     mode = "title"; paused = false; music();
+    demoStart();
     const ov = host.querySelector(".adv-ov"), list = stages();
     host.querySelector(".adv-hud").classList.remove("on");
     host.classList.remove("playing");
@@ -7753,6 +7817,82 @@
     if (ov.querySelector("#advTBack")) ov.querySelector("#advTBack").onclick = () => exit();
     autoFocus();
   }
+  /* The demo: a runner and a zone's Act 1, each at random (not the last ones again), a robot at
+     the controls. It holds right, and jumps for a wall, a gap or a badnik ahead, or when it
+     stops; in the air, its air action for a wall or a drop (Knuckles climbs what he grabs).
+     Nothing hurts it and it is quiet; fallen, it is put back on the road ahead; stuck a while,
+     it skips on; at the goal post the post spins, and after a moment, the next. */
+  function demoStart() {
+    const zones = stages().map((z, i) => i), ids = CAST.map(c => c.id);
+    const pick = (list, not) => { const l = list.length > 1 ? list.filter(v => v !== not) : list; return l[Math.floor(Math.random() * l.length)]; };
+    const i = pick(zones, demo && demo.i), id = pick(ids, demo && demo.id);
+    disposeWorld();
+    world = buildWorld(actDef(i, 0)); world.demo = true; world.played = true;
+    player = makePlayer(castOf(id)); player.demo = true;
+    snapCamera();
+    const box = host.querySelector(".adv-3d");
+    if (box && R.domElement.parentNode !== box) box.appendChild(R.domElement);
+    demo = { i, id, t: 0, acc: 0, best: player.x, still: 0, hold: 0, jt: 0, airUsed: false, done: 0, safe: { x: player.x, y: player.y }, inp: newInput() };
+  }
+  /* back on the road, `dist` metres or more on from x: the nearest standing place to the height it was at */
+  function demoWarp(p, x, dist) {
+    for (let dx = dist; dx < dist + 16; dx++) {
+      const i = Math.floor(x + dx); if (i < 2 || i >= world.W - 2) break;
+      let best = null;
+      for (let j = 1; j < H - 3; j++) {
+        const under = tile(i, j - 1), at = tile(i, j), over = tile(i, j + 1);
+        if ((solid(under) || under === "-") && !solid(at) && !solid(over) && at !== "~" && over !== "~" && (best == null || Math.abs(j - p.y) < Math.abs(best - p.y))) best = j;
+      }
+      if (best != null) {
+        p.x = i + 0.5; p.y = best + 0.02; p.vx = p.c.run * 0.4; p.vy = 0; p.ground = false; p.on = null; p.state = "run"; p.curl = false;
+        p.dead = 0; p.demoFell = false; p.mv = null; p.sp = null;
+        burst(p.x, p.y + 0.6, [0xffffff, 0x9ad4ff], 10, 4);
+        if (demo) demo.warps = (demo.warps || 0) + 1;
+        return true;
+      }
+    }
+    return false;
+  }
+  function demoBot(D, p, w, h) {
+    const I = D.inp, c = p.c;
+    I.R = 1; I.L = 0; I.U = 0; I.D = 0; I.Z = I.X = I.C = 0;
+    p.air = AIR;                                           // (never short of breath)
+    D.t += h; D.jt -= h; D.hold -= h;
+    if (p.x > D.best + 0.4) { D.best = p.x; D.still = 0; } else D.still += h;
+    if (p.ground) { D.safe = { x: p.x, y: p.y }; D.airUsed = false; }
+    if (p.demoFell || p.dead || p.y < 0.3) { demoWarp(p, D.safe.x, 2) || demoWarp(p, p.x, 2); D.still = 0; return; }
+    if (D.still > 2.4) { demoWarp(p, p.x, 5); D.still = 0; D.best = p.x; return; }
+    if (D.t > 75 && w.goal) { demoWarp(p, w.goal.x - 9, 0); D.t = 0; return; }
+    const at = (dx, dy) => { const t = tile(Math.floor(p.x + dx), Math.floor(p.y + dy)); return solid(t); };
+    const front = c.w / 2 + 0.45;
+    const wall = at(front, 0.6) || at(front, 1.3);
+    const floorAt = dx => { const i = Math.floor(p.x + dx); for (let j = Math.floor(p.y + 0.5); j >= Math.max(1, Math.floor(p.y) - 9); j--) { const t = tile(i, j - 1); if (solid(t) || t === "-") return true; } return false; };
+    const gap = p.ground && !floorAt(1.4) && !floorAt(2.4);
+    const foe = w.enemies.some(e => e.alive && !e.hidden && e.x - p.x > 0.2 && e.x - p.x < 2.8 && e.y + e.h > p.y - 0.6 && e.y < p.y + 2.2);
+    const slow = p.ground && Math.abs(p.vx) < 1.5 && D.t > 0.6;
+    if (p.state === "climb") { I.U = 1; return; }          // Knuckles, on a wall: up and over
+    if (p.ground && D.jt <= 0 && (wall || gap || foe || slow)) { I.jp = 1; D.hold = 0.42; D.jt = 0.3; }
+    else if (!p.ground && !D.airUsed && p.vy < 1.5 && (wall || !floorAt(0.8)) && D.jt <= 0) { I.jp = 1; D.airUsed = true; D.hold = 0.6; D.jt = 0.25; }
+    else if (p.state === "fly" && (wall || !floorAt(1)) && D.jt <= 0) { I.jp = 1; D.jt = 0.22; }     // flying: a beat at a time
+    I.J = D.hold > 0 || I.jp ? 1 : 0;
+  }
+  function demoTick(dt) {
+    const D = demo, p = player, w = world, h = 1 / 120;
+    D.acc += Math.min(dt, 0.1);
+    const keep = input; input = D.inp;
+    let n = 0;
+    while (D.acc >= h && n < 14) {
+      D.acc -= h; n++;
+      if (D.done) {                                         // at the post: braking, the post spinning, then the next
+        D.done += h; D.inp.R = 0; D.inp.J = 0;
+        if (D.done > 3.4) { input = keep; demoStart(); return; }
+      } else demoBot(D, p, w, h);
+      step(h); worldStep(h);
+      input.jp = input.zp = input.xp = input.cp = 0; input.dash = 0;
+      if (!D.done && w.goal && p.x >= w.goal.x) { D.done = h; w.goal.spin = 2.6; w.goal.fire = 2.5; w.goal.fireT = 0; }
+    }
+    input = keep;
+  }
   /* the camera goes along the stage's low road on its own; nobody is there to see */
   function titleGlide(dt) {
     const p = player, w = world;
@@ -7765,8 +7905,72 @@
     for (let j = 0; j < H; j++) { const c = tile(Math.floor(glideX), j); if (!solid(c) && c !== "~" && c !== "/" && c !== "\\") { y = j; break; } }
     p.x = glideX; p.y = y; p.vx = 0; p.vy = 0; p.face = 1; p.state = "run"; p.inv = 99; p.dead = 0;
   }
-  /* the post parade along the bottom: everyone's running frames from their own atlas, crisp,
-     at a whole number of times size; Eggman's Egg Mobile floats over the turf */
+  /* The strip along the bottom of the title: up to four of the cast at a time come on, at random,
+     each to do a thing of their own -- dash across; hop across; run in, stop and show a move or
+     two (the 1-2-3, the heavy, the upper, the guard, a heal, a special) and run on; rev a Spin
+     Dash and roll off; fly over (Tails, Cream, Gamma, Eggman); glide over and drop (Knuckles) --
+     in their own frames from their own atlas, crisp, at a whole number of times size. */
+  const PARADE_MAX = 4;
+  function paradeActor(W, k, busy) {
+    const ids = CAST.map(c => c.id).filter(id => SHEETS[id] && !busy.has(id));
+    if (!ids.length) return null;
+    const id = ids[Math.floor(Math.random() * ids.length)], f = SHEETS[id].f, has = n => f[n] && f[n].length;
+    const acts = ["dash", "hop", "show", "show", "show"];
+    if (has("spin") && has("rev")) acts.push("spin");
+    if (has("fly")) acts.push("fly", "fly");
+    if (has("glide")) acts.push("glide", "glide");
+    const act = acts[Math.floor(Math.random() * acts.length)], dir = Math.random() < 0.5 ? 1 : -1;
+    const moves = [["atk1", "atk2", "atk3"], ["atk1", "atk2", "heavy"], ["heavy"], ["upper"], ["guard"], ["heal"], ["dashatk"],
+                   has("shot") ? ["shot"] : ["atk1", "atk2", "atk3"], has("power") ? ["power"] : ["upper"], ["trap"]].filter(m => m.every(has));
+    return { id, act, dir, t: 0, pt: 0, x: dir > 0 ? -50 : W + 50, y: 0, phase: "in",
+             stop: W * (0.18 + Math.random() * 0.64), moves: moves[Math.floor(Math.random() * moves.length)] || ["idle"], mi: 0,
+             hopT: 0.3 + Math.random() * 0.5, alt: 34 + Math.random() * 26 };
+  }
+  /* one step of an actor: where they are, and which frames; false once they're gone */
+  function paradeStep(a, dt, W, k) {
+    const f = SHEETS[a.id].f, has = n => f[n] && f[n].length, sp = 62 * k;
+    a.t += dt; a.pt += dt;
+    const go = (v, name, fps) => { a.x += a.dir * v * dt; a.name = name; a.fps = fps; a.loop = true; };
+    const to = ph => { a.phase = ph; a.pt = 0; };
+    const once = (name, fps) => { a.name = name; a.fps = fps; a.loop = false; return a.pt >= (f[name] || [0]).length / fps; };
+    const gone = () => a.dir > 0 ? a.x > W + 60 : a.x < -60;
+    a.y = 0;
+    switch (a.act) {
+      case "dash": go(sp * 3.4, has("dash") ? "dash" : "run", 16); return !gone();
+      case "fly": go(sp * 1.5, "fly", 12); a.y = a.alt + Math.sin(a.t * 3) * 5; return !gone();
+      case "glide":
+        if (a.phase === "in") { go(sp * 1.9, "glide", 10); a.y = Math.max(0, a.alt - a.pt * 9); if ((a.dir > 0 ? a.x > a.stop : a.x < a.stop) || a.y <= 0) to("drop"); return true; }
+        if (a.phase === "drop") { a.y = Math.max(0, a.alt - 9 * 1.6 - a.pt * 160); a.x += a.dir * sp * 0.6 * dt; a.name = "fall"; a.fps = 10; a.loop = true; if (a.y <= 0) to("off"); return true; }
+        go(sp * 2.2, "run", 14); return !gone();
+      case "hop":
+        if (a.phase === "air") {
+          const T = 0.62, u = Math.min(1, a.pt / T);
+          a.x += a.dir * sp * 2.2 * dt; a.y = 4 * 46 * u * (1 - u);
+          a.name = u < 0.5 ? "jump" : "fall"; a.fps = 14; a.loop = true;
+          if (u >= 1) { a.hopT = 0.25 + Math.random() * 0.6; to("run"); }
+          return true;
+        }
+        go(sp * 2.2, "run", 14); if (a.pt > a.hopT && a.x > -10 && a.x < W + 10) to("air"); return !gone();
+      case "spin":
+        if (a.phase === "in") { go(sp * 2, "run", 13); if (a.dir > 0 ? a.x > a.stop : a.x < a.stop) to("skid"); return true; }
+        if (a.phase === "skid") { once("skid", 12); a.x += a.dir * sp * Math.max(0, 1 - a.pt * 3) * dt; if (a.pt > 0.3) to("rev"); return true; }
+        if (a.phase === "rev") { a.name = "rev"; a.fps = 10 + a.pt * 30; a.loop = true; if (a.pt > 0.8) to("roll"); return true; }
+        go(sp * 5, "spin", 24); return !gone();
+      default:                                              // show: in, a stop, a move or two, and on
+        if (a.phase === "in") { go(sp * 2, "run", 13); if (a.dir > 0 ? a.x > a.stop : a.x < a.stop) to("skid"); return true; }
+        if (a.phase === "skid") { once("skid", 12); a.x += a.dir * sp * Math.max(0, 1 - a.pt * 3) * dt; if (a.pt > 0.3) to("wait"); return true; }
+        if (a.phase === "wait") { a.name = "idle"; a.fps = 7; a.loop = true; if (a.pt > 0.5 + Math.random() * 0.02) to("move"); return true; }
+        if (a.phase === "move") {
+          const m = a.moves[a.mi], long = m === "guard" || m === "heal";
+          if (long) { a.name = m; a.fps = 10; a.loop = true; if (a.pt > 1.1) { a.mi++; a.pt = 0; } }
+          else if (once(m, 15)) { a.mi++; a.pt = 0; }
+          if (a.mi >= a.moves.length) { if (Math.random() < 0.35) a.dir = -a.dir; to("rest"); }
+          return true;
+        }
+        if (a.phase === "rest") { a.name = "idle"; a.fps = 7; a.loop = true; if (a.pt > 0.6) to("off"); return true; }
+        go(sp * 2.3, "run", 14); return !gone();
+    }
+  }
   function drawParade(dt) {
     const cv = parade && parade.cv;
     if (!cv || !cv.isConnected) return;
@@ -7777,29 +7981,40 @@
     const g = cv.getContext("2d");
     g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, Hh); g.imageSmoothingEnabled = false;
     const k = Hh >= 110 ? 2 : 1.5, track = Math.round(Hh * 0.3), top = Hh - track, t = parade.t;
-    // the ground: checkered soil in two browns under a lip of grass, going by slowly
-    const sq = 12, o = (t * 24) % (sq * 2);
-    for (let r = 0, y = top + 8; y < Hh; r++, y += sq) for (let c = 0, x = -o - sq * 2; x < W + sq; c++, x += sq) {
+    // the ground: checkered soil in two browns under a lip of grass
+    const sq = 12;
+    for (let r = 0, y = top + 8; y < Hh; r++, y += sq) for (let c = 0, x = -sq; x < W + sq; c++, x += sq) {
       g.fillStyle = (c + r) & 1 ? "#b8641e" : "#7a3e12"; g.fillRect(x, y, sq, sq);
     }
     g.fillStyle = "#2fb844"; g.fillRect(0, top, W, 6);
     g.fillStyle = "#1c7a2a"; g.fillRect(0, top + 6, W, 3);
     g.fillStyle = "#050a22"; g.fillRect(0, top + 9, W, 2);
     g.fillStyle = "#2fb844";
-    for (let x = -((t * 24) % 16); x < W; x += 16) { g.fillRect(x, top - 3, 4, 3); g.fillRect(x + 9, top - 2, 3, 2); }
-    // the parade
-    const gap = 46 * k, period = W + CAST.length * gap + 120, base = (t * 64) % period, feet = top + 3;
-    CAST.forEach((c, n) => {
-      const A = SHEETS[c.id]; if (!A) return;
-      const img = IMGS[c.id] || (IMGS[c.id] = Object.assign(new Image(), { src: A.url }));
-      if (!img.complete || !img.naturalWidth) return;
-      const X = base - n * gap - 60;
-      if (X < -80 || X > W + 80) return;
-      const run = A.f.run || A.f.idle, f = run[Math.floor(t * 11 + n * 3) % run.length];
-      const lift = c.lift ? Math.round(c.lift / PX * k * 0.6 + Math.sin(t * 3.4 + n) * 2) : 0;
-      g.fillStyle = "rgba(10,30,14,.35)"; g.beginPath(); g.ellipse(X, feet + 1, f[2] * k * 0.32, 3.5, 0, 0, PI * 2); g.fill();
-      g.drawImage(img, f[0], f[1], f[2], f[3], Math.round(X - f[4] * k), Math.round(feet - f[3] * k - lift), f[2] * k, f[3] * k);
-    });
+    for (let x = 0; x < W; x += 16) { g.fillRect(x, top - 3, 4, 3); g.fillRect(x + 9, top - 2, 3, 2); }
+    // the cast: up to four at a time, each come on at random
+    const P = parade, feet = top + 3;
+    P.actors = P.actors || []; P.spawn = P.spawn == null ? 0.2 : P.spawn - dt;
+    if (P.spawn <= 0 && P.actors.length < PARADE_MAX) {
+      const a = paradeActor(W, k, new Set(P.actors.map(a => a.id)));
+      if (a) P.actors.push(a);
+      P.spawn = 0.7 + Math.random() * 2.2;
+    }
+    P.actors = P.actors.filter(a => paradeStep(a, dt, W, k));
+    for (const a of P.actors) {
+      const A = SHEETS[a.id]; if (!A) continue;
+      const img = IMGS[a.id] || (IMGS[a.id] = Object.assign(new Image(), { src: A.url }));
+      if (!img.complete || !img.naturalWidth) continue;
+      const L = A.f[a.name] || A.f.idle, n = L.length;
+      let i = a.loop ? Math.floor(a.pt * a.fps) % n : Math.min(n - 1, Math.floor(a.pt * a.fps));
+      if (a.id === "eggman" && (a.name === "run" || a.name === "idle" || a.name === "dash")) i = EGG_FLAME[Math.floor(t * 30) % EGG_FLAME.length] % n;   // his booster, flickering
+      const fr = L[i], c = castOf(a.id);
+      const lift = c.lift ? Math.round(c.lift / PX * k * 0.6 + Math.sin(t * 3.4) * 2) : 0;
+      const X = Math.round(a.x), Y = Math.round(feet - a.y - lift);
+      g.fillStyle = "rgba(10,30,14,.35)"; g.beginPath(); g.ellipse(X, feet + 1, fr[2] * k * 0.3 * Math.max(0.4, 1 - a.y / 120), 3.5, 0, 0, PI * 2); g.fill();
+      g.save(); g.translate(X, 0); g.scale(a.dir, 1);
+      g.drawImage(img, fr[0], fr[1], fr[2], fr[3], -Math.round(fr[4] * k), Y - fr[3] * k, fr[2] * k, fr[3] * k);
+      g.restore();
+    }
   }
 
   function menu() {
@@ -8074,7 +8289,7 @@
   root.Adventure = { ok: true, open, close, CAST, THEMES,
     _debug: { get world() { return world; }, get player() { return player; }, step: (s, n) => { for (let k = 0; k < (n || 1); k++) { readInput(); step(s); worldStep(s); input.jp = input.zp = input.xp = input.cp = 0; } },
               play: (i, id, a) => { if (id) castId = id; if (i != null) stageIdx = i; actIdx = a || 0; play(); }, draw: dt => draw(dt || 1 / 60), input: INPUT0, keys, touch, parse,
-              get battle() { return battle; }, get mode() { return mode; }, get talk() { return talk; }, startBattle, mainMenu, storyMenu, storyEpisode, playChapter, battleSetup, get storyRun() { return storyRun; }, EPS,
+              get battle() { return battle; }, get punch() { return punch; }, get demo() { return demo; }, demoTick: (secs, h) => { for (let t = 0; t < secs && demo; t += h || 0.05) demoTick(h || 0.05); }, title, get mode() { return mode; }, get talk() { return talk; }, startBattle, mainMenu, storyMenu, storyEpisode, playChapter, battleSetup, get storyRun() { return storyRun; }, EPS,
               trainingSetup, optionsScreen, arenaDef, emerlLearn, emerlSkills, emerlCast, get saveData() { return saveData; },
               bossWeak: () => world && world.boss && BRAIN[world.boss.key].weak(world.boss),
               get tut() { return TUT; }, tutorialStart, trainingMenu, tutLessons: () => tutLessons().map(l => l.id),

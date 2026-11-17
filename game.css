@@ -348,6 +348,10 @@
 @keyframes adv-call{0%{opacity:0;margin-top:10px}12%{opacity:1;margin-top:0}75%{opacity:1}100%{opacity:0;margin-top:-12px}}
 .adv-tag{position:absolute;left:0;top:0;font:700 12px/1 var(--sx-pix);color:#fff;background:var(--tc);padding:3px 6px 2px;border:2px solid var(--sx-ink);border-radius:5px;margin-top:-6px;text-shadow:var(--sx-out1)}
 .adv-tag::after{content:"";position:absolute;left:50%;bottom:-8px;margin-left:-6px;border:6px solid transparent;border-bottom:0;border-top-color:var(--sx-ink)}
+/* a fighter out of the picture: their tag held at the edge, its point turned their way */
+.adv-tag.offl{margin:0 0 0 10px}.adv-tag.offr{margin:0 10px 0 0}
+.adv-tag.offl::after{left:-9px;top:50%;bottom:auto;margin:-6px 0 0;border:6px solid transparent;border-left:0;border-right-color:var(--sx-ink)}
+.adv-tag.offr::after{left:auto;right:-9px;top:50%;bottom:auto;margin:-6px 0 0;border:6px solid transparent;border-right:0;border-left-color:var(--sx-ink)}
 .adv-combo{position:absolute;left:50%;top:78px;transform:translateX(-50%);display:none;flex-direction:column;align-items:center;gap:2px}
 .adv-combo.on{display:flex}
 .adv-combo b{font-size:38px;line-height:1;color:var(--sx-yel);-webkit-text-stroke-width:7px;text-transform:uppercase}

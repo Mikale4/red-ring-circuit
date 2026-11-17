@@ -232,10 +232,20 @@ Capcom 3), borrowing their mechanics, not their look:
 - **Long combos run down.** From the fourth hit each does a tenth less (to a third); from the
   seventh they are held a little less and fall a little faster; at eighteen they break out.
 - **Weight.** Hits freeze the picture longer the heavier they are; the one hit flashes white
-  and shakes through the freeze. A combo's smash, or the chase, freezes it longest, slows the
-  world to a third for a moment, and in a one-on-one fight the camera leans in, tilting (a
-  launch, a bounce, a parry and a heavy lean it in a little); with three or four fighters it
-  keeps still, framing them all. The camera keeps right up with a juggle.
+  and shakes through the freeze. A combo's smash, or the chase, freezes it longest and slows
+  the world to a third for a moment. The camera keeps right up with a juggle.
+- **The dynamic camera** (one-on-one fights only) leans in, tilted -- in, held, and eased out
+  -- for the moments worth it: a KO (the last, match-deciding one biggest and slowest), the
+  smash or chase ending a combo of five hits or more, or a heavy one, or one on someone low on
+  health; a wall or floor bounce six hits into a combo; a parry or a burst out of a long combo
+  in a tight spot (a quarter of the health left). Then it rests for a couple of seconds (a KO
+  still gets one), and it never leans past the arena's walls, so a fight in a corner holds
+  still. With three or four fighters it keeps still, framing them all.
+- **Framing, on any screen.** The camera keeps everyone inside the strip of the picture between
+  the health cards and, on a touch screen, the pad's buttons, so no one stands under them. On
+  an upright phone it backs off much further; if everyone still won't fit, it keeps Player 1
+  in, leaning toward their nearest foe, and anyone off the picture has their tag held at the
+  edge, pointing their way.
 - **Guard and parry (Sonic Battle's).** Down tapped is the fighter's own guard skill, as long as
   theirs is in Sonic Battle (Rouge's quick, behind her wings; Gamma's Guard Mode long; the Chaos
   Guard strong; Cream's Chao Knight, Cheese in front of her; Metal's and Eggman's shields). A blow
@@ -309,8 +319,8 @@ Typhoon and Rouge's Beauty Shock see-through (wind and sound). Each flickers as 
 Mobile's booster does: it grows in, then a new frame of its body every thirtieth of a second
 in no steady order, now and then a frame dropped, and one that runs out dies away through its
 last frames. A shot stops in the fighter it hits (or a boss), with weight: the picture
-freezes and jolts, a ring of light swells, sparks blow out the way it was going, and in a
-one-on-one the camera leans in. A guard catches it. Badniks and blocks it breaks, it goes on
+freezes and jolts, a ring of light swells, and sparks blow out the way it was going. A guard
+catches it. Badniks and blocks it breaks, it goes on
 through. Every shot throws its mark its own way (`kn` in `SPECIALS`: how far, how high, how
 long they float coming down): the Mighty Cyclone launches tallest (about six metres) and Amy's
 Pink Typhoon next, both straight up as the launcher does; the Chaos Spear and Gamma's
@@ -411,12 +421,19 @@ Star Rings, the story's progress and Emerl's moves are kept in this browser
 (`redringcircuit.save`); on a browser where the game was played as Post Parade's cabinet, that
 record comes along the first time, and so do the settings and the two players' keys.
 
-**The title screen** comes first. Behind it the stage you are on goes by on its own, from
-its start to its end and round again; over it the Red Ring Circuit logo under its Sonic & Friends banner, Press Enter,
-Start, and your record (zones cleared, Red Star Rings found, S grades). Along the bottom the whole cast goes by in a
-post parade -- the fourteen of them in a line, in their own running frames, along the rail
-on a strip of mown turf, Eggman's Egg Mobile floating over it -- with the line that says
-it is a fan-made cabinet and the characters are SEGA's.
+**The title screen** comes first. Behind it runs a demo: one of the cast at random plays a
+zone's first Act at random, by itself, to the goal post (the post spins), then another runner
+in another zone, round and round. A robot holds right and jumps for walls, gaps and badniks,
+uses the runner's air action for a wall or a drop (Knuckles climbs), is never hurt, and plays
+quietly; put back on the road if it falls, it skips ahead if it sticks (a run takes about half
+a minute). The stage it used is built fresh before anyone plays it. Over it the Red Ring
+Circuit logo under its Sonic & Friends banner, Press Enter, Start, and your record (zones
+cleared, Red Star Rings found, S grades). Along the bottom, on a strip of checkered soil under
+grass, up to four of the cast at a time come on at random, each to do something of their own:
+dash across, hop across, run in and stop to show a move or two (the 1-2-3, the heavy, the
+upper, the guard, a heal, a special) and run on, rev a Spin Dash and roll off, fly over
+(Tails, Cream, Gamma, Eggman), or glide over and drop (Knuckles). Under it is the line that
+says it is a fan-made game and the characters are SEGA's.
 
 **Controls.** Arrows or WASD to run (and Up and Down to pick a move, crouch or climb), Space
 to jump (hold for height), Z, X and C to attack. Enter goes on from the title to the main
