@@ -162,9 +162,42 @@ three buttons, with all three specials always to hand:
 
 | Button | On the ground | In the air |
 |---|---|---|
-| **Z**, light | the 1st, 2nd and 3rd attacks, a combo | the air attack (Shadow: his Homing Attack, if anything is near) |
-| **X**, heavy | the heavy attack (it also ends a combo); **Up + X** the upper attack; **Down + X** the aim attack, a dash at the nearest thing and a blow; while dashing, the dash attack | the air attack; **Down + X** the aim attack |
+| **Z**, light | the 1st, 2nd and 3rd attacks, a combo, and mashed on, the heavy | the air attack, three to a jump in a combo (Shadow: his Homing Attack, if anything is near) |
+| **X**, heavy | the heavy attack, a smash; **Up + X** the upper attack, a launcher; **Down + X** the aim attack, a dash at the nearest thing and a blow, the chase after one in the air, or the OTG on one knocked down; while dashing, the dash attack | the air attack; **Down + X** the aim attack, or the chase |
 | **C**, special | the shot; **Up + C** the power; **Down + C** the trap, and again to set it off | the air shot, power and trap |
+
+**Battles run on combos**, the way the fighting games' do (Dragon Ball FighterZ, Marvel vs.
+Capcom 3), borrowing their mechanics, not their look:
+
+- **Blows land on their own frames.** Each attack connects on the frames where its sprite's
+  fist, foot, hammer or arm is out, and reaches as far as the sprite does (`blowShape` reads it
+  off the sheet). A heavy drawn swinging twice or three times hits that many times (Sonic's
+  kicks, Knuckles' one-two). A move drawn mostly as an effect (Cheese's) keeps the middle of
+  its frames.
+- **Presses wait for their moment.** A press during a blow is kept, with the direction held
+  when it was pressed, and the moment the blow lands it goes straight into the next (a
+  cancel), or when the blow is over if it missed. The route: the jabs 1-2-3 into the heavy
+  (just mash Z); X after any jab for the heavy, Up + X the launcher, Down + X the aim attack;
+  C after anything that lands, a special.
+- **The launcher, a super jump, an air combo.** Every fighter's upper throws whoever it hits
+  straight up, the same five metres or so. Space as it lands jumps after them, as high as they
+  will go; air attacks then chain three to a jump, and while they land both fighters fall
+  slowly, the fighting games' air-combo gravity. Down + X goes after one in the air, faster
+  than the aim attack and in any direction: the chase, which smashes them down.
+- **Bounces, knockdowns, OTG.** A smash (the heavy, the dash attack) throws them far, flying
+  low; into a wall, they bounce back up for more. The chase drives them into the floor and
+  they bounce up off it. Brought down after a combo of three or more, they lie a moment, and
+  only the aim attack picks them up (an OTG) before they rise, untouchable for a breath. A wall
+  bounce, a floor bounce and an OTG once each a combo. One helpless in a juggle falls through
+  the arena's planks, so the combo stays on the floor.
+- **Long combos run down.** From the fourth hit each does a tenth less (to a third); from the
+  seventh they are held a little less and fall a little faster; at eighteen they break out.
+- **Weight.** Hits freeze the picture longer the heavier they are; the one hit flashes white
+  and shakes through the freeze. A combo's smash, or the chase, freezes it longest, slows the
+  world to a third for a moment, and the camera leans in, tilting; a launch, a bounce and a
+  heavy lean it in a little. The camera keeps right up with a juggle.
+- **The CPUs combo too:** jabs into the launcher or the heavy, then the chase, a super jump and
+  air attacks, the OTG; Hard most often.
 
 A double tap of a direction is the runner's own dash (Sonic Dash and Tails Hop are hops,
 Knuckles' cannot steer, Shadow's leaves him unseen). Down crouches (the landing frames, as

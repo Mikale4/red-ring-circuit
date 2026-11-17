@@ -26,10 +26,18 @@
  * The fighting is Sonic Battle's, every move off the runner's own sheet. That game puts its
  * attacks on B and its specials on R; here they are three buttons:
  *   Space       jump; again in the air, the runner's air action
- *   Z           light attack: the sheet's 1st, 2nd and 3rd attacks, a combo
- *   X           heavy attack (a combo ends well in one); Up + X the upper attack; Down + X
- *               the aim attack, a dash at the nearest thing and a blow; dashing, the dash
- *               attack; in the air, the air attack
+ *   Z           light attack: the sheet's 1st, 2nd and 3rd attacks, a combo, and the heavy
+ *   X           heavy attack (a smash, in a battle); Up + X the upper attack, a launcher;
+ *               Down + X the aim attack, a dash at the nearest thing and a blow -- or, with a
+ *               rival in the air, after them (the chase); on one knocked down, the OTG;
+ *               dashing, the dash attack; in the air, the air attack
+ * A battle's fighting runs on combos, as the fighting games' do (Dragon Ball FighterZ, Marvel
+ * vs. Capcom 3): each blow lands on the frames its sprite's fist or foot is out, presses wait
+ * for their moment, and a blow that lands goes straight into the next -- jabs into the heavy,
+ * the launcher, a special; the launcher into a super jump (Space) and air attacks, everyone
+ * falling slowly while they land; then the chase. Smashes bounce off walls, the chase off the
+ * floor; one knocked down is picked up by an OTG; once each a combo, and each hit of a long one
+ * does less. A smash freezes the picture, slows the world a moment and the camera leans in.
  *   C           special: the shot; Up + C the power; Down + C the trap, and again to set it
  *               off. In the air each is its air version. (Sonic Battle has the player slot
  *               one special for the ground and one for the air before a match; here all
@@ -242,17 +250,24 @@
      the picture, the size of the hit spark (metres), and the knock it gives what it hits (m/s
      forward, up). The finishers -- the third jab, the heavies, the upper, the dash and aim
      attacks -- hold the picture longest and throw furthest. Knuckles hits hardest of the six,
-     and Amy's hammer blows land like a hammer. A hit spark is in the runner's colour. */
+     and Amy's hammer blows land like a hammer. A hit spark is in the runner's colour. In a
+     battle the jabs knock by `bkick` instead, hardly at all, so a string stays in reach of the
+     next blow; the heavies and the dash attack smash, the chase smashes down (see hitFighter). */
   const HITS = {
-    atk1:    { stop: 0.035, shake: 0.04, spark: 0.95, kick: [6, 4] },
-    atk2:    { stop: 0.04,  shake: 0.05, spark: 1.05, kick: [7, 4.5] },
-    atk3:    { stop: 0.07,  shake: 0.14, spark: 1.4,  kick: [12, 7],  heavy: true },
-    heavy:   { stop: 0.085, shake: 0.18, spark: 1.6,  kick: [15, 6],  heavy: true },
-    upper:   { stop: 0.075, shake: 0.16, spark: 1.5,  kick: [3, 16],  heavy: true },
-    dashatk: { stop: 0.07,  shake: 0.16, spark: 1.5,  kick: [16, 5],  heavy: true },
-    airatk:  { stop: 0.05,  shake: 0.1,  spark: 1.2,  kick: [10, 2] },
-    aim:     { stop: 0.06,  shake: 0.12, spark: 1.3,  kick: [11, 6],  heavy: true },
+    atk1:    { stop: 0.06,  shake: 0.05, spark: 1.0,  kick: [6, 4],   bkick: [2.5, 0] },
+    atk2:    { stop: 0.065, shake: 0.06, spark: 1.1,  kick: [7, 4.5], bkick: [3, 0] },
+    atk3:    { stop: 0.09,  shake: 0.14, spark: 1.4,  kick: [12, 7],  bkick: [3.5, 2], heavy: true },
+    heavy:   { stop: 0.12,  shake: 0.2,  spark: 1.7,  kick: [15, 6],  heavy: true },
+    upper:   { stop: 0.11,  shake: 0.18, spark: 1.6,  kick: [3, 16],  heavy: true },
+    dashatk: { stop: 0.1,   shake: 0.18, spark: 1.6,  kick: [16, 5],  heavy: true },
+    airatk:  { stop: 0.075, shake: 0.1,  spark: 1.25, kick: [10, 2] },
+    aim:     { stop: 0.09,  shake: 0.14, spark: 1.4,  kick: [11, 6],  heavy: true },
+    chase:   { stop: 0.14,  shake: 0.24, spark: 1.9,  kick: [3, -12], heavy: true },
   };
+  /* In a battle the upper is a launcher, everyone's alike: whoever it lands on goes straight up
+     (about five metres) and is helpless till they come down; and Down + X goes after them into
+     the air (the aim attack's chase) and lands the `chase` blow, down and away. */
+  const LAUNCH = { vx: 1.5, vy: 18 };
   const HIT_C = { sonic: 0x9ad4ff, tails: 0xfff070, knuckles: 0xff9030, amy: 0xff80c0, rouge: 0xff70d0, shadow: 0xff4060,
                   emerl: 0xffa030, cream: 0x8ad8ff, chaos: 0x70c8ff, gamma: 0xff6040, eggman: 0xffc040, metal: 0x6a90ff, mighty: 0xff4a4a, silver: 0x70f0d0 };
   const hitWeight = (c, name) => c.id === "knuckles" || c.id === "mighty" ? 1.3 : c.id === "gamma" || c.id === "eggman" ? 1.2 :
@@ -332,7 +347,9 @@
                   charge: 0xff4060, pow: { c: 0xffe060, flash: 2.4, shake: 0.14, recoil: 3.5 } },
       airshot:  { body: "airshot", fps: 22, at: 5, fly: "fx.shot", speed: 26, down: 0.6, life: 0.4, ahead: 1.8, k: 1.25, trail: 0xffe060, // appears a few steps ahead
                   charge: 0xff4060, pow: { c: 0xffe060, flash: 2.4, shake: 0.14, recoil: 3.5 } },
-      power:    { body: "power", fps: 30, at: 8, area: "fx.power", ax: 0, ay: 0.7, w: 4.0, h: 3.2, around: true, k: 1.45, // Chaos Burst
+      /* Chaos Burst: the burst's frames draw Shadow himself in the sphere, so it goes over him at his
+         own size, centred on him, and his own sprite stands aside while it plays (`self`) */
+      power:    { body: "power", fps: 30, at: 8, area: "fx.power", ax: 0, ay: 0.58, w: 4.0, h: 3.2, around: true, k: 1, self: true,
                   charge: 0xff4060, pow: { c: 0xff70a0, flash: 5, shake: 0.4, stop: 0.1 } },
       airpower: { body: "airpower", fps: 24, at: 0, dive: "burst", pow: { c: 0xff70a0, flash: 5, shake: 0.4, stop: 0.1 } }, // Air Chaos Burst: drops, then bursts
       trap:     { body: "trap", fps: 20, at: 5, trap: "orbit" },                                                // Roaming Chaos: circles him
@@ -464,6 +481,22 @@
       ghost: new THREE.MeshBasicMaterial({ map: tex, alphaTest: 0.02, side: THREE.DoubleSide, transparent: true, opacity: 0.55, depthWrite: false }),
       depth: new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map: tex, alphaTest: 0.5, side: THREE.DoubleSide }),
     });
+  }
+  /* struck, a fighter shows pure white for an instant: their sheet with every pixel white (made
+     once the sheet is in; till then, null) */
+  function whiteMat(who) {
+    const M = sheetMats(who);
+    if (M.white) return M.white.map ? M.white : null;
+    const w = M.white = new THREE.MeshBasicMaterial({ color: 0xffffff, alphaTest: 0.5, side: THREE.DoubleSide });
+    const make = src => {
+      const c = document.createElement("canvas"); c.width = src.width; c.height = src.height;
+      const g = c.getContext("2d"); g.drawImage(src, 0, 0); g.globalCompositeOperation = "source-in"; g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+      const t = new THREE.CanvasTexture(c); t.magFilter = t.minFilter = THREE.NearestFilter; t.generateMipmaps = false;
+      w.map = t; w.needsUpdate = true;
+    };
+    if (SHEETS[who].canvas) make(SHEETS[who].canvas);
+    else { const img = new Image(); img.onload = () => make(img); img.src = SHEETS[who].url; }
+    return w.map ? w : null;
   }
   function makeCard(who, kind) {
     const M = sheetMats(who);
@@ -3030,7 +3063,7 @@
     const x0 = p.x - p.c.w / 2 + 0.04, x1 = p.x + p.c.w / 2 - 0.04;
     for (let i = Math.floor(x0); i <= Math.floor(x1); i++) for (let j = Math.floor(yHi); j >= Math.floor(yLo) - 1; j--) {
       const c = tile(i, j);
-      if (solid(c) || (c === "-" && !p.drop)) {
+      if (solid(c) || (c === "-" && !p.drop && !(battle && p.juggle && p.state === "hurt"))) {    // (one helpless in a juggle falls through a plank)
         const top = j + 1;
         if (top <= yHi + 1e-4 && top >= yLo - 1e-4 && (best === null || top > best)) { best = top; tl = solid(c) ? { i, j } : null; }
       }
@@ -3165,6 +3198,7 @@
       }
       if (hit) {
         p.x = dx > 0 ? i - p.c.w / 2 - 1e-3 : i + 1 + p.c.w / 2 + 1e-3;
+        if (battle && p.state === "hurt" && p.smashT > 0 && p.cmb && !p.cmb.wb && Math.abs(p.vx) > 6) return wallBounce(p, sgn(dx));   // smashed into it
         if (p.state === "homing" || p.state === "seek" || p.state === "dash" || p.state === "jet" || p.state === "psy") { p.state = "run"; p.st = 0; }
         if (p.state === "glide" && p.c.climb) { startClimb(p, sgn(dx)); return; }
         p.vx = 0;
@@ -3196,8 +3230,16 @@
     if (!p.ground && p.vy < -14 && !(p.state === "dive" && p.diveS && p.diveS.bits === 0)) burst(p.x, p.y, [0xd8d0c0, 0xc8c0b0], 5, 2);
     if (!p.ground && p.vy < -4) p.landT = 0.14;
     const fell = p.vy;
-    p.ground = true; p.vy = 0; p.airMove = false; p.airSp = false; p.airUses = 0; p.jumping = false; p.flyLeft = p.c.flyTime || 0;
+    p.ground = true; p.vy = 0; p.airMove = false; p.airSp = false; p.airUses = 0; p.airChain = 0; p.jumping = false; p.flyLeft = p.c.flyTime || 0;
     p.on = hit.on; p.onTile = hit.tl;
+    /* a juggle comes down: the chase's smash bounces off the floor (once a combo); else after a
+       combo of three or more, or a hard fall, they are knocked down a moment */
+    if (battle && p.state === "hurt" && p.juggle) {
+      if (p.smashT > 0 && p.spike && !p.cmb.gb && fell < -4) return floorBounce(p);
+      p.juggle = false;
+      if (p.cmb.n >= 3 || fell < -11) { p.state = "down"; p.st = 0.6; p.vx *= 0.5; burst(p.x, p.y + 0.05, [0xd8d0c0, 0xc8c0b0], 8, 3); SFX.stomp(); }
+      else p.st = Math.min(p.st, 0.1);
+    }
     if (p.state !== "roll") p.curl = false;
     if (p.state === "dive") diveLand(p, fell);
     else if (AIR_STATES[p.state]) p.state = "run";
@@ -3264,14 +3306,30 @@
     if (ice) { acc *= 0.32; fr = 2.2; }
     p.st -= dt;
     if (battle) guardUpkeep(p, dt);
-    p.hh = (p.state === "crouch" || p.state === "roll" || p.state === "charge") && !c.lift ? 0.72 : c.h;
+    /* a press waits a moment for the runner to be free -- and in a blow, for its link -- with the
+       direction held as it was pressed */
+    if (input.zp || input.xp || input.cp) p.buf = { k: input.zp ? "z" : input.xp ? "x" : "c", U: input.U, D: input.D, t: 0.2 };
+    else if (p.buf && p.state !== "atk" && (p.buf.t -= dt) <= 0) p.buf = null;
+    p.jbuf = input.jp ? 0.15 : Math.max(0, (p.jbuf || 0) - dt);
+    if (p.hang > 0) p.hang -= dt;
+    if (p.hideT > 0) p.hideT -= dt;
+    p.hh =(p.state === "crouch" || p.state === "roll" || p.state === "charge") && !c.lift ? 0.72 : c.h;
     if (p.state === "ledge") { stepLedge(p, dt); interact(p, dt); return; }
 
     // what they are in the middle of
     switch (p.state) {
       case "hurt": case "stumble":
         if (battle && p.ground && p.state === "hurt") p.vx *= Math.pow(0.03, dt);     // knocked along the floor, sliding to a stop
-        if (p.st <= 0) p.state = "run";
+        if (p.smashT > 0) p.smashT -= dt;
+        if (p.st <= 0) {
+          p.state = "run";
+          if (p.juggle && !p.ground) { p.inv = Math.max(p.inv, 0.2); p.vy = Math.max(p.vy, 4); burst(p.x, p.y + p.hh / 2, [0xffffff, 0xbfe8ff], 6, 3); }  // out of it in the air: a flip clear
+          p.juggle = false;
+        }
+        break;
+      case "down":                                          // knocked down: a moment on the floor, then up, untouchable for a breath
+        p.vx *= Math.pow(0.02, dt);
+        if (p.st <= 0) { p.state = "run"; p.inv = Math.max(p.inv, 0.3); p.landT = 0.12; }
         break;
       case "crouch":
         p.vx = Math.abs(p.vx) <= fr * dt ? 0 : p.vx - sgn(p.vx) * fr * dt;
@@ -3361,8 +3419,7 @@
     if (p.jumping && !input.J && p.vy > 5 && p.state === "run") { p.vy = 5; p.jumping = false; }
     if (free) {
       if (input.dash && p.ground && (p.state === "run" || p.state === "crouch")) startDash(p, input.dash);
-      else if ((input.zp || input.xp) && free) startAttack(p, input.zp ? "light" : "heavy");
-      else if (input.cp && free) startSpecial(p);
+      else if (p.buf) { const b = p.buf; p.buf = null; freshPress(p, b); }
     }
     // Down: crouch when still, curl into a roll when running (everyone with a Spin Dash)
     if (p.state === "run" && p.ground && input.D) {
@@ -3387,7 +3444,12 @@
       case "teleport": g *= 0.25; maxFall = 2; break;
       case "jet": g *= 0.15; maxFall = 0.8; break;
       case "psy": g = 0; p.vy = lerp(p.vy, 0, Math.min(1, dt * 10)); break;
-      case "atk": if (p.mv.air) g *= 0.6; break;
+      case "atk": if (p.mv.air) g *= p.hang > 0 ? 0.3 : 0.6; break;
+      case "hurt":
+        if (p.hang > 0 && p.juggle) g *= 0.4 * (1 + Math.min(0.8, p.cmb.n * 0.05));   // an air combo: falling slowly (a long one less so)
+        else if (p.smashT > 0 && !p.spike) g *= 0.45;                             // smashed: flying, low and far
+        else if (p.juggle && p.cmb) g *= 1 + Math.min(0.8, p.cmb.n * 0.05);       // a long juggle falls faster and faster
+        break;
       case "special": if (p.sp.air) { g *= 0.3; maxFall = 2.5; } break;
       case "tornado": if (p.tor.air) { g *= 0.15; maxFall = 1.2; } break;
     }
@@ -3556,106 +3618,237 @@
   }
 
   // ---------------------------------------------------------------- the blows
-  /** Z or X: which blow, from where they are and the direction held. */
-  function startAttack(p, kind) {
+  /** Z or X: which blow, from where they are and the direction held (as it was when pressed). */
+  function startAttack(p, kind, U, D) {
+    if (U === undefined) { U = input.U; D = input.D; }
     const c = p.c;
     let name;
-    if (p.state === "dash" && kind === "heavy") return startBlow(p, "dashatk");
+    if (p.state === "dash" && kind === "heavy" && !U && !D) return startBlow(p, "dashatk");   // (Up or Down picks its own)
     if (p.ground && p.comboT > 0) {                         // just after a blow: the chain goes on
-      const next = kind === "light" ? p.comboNext : /^atk[123]$/.test(p.comboLast) ? (input.U ? "upper" : input.D ? "aim" : "heavy") : null;
+      const next = linkFrom(p, { name: p.comboLast }, { k: kind === "light" ? "z" : "x", U, D });
       p.comboT = 0;
-      if (next === "aim") return startSeek(p);
-      if (next) return startBlow(p, next);
+      if (next) return doLink(p, next, { U, D });
     }
     if (!p.ground) {
+      if (kind === "heavy" && D && juggled(p)) return startSeek(p);    // after one thrown up, air move or not
       if (p.airMove) return;
       p.airMove = true;
-      if (kind === "heavy" && input.D) return startSeek(p);
+      if (kind === "heavy" && D) return startSeek(p);
       if (kind === "light" && srcOf(p, "airatk") === "shadow") {         // his Homing Attack
         const t = homingTarget(p, 7.5);
         if (t) { p.state = "homing"; p.target = t; p.st = 0.6; p.curl = true; SFX.homing(); return; }
       }
       name = "airatk";
     } else if (kind === "light") name = "atk1";
-    else if (input.U) name = "upper";
-    else if (input.D) return startSeek(p);
+    else if (U) name = "upper";
+    else if (D) return startSeek(p);
     else if (p.state === "dash" || p.state === "roll" || Math.abs(p.vx) > c.run * 0.85) name = "dashatk";
     else name = "heavy";
     startBlow(p, name);
   }
+  /** A press, as it was pressed: Z or X a blow, C a special. */
+  const freshPress = (p, b) => b.k === "c" ? startSpecial(p, b.U, b.D) : startAttack(p, b.k === "z" ? "light" : "heavy", b.U, b.D);
+  /* The route, as the fighting games run their combos: what a press in blow `m` goes on to the
+     moment it lands (or, missed, when it is over). On the ground the jabs chain 1-2-3, the third
+     into the heavy (mash Z and that is the whole string); X after any jab is the heavy, Up + X
+     the launcher, Down + X the aim attack; Down + X after the launcher, the heavy or the dash
+     attack goes after them (the chase). In the air the air attacks chain three a jump, and Down +
+     X is the chase. Anything that lands goes into a special. Null: no link from there. */
+  function linkFrom(p, m, q) {
+    const lite = /^atk[123]$/.test(m.name);
+    if (q.k === "c") return m.struck ? "special" : null;
+    if (!p.ground) {
+      if (q.k === "x" && q.D) return "aim";
+      if ((m.name === "airatk" || m.name === "upper") && (p.airChain || 0) < 3) return "airatk";
+      return null;
+    }
+    if (q.k === "z") return m.name === "atk1" ? "atk2" : m.name === "atk2" ? "atk3" : m.name === "atk3" ? "heavy" : null;
+    if (lite) return q.U ? "upper" : q.D ? "aim" : "heavy";
+    if ((m.name === "upper" || m.name === "heavy" || m.name === "dashatk") && q.D) return "aim";
+    return null;
+  }
+  function doLink(p, nx, q) {
+    if (nx === "special") return startSpecial(p, q.U, q.D);
+    if (nx === "aim") return startSeek(p);
+    if (nx === "airatk") { p.airChain = (p.airChain || 0) + 1; p.airMove = true; }
+    startBlow(p, nx);
+    /* a link is a link: the one this string is on, still reeling on the ground, reels until the
+       next blow is out (a slow one -- Gamma's, Tails' tail -- included) */
+    const v = p.lastVic, m = p.mv;
+    if (battle && v && v.state === "hurt" && !v.juggle && m && m.runs) v.st = Math.max(v.st, m.runs[0][0] / m.fps + 0.12);
+  }
+
+  /* Where each blow lands, from its own frames: the frames on which the fist, foot, hammer or arm
+     is out -- the sprite reaching furthest forward, or for an upper drawn rising, highest -- each
+     run of them a swing of its own (Sonic's heavy kicks three times, Knuckles' punches twice);
+     and how far each frame reaches, the sprite's own front edge and a hand more. Nothing lands
+     on a blow's first frame. A blow whose frames hardly move (one drawn mostly as an effect, as
+     Cheese's are) lands through the middle of them, as far as BLOWS has it. */
+  const SHAPES = {};
+  function blowShape(id, name) {
+    const key = id + "|" + name; if (SHAPES[key]) return SHAPES[key];
+    const L = framesOf(id, name) || framesOf(id, "atk1"), I = (framesOf(id, "idle") || L)[0], n = L.length;
+    const ext = L.map(f => (f[2] - f[4]) * PX), ht = L.map(f => f[3] * PX);
+    const e0 = (I[2] - I[4]) * PX, hI = I[3] * PX, eMax = Math.max(...ext), hMax = Math.max(...ht);
+    let on = null, by = null;
+    if (name === "upper" && hMax - hI >= 0.2) { const t = hI + 0.6 * (hMax - hI); on = ht.map(h => h >= t); by = "up"; }
+    else if (eMax - e0 >= 0.18) { const t = e0 + 0.6 * (eMax - e0); on = ext.map(e => e >= t); by = "fwd"; }
+    if (on && n >= 3) on[0] = false;
+    let runs = [];
+    if (on) for (let i = 0; i < n; i++) if (on[i]) {
+      const r = runs[runs.length - 1];
+      if (r && r[1] === i - 1) r[1] = i; else runs.push([i, i]);
+    }
+    if (!runs.length) { const h0 = Math.floor(n * 0.3); runs = [[h0, Math.max(h0, Math.ceil(n * 0.7) - 1)]]; by = null; }
+    if (runs.length > 3) runs = [runs[0], runs[runs.length >> 1], runs[runs.length - 1]];
+    return (SHAPES[key] = { runs, by, ext, ht, e0 });
+  }
   function startBlow(p, name) {
-    const bw = srcOf(p, name), b = blow(castOf(bw), name), n = (framesOf(p.c.sheet || p.c.id, name) || framesOf(p.c.sheet || p.c.id, "atk1")).length;
-    const h0 = Math.floor(n * 0.3), h1 = Math.max(h0, Math.ceil(n * 0.7) - 1);
+    const id = p.c.sheet || p.c.id, bw = srcOf(p, name), b = blow(castOf(bw), name);
+    const S = blowShape(id, framesOf(id, name) ? name : "atk1"), n = S.ext.length, runs = S.runs;
     p.state = "atk"; p.curl = false;
-    p.mv = { name, t: 0, fps: b.fps, n, reach: b.reach, step: b.step, h0, h1, live: false, queue: null, air: !p.ground, struck: false,
-             speed: Math.max(Math.abs(p.vx), p.c.run * 0.9) };
-    if (name === "airatk") p.vy = Math.max(p.vy, 4);
+    p.mv = { name, t: 0, fps: b.fps, n, reach: b.reach, step: b.step, shape: S, runs, h0: runs[0][0], h1: runs[runs.length - 1][1],
+             cheese: !!(CHEESE[name] && framesOf(bw, CHEESE[name])), live: false, queue: null, air: !p.ground, struck: false,
+             cur: -1, landed: -1, lk: {}, speed: Math.max(Math.abs(p.vx), p.c.run * 0.9) };
+    if (name === "airatk") {                                // near one in a juggle: going with them, level; else a lift
+      const j = battle && juggled(p);
+      p.vy = j && Math.hypot(j.x - p.x, j.y - p.y) < 2.2 ? clamp(j.vy + (j.y - p.y) * 4, -1, 16) : Math.max(p.vy, 4);
+    }
     /* Cream's blows are Cheese's: out in front of her, keeping time with her */
-    if (CHEESE[name] && framesOf(bw, CHEESE[name])) {
+    if (p.mv.cheese) {
       const nm = CHEESE[name], up = name === "upper" ? 0.95 : 0.55;
       effect(bw, nm, p.x + p.face * 0.8, p.y + up, p.face, framesOf(bw, nm).length * b.fps / n, true, "fx", 1, 0, { p, ox: 0.8, oy: up });
     }
     SFX.swing(name === "heavy" || name === "dashatk" || name === "upper");
   }
+  /** a blow's damage, shared out over its swings: the early ones a little each, the last the rest */
+  function runDmg(p, m, fin) {
+    const all = blowDmg(p, m.chase ? "chase" : m.name), k = m.runs.length;
+    if (k < 2) return all;
+    const early = Math.max(1, Math.round(all * 0.6 / k));
+    return fin ? Math.max(1, all - early * (k - 1)) : early;
+  }
   function stepBlow(p, dt) {
     const m = p.mv, c = p.c;
     m.t += dt;
-    const i = Math.floor(m.t * m.fps);
-    m.live = i >= m.h0 && i <= m.h1;
+    const i = Math.floor(m.t * m.fps), last = m.runs.length - 1;
+    const r = m.runs.findIndex(R => i >= R[0] && i <= R[1]);
+    m.live = r >= 0;
     if (m.name === "dashatk") p.vx = p.face * m.speed * (i <= m.h1 ? 1 : 0.45);
     else if (!m.air) p.vx = p.face * m.step * (i <= m.h1 ? 1 : 0.2);
     // Amy's upper is her hammer swung at the ground: a Hammer Jump
     if (srcOf(p, "upper") === "amy" && m.name === "upper" && i >= m.h0 && !m.launched) { m.launched = true; p.vy = 16.5; p.ground = false; p.on = null; SFX.spring(); }
     if (m.live) {
-      const up = m.name === "upper" ? 0.9 : 0;
-      const x0 = p.face > 0 ? p.x : p.x - c.w / 2 - m.reach, x1 = p.face > 0 ? p.x + c.w / 2 + m.reach : p.x;
-      tok(m, blowDmg(p, m.name), m.name === "atk1" || m.name === "atk2" ? 0.35 : 0.85);
-      if (strike(x0, x1, p.y + 0.08, p.y + p.hh + up, blowKick(p)) && !m.struck) landBlow(p);
+      if (r !== m.cur) { m.cur = r; m.tk = {}; }                       // each swing lands on its own
+      const S = m.shape, f = Math.min(i, S.ext.length - 1), fin = r === last;
+      /* the box the blow fills: from the runner's middle to the sprite's front edge on this
+         frame (and over the head, for an upper); the chase's above and below as well */
+      const fwd = m.cheese || !S.by ? c.w / 2 + m.reach : Math.max(S.ext[f], S.e0, c.w / 2 + 0.3) + 0.3;
+      const top = p.y + (m.name === "upper" ? Math.max(p.hh, S.by ? S.ht[f] : 0) + (S.by ? 0.4 : 0.9) : p.hh), lo = m.chase ? 0.7 : 0;
+      const x0 = p.face > 0 ? p.x - 0.1 : p.x - fwd, x1 = p.face > 0 ? p.x + fwd : p.x + 0.1;
+      tok(m.tk, runDmg(p, m, fin), !fin ? 0.3 : m.name === "atk1" || m.name === "atk2" ? 0.35 : 0.85);
+      if (strike(x0, x1, p.y + 0.08 - lo, top + lo, blowKick(p, fin))) landBlow(p, fin);
     }
-    // the combo: the next blow, pressed once this one has landed
-    if (i >= m.h0 && !m.air) {
-      if (input.zp && m.name === "atk1") m.queue = "atk2";
-      else if (input.zp && m.name === "atk2") m.queue = "atk3";
-      else if (input.xp && /^atk[123]$/.test(m.name)) m.queue = input.U ? "upper" : input.D ? "aim" : "heavy";
-    }
+    /* a press in the blow waits for its moment: once the blow has landed (its last swing, and
+       the freeze over) the next link cuts in; missed, it comes when the blow is done */
+    if (p.buf && i >= 1) { m.queue = p.buf; p.buf = null; }
+    const q = m.queue, done = m.struck && m.t - m.struckAt >= 0.05 && (m.landed === last || i > m.h1);
+    if (q && done) { const nx = linkFrom(p, m, q); if (nx) { p.mv = null; p.state = "run"; doLink(p, nx, q); return; } }
+    // Space in the launcher (any time in it): once it has launched someone, a super jump after them
+    if (m.name === "upper" && p.jbuf > 0) m.jq = true;
+    if (done && m.jq && m.name === "upper" && juggled(p)) { p.jbuf = 0; p.mv = null; p.state = "run"; superJump(p); return; }
     if (i >= m.n) {
       p.mv = null; p.state = "run";
-      if (m.queue && p.ground) { if (m.queue === "aim") startSeek(p); else startBlow(p, m.queue); }
-      else if (/^atk[123]$/.test(m.name)) { p.comboT = 0.25; p.comboLast = m.name; p.comboNext = m.name === "atk1" ? "atk2" : m.name === "atk2" ? "atk3" : null; }
+      if (q) { const nx = linkFrom(p, m, q); if (nx) doLink(p, nx, q); else freshPress(p, q); }
+      else if (/^atk[123]$/.test(m.name)) { p.comboT = 0.25; p.comboLast = m.name; }
     }
   }
-  /** The knock a blow gives what it hits: forward and up, by its row and the runner's weight. */
-  function blowKick(p) {
-    const H = HITS[p.mv.name] || HITS.atk1, k = hitWeight(castOf(srcOf(p, p.mv.name)), p.mv.name);
-    return { vx: p.face * H.kick[0] * k, vy: H.kick[1] * k };
+  /** The knock a blow gives what it hits: forward and up, by its row and the runner's weight. An
+      early swing of several only holds them there for the next; the heavies and the dash attack
+      smash (and off a wall they bounce), the chase smashes down (and off the floor they bounce);
+      the aim attack picks up one lying down (OTG). */
+  function blowKick(p, fin) {
+    const m = p.mv, H = (m.chase && HITS.chase) || HITS[m.name] || HITS.atk1, k = hitWeight(castOf(srcOf(p, m.name)), m.name);
+    if (fin === false && battle) return { vx: p.face * 1.2, vy: 0, hold: true };
+    const K = (battle && H.bkick) || H.kick;
+    return { vx: p.face * K[0] * k, vy: K[1] * k, launch: m.name === "upper", smash: !!m.chase || m.name === "heavy" || m.name === "dashatk",
+             spike: !!m.chase, otg: m.name === "aim" };
   }
   /** A blow connects: a hit spark in the runner's colour where it met, a flash, and the picture
-      stops dead for a few hundredths of a second and jolts -- longest and hardest for a finisher,
-      while what it hit shakes white and is then thrown. Once a blow. */
-  function landBlow(p) {
-    const m = p.mv; if (!m || m.struck) return;
-    m.struck = true;
-    const H = HITS[m.name] || HITS.atk1, k = hitWeight(castOf(srcOf(p, m.name)), m.name), col = HIT_C[p.c.id] || 0xffffff;
+      stops dead and jolts -- longest and hardest for a finisher, while what it hit shows white,
+      shaking, and is then thrown. Once a swing. A combo's finisher (a heavy or the dash attack
+      after two hits or more) and the chase are smashes: a longer freeze, a moment of slow motion,
+      and the camera leaning in on it. */
+  function landBlow(p, fin) {
+    const m = p.mv; if (!m) return;
+    if (fin === undefined) fin = true;
+    if (m.lk[m.cur]) return;
+    m.lk[m.cur] = true; m.struck = true; m.struckAt = m.t; m.landed = Math.max(m.landed, m.cur);
+    const H = (m.chase && HITS.chase) || HITS[m.name] || HITS.atk1, k = hitWeight(castOf(srcOf(p, m.name)), m.name) * (fin ? 1 : 0.7);
+    const col = HIT_C[p.c.id] || 0xffffff;
     const h = world.hitAt || { x: p.x + p.face * (p.c.w / 2 + m.reach * 0.6), y: p.y + p.hh * 0.55 };
     hitSpark(h.x, h.y, H.spark * k, col);
     flash(h.x, h.y, H.spark * 1.5 * k, col);
-    hitStop(H.stop * k); shakeCam(H.shake * k);
-    SFX.hit(); if (H.heavy) SFX.impact();
+    hitStop(H.stop * k * (battle ? 1 : 0.6)); shakeCam(H.shake * k);
+    SFX.hit(); if (H.heavy && fin) SFX.impact();
+    if (!battle) return;
+    /* an air blow that lands: the slow fall of the fighting games' air combos -- both of them
+       hang, falling slowly, for the next blow (UMvC3's air combo gravity) */
+    if (m.air && !m.chase) {
+      p.vy = 2; p.hang = 0.45;
+      const v = p.lastVic; if (v && !v.ground && v.state === "hurt") { v.hang = 0.45; v.st = Math.max(v.st, 0.55 * Math.max(0.55, 1 - 0.035 * Math.max(0, v.cmb.n - 6))); }
+    }
+    const cm = p.lastCmb, smash = fin && (m.chase || ((m.name === "heavy" || m.name === "dashatk") && cm && cm.n >= 3));
+    if (m.chase) p.vy = -5;                                // the chase: down after them, for the bounce
+    if (smash) {
+      hitStop(0.2); slowMo(0.32); camPunch(h.x, h.y, 1, 0.75);
+      impact(h.x, h.y, { c: col, flash: 3.2, shake: 0.3 });
+      SFX.boom();
+    } else if (fin && H.heavy) camPunch(h.x, h.y, m.name === "upper" ? 0.45 : 0.3, 0.4);
   }
-  /* Down + X: the aim attack -- a dash at the nearest thing, then the blow. */
+  /* Down + X: the aim attack -- a dash at the nearest thing, then the blow. In a battle, with a
+     rival thrown up by an upper, it is the chase: after them, wherever they are, faster, and
+     the blow lands the moment it reaches them. */
   function startSeek(p) {
-    p.target = homingTarget(p, 8); p.state = "seek"; p.st = p.target ? 0.7 : 0.25; p.curl = false;
+    const j = juggled(p);
+    p.target = j || homingTarget(p, 8); p.chase = !!j; p.state = "seek"; p.st = j ? 0.9 : p.target ? 0.7 : 0.25; p.curl = false;
     if (!p.ground) p.airMove = true;
     SFX.homing();
   }
+  /* Space the moment the launcher lands: a super jump after the one it threw up, for an air combo */
+  function superJump(p) {
+    const t = juggled(p);
+    /* high enough to meet them at the top of their flight */
+    let vy = 16;
+    if (t) { const g = GRAV * (1 + Math.min(0.8, t.cmb.n * 0.05)), top = t.y + Math.max(0, t.vy) ** 2 / (2 * g); vy = clamp(Math.sqrt(2 * GRAV * Math.max(1, top - p.y - 0.2)), 11, 19); }
+    p.vy = vy; p.ground = false; p.on = null; p.onTile = null; p.coyote = 0; p.jumping = false; p.curl = false;
+    p.airMove = false; p.airChain = 0; p.airUses = 0;
+    if (t) { p.face = sgn(t.x - p.x) || p.face; p.vx = clamp((t.x - p.x - p.face * 0.8) / Math.max(0.2, vy / GRAV) + t.vx, -8, 8); }   // to just short of them
+    burst(p.x, p.y + 0.05, [0xd8d0c0, 0xffffff], 8, 3); SFX.jump(); SFX.dash();
+  }
+  /** the nearest rival in the air and helpless (a juggle), within 16 m */
+  function juggled(p) {
+    if (!battle) return null;
+    let best = null, bd = 16;
+    for (const q of battle.fs) if (q.juggle && !q.ground && !q.ko && !q.out && rivals(p, q)) {
+      const d = Math.hypot(q.x - p.x, q.y - p.y);
+      if (d < bd) { bd = d; best = q; }
+    }
+    return best;
+  }
   function stepSeek(p) {
-    const t = p.target;
-    const strikeNow = () => { const air = !p.ground; startBlow(p, "aim"); p.mv.air = air; p.vx = p.face * 2; if (air) p.vy = Math.max(p.vy, 3); };
+    const t = p.target, chase = p.chase && t && t.juggle;
+    const strikeNow = met => {
+      const air = !p.ground; startBlow(p, "aim"); p.mv.air = air; p.chase = false;
+      if (chase && met) { p.mv.chase = true; p.mv.runs = [[0, p.mv.h1]]; p.mv.h0 = 0; p.vx = t.vx; p.vy = Math.max(t.vy, 1); }    // at once, keeping with them
+      else { p.vx = p.face * 2; if (air) p.vy = Math.max(p.vy, 3); }
+    };
     if (t && t.alive !== false) {
-      const ty = (t.y || 0) + (t.h ? t.h / 2 : 0.4), dx = t.x - p.x, dy = ty - (p.y + 0.5), d = Math.hypot(dx, dy) || 1;
-      p.face = sgn(dx) || p.face;
-      if (d < 1.1 || p.st <= 0) return strikeNow();
-      p.vx = dx / d * 16; p.vy = p.ground && dy < 0.6 ? 0 : dy / d * 16;
+      const ty = (t.y || 0) + (t.h ? t.h / 2 : 0.4), dx = t.x - p.x, dy = ty - (p.y + 0.5), d = Math.hypot(dx, dy) || 1, sp = chase ? 26 : 16;
+      p.face = Math.abs(dx) > 0.05 ? sgn(dx) : p.face;
+      if (d < (chase ? 1.3 : 1.1)) return strikeNow(true);
+      if (p.st <= 0) return strikeNow(false);
+      p.vx = dx / d * sp; p.vy = p.ground && dy < 0.6 ? 0 : dy / d * sp;
     } else {
       p.vx = p.face * 14;
       if (p.st <= 0) strikeNow();
@@ -3685,8 +3878,9 @@
 
   // ---------------------------------------------------------------- the specials
   /** C: the shot; Up + C the power; Down + C the trap, or sets off the traps already down. */
-  function startSpecial(p) {
-    const c = p.c, air = !p.ground, kind = input.U ? "power" : input.D ? "trap" : "shot";
+  function startSpecial(p, U, D) {
+    if (U === undefined) { U = input.U; D = input.D; }
+    const c = p.c, air = !p.ground, kind = U ? "power" : D ? "trap" : "shot";
     if (kind === "trap" && world.traps.some(t => !t.gone && mine(t, p))) { world.traps.forEach(t => { if (!t.gone && mine(t, p)) boomTrap(t); }); return; }
     if (p.cd[kind] > 0 || (air && p.airSp)) return;
     if (air) p.airSp = true;
@@ -3879,6 +4073,7 @@
     } else if (s.area) {
       const ax = p.x + f * s.ax, ay = p.y + s.ay;
       effect(who, s.area, ax, ay, f, 22, true, "fx", k);
+      if (s.self && !p.c.emerl) p.hideT = framesOf(who, s.area).length / 22;
       tok(s, spDmg(p, s));
       if (strike(ax - s.w / 2, ax + s.w / 2, ay - s.h / 2, ay + s.h / 2, { r: 11, cx: ax - f * 0.6, cy: ay - 0.3 })) hitStop(0.05);
       SFX.boom();
@@ -3945,8 +4140,9 @@
     if (!e.fired && i >= e.from + e.at) {
       e.fired = true;
       const ew = (p.diveS && p.diveS.fxWho) || p.c.id;
-      if (e.fx) {                                          // Shadow's Air Chaos Burst, kicking up dust
-        effect(ew, e.fx, p.x, p.y + 0.7, p.face, 22, true, "fx", 1.45);
+      if (e.fx) {                                          // Shadow's Air Chaos Burst, kicking up dust (him in it, at his own size)
+        effect(ew, e.fx, p.x, p.y + 0.58, p.face, 22, true, "fx", 1);
+        if (ew === "shadow" && !p.c.emerl) p.hideT = framesOf(ew, e.fx).length / 22;
         if (framesOf(ew, "fx.dust")) { effect(ew, "fx.dust", p.x - 0.7, p.y, -1, 20, false); effect(ew, "fx.dust", p.x + 0.7, p.y, 1, 20, false); }
       } else effect(ew, "fx.boom", p.x, p.y + 0.6, p.face, 22, true, "fx", 1.5);   // Knuckles' Major Eruption: the blast alone
       impact(p.x, p.y + 0.7, p.diveS && p.diveS.pow);
@@ -4438,11 +4634,21 @@
   }
 
   // ---------------------------------------------------------------- the picture
-  let camX = 0, camY = 0, shake = 0, stopT = 0;
+  let camX = 0, camY = 0, shake = 0, stopT = 0, slowT = 0, punch = null;
   const hitStop = s => { stopT = Math.max(stopT, s); };
+  /* a smash: the world runs at a third of its speed for a moment after the freeze */
+  const slowMo = s => { slowT = Math.max(slowT, s); };
+  /** In a battle, the camera leans in on a big hit: toward (x, y), closer the bigger `k` (1 the
+      most), tilting a little, and eases back over `life` seconds. */
+  const camPunch = (x, y, k, life) => {
+    if (!battle || (punch && punch.k > k && punch.t < punch.life * 0.5)) return;
+    punch = { x, y, k, life: life || 0.6, t: 0, roll: (Math.random() < 0.5 ? -1 : 1) * 0.05 * k };
+  };
   const shakeCam = s => { if (!root.Settings || Settings.get("shake") !== false) shake = Math.max(shake, s); };   // Options can turn it off
   const CAM_D = 17;
   function snapCamera() { if (!player) return; camX = player.x + 2; camY = Math.max(6.1, player.y + 2.1); }
+  const EGG_FLAME = [2, 3, 1, 2, 3, 2, 1, 3, 2, 0, 3, 1, 2, 3, 3, 1, 2, 1, 3, 2, 0, 2, 3, 1];   // big and middling mostly, now and then a gutter
+  const EGG_JETS = [1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1];
   /** The runner's frame, from what they are doing. */
   function drawRunner(p, dt) {
     const c = p.c, a = p.anim, sp = Math.abs(p.vx), id = c.sheet || c.id;
@@ -4454,6 +4660,7 @@
     if (p.dead || p.ko) { name = "out"; fps = 8; loop = false; }
     else switch (p.state) {
       case "hurt": case "stumble": name = "hit"; fps = 12; loop = false; break;
+      case "down": name = "out"; fps = 14; loop = false; break;          // knocked down: flat out a moment
       case "atk": name = p.mv.name; pick = () => Math.floor(p.mv.t * p.mv.fps); break;
       case "special":
         name = p.sp.body;
@@ -4513,12 +4720,25 @@
         else if (sp < 2.2) name = "start";
         else { name = "run"; fps = runId === "shadow" && !c.emerl ? 8 + sp * 1.7 : 5 + sp * 1.15; }
     }
+    /* Eggman's Egg Mobile: its booster (the idle and run frames, the flame off, small, big and
+       middling) and its hover jets flicker as an engine does, a new flame every thirtieth of a
+       second in no steady order, rather than turning slowly through them */
+    if (id === "eggman" && /^(idle|run|start|land|fly)$/.test(name)) {
+      if (name === "start") name = "run"; else if (name === "land") name = "idle";
+      const seq = name === "fly" ? EGG_JETS : EGG_FLAME, n = count(name);
+      pick = () => seq[Math.floor(world.t * 30) % seq.length] % n;
+    }
     const key = name + "|" + p.state;
     if (a.key !== key) { a.key = key; a.t = 0; } else a.t += dt;
     const i = pick ? pick(a.t) : frameAt(count(name), a.t, fps, loop);
     const lift = c.lift && !p.dead && !p.ko ? c.lift + Math.sin(world.t * 3.4) * 0.05 : 0;          // Eggman's Egg Mobile, hovering
     setFrame(p.spr, name, i, face, p.x, p.y + lift);
-    p.spr.visible = !GLIDE[mode] && !p.out && !(p.inv > 0 && !p.dead && p.state !== "dash" && p.state !== "teleport" && !(p.sp && p.sp.shield) && Math.sin(world.t * 40) > 0.4);
+    /* struck: white for an instant, shaking through the freeze-frame */
+    const wm = p.whiteT > 0 ? whiteMat(p.spr.userData.who) : null;
+    p.whiteT = Math.max(0, (p.whiteT || 0) - dt);
+    p.spr.material = wm || sheetMats(p.spr.userData.who).mat;
+    if (stopT > 0 && p.state === "hurt" && p.sinceHit < 0.02) { p.spr.position.x += (Math.random() - 0.5) * 0.14; p.spr.position.y += (Math.random() - 0.5) * 0.06; }
+    p.spr.visible = !GLIDE[mode] && !p.out && !(p.hideT > 0) && !(p.inv > 0 && !p.dead && p.state !== "dash" && p.state !== "teleport" && !(p.sp && p.sp.shield) && Math.sin(world.t * 40) > 0.4);
   }
   /* The dust behind a rev: Sonic Advance's spray, looping faster and swelling as the rev
      builds (each tap of Space kicks it up), at the runner's heels, trailing away from them. */
@@ -4626,12 +4846,24 @@
       camX = lerp(camX, tx, 1 - Math.exp(-dt * 3.6));
       camY = lerp(camY, ty, 1 - Math.exp(-dt * (p.ground ? 4 : 1.8)));
     }
-    camera.position.set(camX, camY + 1.9, D);
+    /* a big hit in a battle: the camera leans in on it fast, tilted, then eases back */
+    let cx = camX, cy = camY, roll = 0;
+    if (punch) {
+      punch.t += dt;
+      const u = punch.t / punch.life;
+      if (u >= 1 || !battle) punch = null;
+      else {
+        const e0 = u < 0.14 ? u / 0.14 : 1 - (u - 0.14) / 0.86, e = e0 * e0 * (3 - 2 * e0);
+        D *= 1 - 0.34 * punch.k * e; cx = lerp(camX, punch.x, 0.55 * e); cy = lerp(camY, punch.y, 0.45 * e); roll = punch.roll * e;
+      }
+    }
+    camera.position.set(cx, cy + 1.9, D);
     if (shake > 0) {                                       // a blast shakes the picture, briefly
       shake = Math.max(0, shake - dt);
       camera.position.x += (Math.random() - 0.5) * shake * 1.6; camera.position.y += (Math.random() - 0.5) * shake * 1.6;
     }
-    camera.lookAt(camX, camY, 0);
+    camera.lookAt(cx, cy, 0);
+    if (roll && (!root.Settings || Settings.get("shake") !== false)) camera.rotateZ(roll);
     if (w.snow) w.snow.position.set(camX, 0, 0);
     sun.position.set(camX + w.T.sun[2][0], w.T.sun[2][1], w.T.sun[2][2]);
     sun.target.position.set(camX, camY - 2, 0);
@@ -5355,7 +5587,7 @@
     if (mode === "play" || mode === "goal") {
       if (!paused) {
         if (stopT > 0) { stopT = Math.max(0, stopT - dt); acc = 0; }     // a freeze-frame: the world holds still
-        else acc += dt;
+        else { acc += dt * (slowT > 0 ? 0.33 : 1); slowT = Math.max(0, slowT - dt); }   // and after a smash, slow motion
         const h = 1 / 120;
         let n = 0;
         while (acc >= h && n < 14 && (mode === "play" || mode === "goal")) {
@@ -5406,7 +5638,7 @@
   const tok = (o, d, k) => { hitTok = o; hitDmg = d; hitKnock = k == null ? 0.85 : k; return true; };
   /* Damage, of a hundred: the third jab and the heavies the most; the runner's Power grade
      scales it, S a fifth more and C a tenth less. Powers hit harder than shots, traps between. */
-  const DMG = { atk1: 4, atk2: 4, atk3: 7, heavy: 11, upper: 10, aim: 8, dashatk: 9, airatk: 7 };
+  const DMG = { atk1: 4, atk2: 4, atk3: 7, heavy: 11, upper: 10, aim: 8, chase: 9, dashatk: 9, airatk: 7 };
   const POW = { S: 1.2, A: 1.1, B: 1, C: 0.9 };
   const powK = c => POW[c.grades && c.grades.Power] || 1;
   const blowDmg = (p, name) => Math.round((DMG[name] || 6) * powK(p.c));
@@ -5422,9 +5654,18 @@
   /** A fighter is hit. Unless their guard is up (the shield takes it: a clink, a push back),
       the damage comes off their health and they are knocked away -- a jab barely moves them,
       a finisher throws them across the arena or up into the air -- and reel a moment; at no
-      health left, they are KO'd. Each blow lands on each fighter once. */
+      health left, they are KO'd. Each swing lands on each fighter once.
+      The combo rules, as the fighting games have them: one in the air off a hit is helpless till
+      they come down (a juggle), and blows on them keep them up; the upper launches; a smash
+      throws them hard, and off a wall they bounce (once a combo), the chase's off the floor
+      (once); down on the floor only an OTG blow (the aim attack) picks them up, once a combo.
+      The longer the combo, the less each hit does (from the fourth, a tenth less each, to a
+      third), the shorter they are held (from the seventh) and the faster they fall; at eighteen
+      hits they break out. */
   function hitFighter(q, kick, cx) {
     if (q.inv > 0 || q.state === "teleport" || q.ko || q.out) return false;
+    const down = q.state === "down";
+    if (down && !(kick && kick.otg && !q.cmb.otg)) return false;          // lying down: only an OTG blow, once a combo
     if (hitTok) { if (q.hits.has(hitTok)) return false; q.hits.add(hitTok); }
     const by = actor, from = by ? by.x : cx, away = sgn(q.x - from) || -q.face;
     if (q.guardT > 0) {
@@ -5432,28 +5673,67 @@
       hitSpark(q.x - away * 0.35, q.y + q.hh * 0.55, 0.85, 0xbfe8ff); SFX.grab(); hitStop(0.03);
       return false;
     }
+    const stunned = q.state === "hurt" || down, n = stunned ? q.cmb.n + 1 : 1, wasUp = stunned && q.juggle && !q.ground;
     /* a CPU's blows on a player are softer the easier it is: Easy three-quarters, Normal nine-tenths */
-    const dmg = hitDmg * (by && by.ctl === "cpu" && q.ctl !== "cpu" ? [0.75, 0.9, 1][clamp(by.lvl, 0, 2)] : 1), k = hitKnock;
+    const soft = by && by.ctl === "cpu" && q.ctl !== "cpu" ? [0.75, 0.9, 1][clamp(by.lvl, 0, 2)] : 1;
+    const dmg = Math.max(1, Math.round(hitDmg * soft * (n <= 3 ? 1 : Math.max(0.3, 1 - 0.1 * (n - 3))))), k = hitKnock;
     let vx, vy;
     if (kick && kick.r) {
       const dx = q.x - kick.cx, dy = q.y + q.hh / 2 - kick.cy, d = Math.hypot(dx, dy) || 1;
       vx = dx / d * kick.r * 0.8 + (sgn(dx) || away) * 1.5; vy = Math.max(5, dy / d * kick.r * 0.8 + 4);
-    } else if (kick) { vx = kick.vx * k; vy = kick.vy * k; }
-    else { vx = away * 6; vy = 5; }
-    const stunned = q.state === "hurt";
-    q.cmb = stunned ? { n: q.cmb.n + 1, dmg: q.cmb.dmg + dmg } : { n: 1, dmg };
+    } else if (kick && kick.launch) { vx = (sgn(kick.vx) || away) * LAUNCH.vx; vy = LAUNCH.vy; }   // the upper: straight up, everyone's alike
+    else if (down) { vx = (sgn(kick.vx) || away) * 1.5; vy = 9; }                              // OTG: up off the floor into the air
+    else if (kick && kick.hold) { vx = kick.vx; vy = q.ground ? 0 : 4.5; }                     // an early swing: held there for the next
+    else if (kick) {
+      vx = kick.vx * k; vy = kick.vy * k;
+      if (kick.smash && kick.spike) vx *= 1.3;                                                  // the chase: down hard
+      else if (kick.smash) { vx = (sgn(vx) || away) * Math.max(Math.abs(vx) * 1.3, 18); vy = Math.max(vy, 6.5); }   // a smash: hard and far, flying
+      else if (wasUp) {                                                                          // up in the air already: kept up, with whoever hit them
+        const air = by && !by.ground;
+        vx = air ? by.vx * 0.5 + (sgn(vx) || away) * 1.2 : clamp(vx, -3.5, 3.5); vy = Math.max((air ? 4.5 : 6.5) - 0.15 * n, 2.5);
+      }
+    } else { vx = away * 6; vy = 5; }
+    q.cmb = stunned ? Object.assign(q.cmb, { n, dmg: q.cmb.dmg + dmg }) : { n: 1, dmg };
+    if (down) q.cmb.otg = true;
     q.hp = Math.max(0, q.hp - dmg); q.sinceHit = 0; q.lastDmg = dmg;
-    if (by) { by.dealt += dmg; by.landed++; by.lastCmb = q.cmb; }
-    q.state = "hurt"; q.st = 0.24 + dmg * 0.014; q.mv = null; q.sp = null; q.tor = null; q.er = null; q.curl = false; q.target = null;
+    if (by) { by.dealt += dmg; by.landed++; by.lastCmb = q.cmb; by.lastVic = q; }
+    q.state = "hurt"; q.mv = null; q.sp = null; q.hideT = 0; q.tor = null; q.er = null; q.curl = false; q.target = null;
     q.guardT = 0; q.healing = false; q.crouchT = 0;
     q.vx = vx;
     if (vy > 3 || !q.ground) { q.vy = vy; q.ground = false; q.on = null; }
-    if (q.cmb.n >= 6) q.inv = Math.max(q.inv, 0.5);       // a long string: they break out of it
+    q.juggle = !q.ground; q.jBy = by;
+    q.smashT = kick && kick.smash ? 0.9 : 0; q.spike = !!(kick && kick.spike);
+    const decay = Math.max(0.55, 1 - 0.035 * Math.max(0, n - 6));
+    q.st = (q.juggle ? Math.min(1.6, airTime(q, q.smashT > 0 && !q.spike ? 0.45 : 0)) + 0.08 : 0.24 + hitDmg * 0.014) * decay;
+    q.whiteT = kick && (kick.smash || kick.launch) ? 0.12 : 0.07;
+    if (n >= 18) { q.inv = Math.max(q.inv, 0.6); q.st = Math.min(q.st, 0.3); }   // a long combo: they break out of it
     if (q.hp <= 0) {
       if (battle.cfg.kind === "training") { q.hp = q.hpMax; caption("KO!"); }   // the dummy never goes down for good
       else koFighter(q, by);
     }
     return true;
+  }
+  /** how long one in the air takes to come down to the floor under them, as they are going */
+  function airTime(q, gk) {
+    const g = GRAV * (gk || 1 + Math.min(0.8, (q.cmb ? q.cmb.n : 0) * 0.05)), h = Math.max(0, q.y - floorAt(q.x)), vy = q.vy || 0;
+    return (vy + Math.sqrt(vy * vy + 2 * g * h)) / g;
+  }
+  /* A smash into a wall: off it and back up into the air, for the combo to go on (once a combo).
+     The chase's smash into the floor: up off it the same way (once). */
+  function wallBounce(p, d) {
+    p.cmb.wb = true; p.smashT = 0;
+    p.vx = -d * 4.5; p.vy = Math.max(p.vy, 9.5); p.ground = false; p.on = null;
+    p.juggle = true; p.st = Math.min(1.4, airTime(p)) + 0.08;
+    const x = p.x + d * p.c.w / 2, y = p.y + p.hh * 0.5;
+    impact(x, y, { c: 0xffffff, flash: 2.4, shake: 0.24 }); burst(x, y, [0xd8d0c0, 0xffffff, 0xa8a090], 16, 6);
+    hitStop(0.09); camPunch(x, y, 0.6, 0.5); SFX.impact(); SFX.stomp();
+  }
+  function floorBounce(p) {
+    p.cmb.gb = true; p.smashT = 0; p.spike = false;
+    p.ground = false; p.on = null; p.onTile = null; p.vy = 10.5; p.vx *= 0.4;
+    p.juggle = true; p.st = Math.min(1.4, airTime(p)) + 0.08;
+    impact(p.x, p.y + 0.1, { c: 0xffffff, flash: 2.4, shake: 0.24 }); burst(p.x, p.y + 0.1, [0xd8d0c0, 0xffffff, 0xa8a090], 18, 6);
+    hitStop(0.08); camPunch(p.x, p.y + 0.6, 0.6, 0.5); SFX.impact(); SFX.stomp();
   }
   function guardUpkeep(p, dt) {
     if (p.guardT > 0 && (p.guardT -= dt) <= 0) { p.guardT = 0; p.guardCd = 0.35; }
@@ -5499,7 +5779,7 @@
      are spent (Survival), or the match is over */
   function koFighter(q, by) {
     const B = battle;
-    q.ko = true; q.koT = 2.2; q.hp = 0; q.state = "run"; q.guardT = 0; q.healing = false;
+    q.ko = true; q.koT = 2.2; q.hp = 0; q.state = "run"; q.guardT = 0; q.healing = false; q.juggle = false;
     q.vy = Math.max(q.vy, 9); q.vx = (sgn(q.x - (by ? by.x : q.x)) || -q.face) * 5; q.ground = false; q.on = null;
     hitStop(0.22); shakeCam(0.3);
     flash(q.x, q.y + q.hh * 0.5, 3.6, HIT_C[by ? by.c.id : q.c.id] || 0xffffff);
@@ -5534,7 +5814,7 @@
     }
     Object.assign(p, { ko: false, x: best, y: floorAt(best) + 5, vx: 0, vy: 0, ground: false, on: null, onTile: null, state: "run", hp: p.hpMax, inv: 1.6,
                        curl: false, mv: null, sp: null, tor: null, er: null, airUses: 0, airMove: false, airSp: false, flyLeft: p.c.flyTime || 0,
-                       star: 0, rev: 0, dead: 0, guardT: 0, healing: false, crouchT: 0, cmb: { n: 0, dmg: 0 } });
+                       star: 0, rev: 0, dead: 0, guardT: 0, healing: false, crouchT: 0, cmb: { n: 0, dmg: 0 }, juggle: false, chase: false, buf: null, smashT: 0, spike: false });
     p.face = best < W / 2 ? 1 : -1;
     burst(p.x, p.y + 0.5, [0xffffff, 0xfff3a0], 10, 3);
   }
@@ -5665,7 +5945,7 @@
     player = battle.lead;
     for (const k in keys) keys[k] = 0;
     duoKeys.forEach(m => { for (const k in m) m[k] = 0; });
-    camX = W / 2; camY = 8; camD = 24; acc = 0; last = 0; stopT = 0; shake = 0;
+    camX = W / 2; camY = 8; camD = 24; acc = 0; last = 0; stopT = 0; shake = 0; slowT = 0; punch = null;
     const box = host.querySelector(".adv-3d");
     if (box && R.domElement.parentNode !== box) box.appendChild(R.domElement);
     R.domElement.__w = 0;
@@ -5748,9 +6028,9 @@
      an upper, its power or a trap. When a blow or a shot is coming it may see it in time and
      guard; hurt and out of reach it may stop to heal. */
   const AI_LV = [
-    { think: 0.5, guard: 0.12, sp: 0.1, combo: [1, 2], fin: 0.25, aim: 0.05, jumpIn: 0.15, air: 2 },
-    { think: 0.28, guard: 0.38, sp: 0.18, combo: [2, 3], fin: 0.55, aim: 0.1, jumpIn: 0.22, air: 5 },
-    { think: 0.15, guard: 0.62, sp: 0.24, combo: [3, 3], fin: 0.85, aim: 0.14, jumpIn: 0.26, air: 9 },
+    { think: 0.5, guard: 0.12, sp: 0.1, combo: [1, 2], fin: 0.25, aim: 0.05, jumpIn: 0.15, air: 2, chase: 0.35, launch: 0.2, sj: 0 },
+    { think: 0.28, guard: 0.38, sp: 0.18, combo: [2, 3], fin: 0.55, aim: 0.1, jumpIn: 0.22, air: 5, chase: 0.7, launch: 0.4, sj: 0.25 },
+    { think: 0.15, guard: 0.62, sp: 0.24, combo: [3, 3], fin: 0.85, aim: 0.14, jumpIn: 0.26, air: 9, chase: 0.95, launch: 0.55, sj: 0.55 },
   ];
   const aiNew = s => ({ t: 0.4 + Math.random() * 0.4, q: [], qt: 0, dir: 0, hold: 0, D: 0, U: 0, mU: 0, mD: 0, mod: 0, jt: 0, ct: 0,
                         dummy: s.dummy || null, wander: Math.random() < 0.5 ? -1 : 1, wt: 0 });
@@ -5800,6 +6080,20 @@
       A.seen = true;
       if (f.ground && f.state !== "atk" && f.state !== "special" && Math.random() < L.guard) { A.q = []; A.dir = 0; A.D = 1; A.hold = 0.42; A.t = 0.45; return; }
     } else if (!threat) A.seen = false;
+    /* its own combo going: a rival it has put in the air, after them (the chase, or after a
+       launch a super jump and air attacks first); one it has knocked down, picked up (OTG) */
+    const up = juggled(f);
+    if (up && up.jBy === f && A.chased !== up.cmb) {
+      A.chased = up.cmb;
+      if (Math.random() < L.chase) {
+        A.q = f.state === "atk" && f.mv && f.mv.name === "upper" && Math.random() < L.sj
+          ? [{ at: 0.04, k: "j", hold: 0.3 }, { at: 0.3, k: "z" }, { at: 0.48, k: "z" }, { at: 0.66, k: "x", D: 1 }]
+          : [{ at: 0.08, k: "x", D: 1 }];
+        A.qt = 0; return;
+      }
+    }
+    const low = battle.fs.find(q => q.state === "down" && q.jBy === f && !q.cmb.otg && rivals(f, q) && Math.abs(q.x - f.x) < 3.5);
+    if (low && A.otg !== low.cmb) { A.otg = low.cmb; if (Math.random() < L.chase) { A.dir = sgn(low.x - f.x); A.hold = 0.05; A.q = [{ at: 0.05, k: "x", D: 1 }]; A.qt = 0; return; } }
     // in the air near its mark: the air attack
     if (!f.ground && !f.airMove && f.state === "run" && adx < 1.9 && Math.abs(dy) < 1.4 && Math.random() < dt * L.air) press(f, { k: "z" });
     // a wall in the way: over it
@@ -5829,8 +6123,11 @@
       else if (r < L.sp * 0.6 + 0.06) A.q = [{ at: 0, k: "c", D: 1 }];                                       // a trap
       else {
         const n = L.combo[0] + Math.floor(Math.random() * (L.combo[1] - L.combo[0] + 1));
-        for (let k = 0; k < n; k++) A.q.push({ at: k * 0.13, k: "z" });
-        if (n >= 3 || Math.random() < L.fin) A.q.push({ at: n * 0.13, k: "x", U: Math.random() < 0.3 ? 1 : 0 });
+        for (let k = 0; k < n; k++) A.q.push({ at: k * 0.12, k: "z" });
+        if (n >= 3 || Math.random() < L.fin) {                                   // the ender: the launcher, the auto-combo's heavy, or X's
+          const r2 = Math.random(), at = n * 0.12;
+          A.q.push(r2 < L.launch ? { at, k: "x", U: 1 } : r2 < L.launch + 0.3 && n >= 3 ? { at, k: "z" } : { at, k: "x" });
+        }
       }
     }
   }
@@ -5862,7 +6159,8 @@
     const halfW = T * camD * aspect, halfH = T * camD;
     const tx = halfW * 2 > W ? W / 2 : clamp((x0 + x1) / 2, halfW - 0.5, W - halfW + 0.5);
     const ty = Math.max((y0 + y1) / 2 + 0.6, 4 + halfH * 0.62);
-    camX = lerp(camX, tx, 1 - Math.exp(-dt * 4)); camY = lerp(camY, ty, 1 - Math.exp(-dt * 3));
+    const fast = battle.fs.some(f => f.juggle || f.state === "seek");          // a juggle or a chase: the camera keeps right up with it
+    camX = lerp(camX, tx, 1 - Math.exp(-dt * (fast ? 6 : 4))); camY = lerp(camY, ty, 1 - Math.exp(-dt * (fast ? 6.5 : 3)));
     return camD;
   }
   /* each fighter's tag (1P, 2P, CPU) over their head, in their colour */
@@ -6177,9 +6475,10 @@
     const R = (k, t) => `<div class="adv-mv-r"><b>${k}</b><span>${t}</span></div>`;
     return `<div class="adv-mlist">
       <div class="adv-mv-hd"><b>${esc(c.name)}</b><i>${esc(c.moves)}</i></div>
-      ${R("Z", "Light attack: three in a row; X straight after for the heavy")}
-      ${R("X", "Heavy attack. Up + X upper, Down + X aim attack, dashing the dash attack")}
-      ${R("Z or X in the air", "Air attack" + (c.id === "shadow" ? " (Z: Homing Attack)" : ""))}
+      ${R("Z", "Light attack: mash it for the 1-2-3 and the heavy")}
+      ${R("X", "Heavy attack, a smash: off a wall they bounce. Up + X launches; Down + X the aim attack, after one in the air the chase, on one knocked down the OTG; dashing, the dash attack")}
+      ${R("Z or X in the air", "Air attack, three to a jump in a combo" + (c.id === "shadow" ? " (Z: Homing Attack)" : ""))}
+      ${R("Combos", "A blow that lands goes straight into the next: jabs, then X, Up + X or C; Space after the launcher jumps after them; in the air, air attacks, then Down + X (off the floor they bounce). A wall bounce, a floor bounce and an OTG once each a combo")}
       ${R("C", "Shot. Up + C power, Down + C trap (again to set it off); each has an air version")}
       ${R("Space", "Jump; again in the air, " + airDesc(c))}
       ${R("Twice left or right", "Dash")}
