@@ -6083,10 +6083,12 @@
       b.slots.forEach((s, i) => { s.ctl = ctl[i]; if (tm) s.team = tm[i]; });
       b.teams = !!tm; redo();
     });
+    /* an empty slot: anywhere on its card adds a fighter, as its button does */
+    ov.querySelectorAll(".adv-slot.off").forEach(card => card.onclick = e => { if (!e.target.closest("[data-ctl]")) card.querySelector("[data-ctl]").click(); });
     ov.querySelectorAll("[data-ctl]").forEach(el => el.onclick = () => {
       const i = +el.dataset.ctl, s = b.slots[i];
       const order = i < 2 ? ["p1", "p2", "cpu"] : ["p1", "p2", "cpu", "off"];
-      s.ctl = cycle(order, s.ctl, 1);
+      s.ctl = s.ctl === "off" ? "cpu" : cycle(order, s.ctl, 1);              // an empty slot: in comes a CPU
       if (s.ctl === "p1" || s.ctl === "p2") b.slots.forEach((o, k) => { if (k !== i && o.ctl === s.ctl) o.ctl = "cpu"; });   // one of each player
       redo();
     });
