@@ -37,7 +37,12 @@
  * the launcher, a special; the launcher into a super jump (Space) and air attacks, everyone
  * falling slowly while they land; then the chase. Smashes bounce off walls, the chase off the
  * floor; one knocked down is picked up by an OTG; once each a combo, and each hit of a long one
- * does less. A smash freezes the picture, slows the world a moment and the camera leans in.
+ * does less. A smash freezes the picture, slows the world a moment and (one on one) the camera leans in.
+ * Down tapped is Sonic Battle's guard, each fighter's own; just as a blow lands, a parry -- the
+ * attacker reels (Attack blocked), open to a counter. Z + X with the burst gauge full is Guilty
+ * Gear's Psych Burst: blue out of a combo (it throws everyone off), gold otherwise (it hits).
+ * Every hurt has its own frames off the sheets: knocked upward, knocked back, hitting a wall,
+ * hitting the ground, getting up; and the guard and healing their own.
  *   C           special: the shot; Up + C the power; Down + C the trap, and again to set it
  *               off. In the air each is its air version. (Sonic Battle has the player slot
  *               one special for the ground and one for the air before a match; here all
@@ -319,8 +324,8 @@
       power:    { body: "power", fps: 32, at: 29, area: "fx.power", ax: 1.2, ay: 0.7, w: 2.6, h: 2.4, step: 1.6, k: 1.7, bits: 0, // Deep Impact: the punch goes off
                   charge: 0xff9030, pow: { c: 0xff9030, flash: 4.5, shake: 0.4, stop: 0.09, recoil: 2, bits: 0 } },
       airpower: { body: "airpower", fps: 20, at: 0, dive: "erupt", bits: 0, pow: { c: 0xff9030, flash: 4, shake: 0.38, stop: 0.08, bits: 0 } }, // Major Eruption: dives, burrows, bursts out
-      trap:     { body: "trap", fps: 18, at: 5, trap: "mine", faint: true },                                    // Mole Bomb: a landmine you can barely see
-      airtrap:  { body: "airtrap", fps: 18, at: 3, trap: "mine", faint: true, toss: true } },
+      trap:     { body: "trap", fps: 18, at: 5, trap: "mine" },                       // Mole Bomb: a landmine that drills in, then its light blinks
+      airtrap:  { body: "airtrap", fps: 18, at: 3, trap: "mine", toss: true } },
     amy: {
       /* Pink Typhoon: a tornado off her hammer -- wind, so you can see through it */
       shot:     { body: "shot", fps: 24, at: 7, wave: "fx.shot", speed: 15, life: 0.8, ghost: 1.5, trail: 0xffa0d0,
@@ -431,7 +436,7 @@
                   pow: { c: 0xffa060, flash: 2.2, shake: 0.14, recoil: 2 } },
       power:    { body: "power", fps: 18, at: 4, tornado: [5, 8], pow: { c: 0xff4a4a, flash: 2.2, shake: 0.1 } },
       airpower: { body: "airpower", fps: 20, at: 0, dive: "hammer", bits: 0, pow: { c: 0xffa060, flash: 4.5, shake: 0.42, stop: 0.08, bits: 0 } },
-      trap:     { body: "trap", fps: 18, at: 6, trap: "mine" },
+      trap:     { body: "trap", fps: 18, at: 6, trap: "mine", toss: true, far: 3.5 },               // Peacemaker: a little bomb, thrown
       airtrap:  { body: "airtrap", fps: 18, at: 3, trap: "mine", toss: true } },
     silver: {
       /* Psycho Knife, a blade of psychokinesis, gone in a moment; Psycho Surge, a whirlwind of
@@ -454,7 +459,7 @@
     cream:  { from: 2, loop: [5, 6], boom: "fx.trapboom", bmid: true, bk: 1.6 },     // an Omochao flies off; the Cream Cracker
     chaos:  { loop: [0, 3], boom: "fx.trap", bfrom: 4, bk: 1.7 },                    // a puddle, that throws up tentacles
     eggman: { from: 2, loop: [4, 10] },                                              // his bomb, the fuse burning down
-    mighty: { k: 1.8 },
+    mighty: { k: 2 },                                                                  // Peacemaker's bomb, spinning
     silver: { loop: [5, 11] },                                                       // the orb gathers, then hangs there
   };
 
@@ -610,7 +615,7 @@
     const want = [];
     const add = (name, k, src) => { const A = k === "emerl" ? EM.emerl : EM[k]; const fs = A && A.f[src]; if (fs) want.push([name, k, fs]); };
     for (const [slot] of EM_SLOTS) for (const nm of EM_NAMES[slot]) add(nm, from[slot], nm);
-    for (const nm of ["hit", "out", "portrait"]) add(nm, "emerl", nm);
+    for (const nm of ["hit", "out", "portrait", "guard", "heal", "blocked", "up", "back", "wall", "floor", "getup"]) add(nm, "emerl", nm);
     add("spin", "emerl", "double"); add("ball", "emerl", "double");                 // curled: his own air action's spin
     if (!want.some(w => w[0] === "fly") && from.air === "rouge") add("fly", "rouge", "fall");
     const runF = want.find(w => w[0] === "run"); if (runF) want.push(["start", runF[1], [runF[2][0]]]);
@@ -3308,11 +3313,16 @@
     if (battle) guardUpkeep(p, dt);
     /* a press waits a moment for the runner to be free -- and in a blow, for its link -- with the
        direction held as it was pressed */
+    if (battle && input.Z && input.X && (input.zp || input.xp) && p.burst >= BURST_MAX && !p.ko && p.state !== "burst") {
+      input.zp = input.xp = 0; p.buf = null; psychBurst(p);
+    }
     if (input.zp || input.xp || input.cp) p.buf = { k: input.zp ? "z" : input.xp ? "x" : "c", U: input.U, D: input.D, t: 0.2 };
     else if (p.buf && p.state !== "atk" && (p.buf.t -= dt) <= 0) p.buf = null;
     p.jbuf = input.jp ? 0.15 : Math.max(0, (p.jbuf || 0) - dt);
     if (p.hang > 0) p.hang -= dt;
     if (p.hideT > 0) p.hideT -= dt;
+    if (p.wallT > 0) p.wallT -= dt;
+    if (p.floorT > 0) p.floorT -= dt;
     p.hh =(p.state === "crouch" || p.state === "roll" || p.state === "charge") && !c.lift ? 0.72 : c.h;
     if (p.state === "ledge") { stepLedge(p, dt); interact(p, dt); return; }
 
@@ -3327,13 +3337,19 @@
           p.juggle = false;
         }
         break;
-      case "down":                                          // knocked down: a moment on the floor, then up, untouchable for a breath
+      case "down":                                          // knocked down: a moment on the floor, then getting up, untouchable
         p.vx *= Math.pow(0.02, dt);
-        if (p.st <= 0) { p.state = "run"; p.inv = Math.max(p.inv, 0.3); p.landT = 0.12; }
+        if (p.st <= 0) { p.state = "getup"; p.st = GETUP_T; p.inv = Math.max(p.inv, GETUP_T + 0.15); }
         break;
+      case "getup": p.vx = 0; if (p.st <= 0) p.state = "run"; break;
+      case "blocked":                                       // parried: reeling, open
+        p.vx *= Math.pow(0.02, dt);
+        if (p.st <= 0) p.state = "run";
+        break;
+      case "burst": p.vx *= Math.pow(0.01, dt); if (p.st <= 0) p.state = "run"; break;
       case "crouch":
         p.vx = Math.abs(p.vx) <= fr * dt ? 0 : p.vx - sgn(p.vx) * fr * dt;
-        if (!input.D || !p.ground) { p.state = "run"; p.landT = 0.1; }
+        if (!p.ground || (!input.D && !(battle && p.guardT > 0))) { p.state = "run"; p.landT = 0.1; }   // (a guard, once up, plays out)
         else if (battle) stepGuard(p, dt);                // in a battle, Down guards, and held, heals
         break;
       case "charge":                                       // a Spin Dash, revving: tap Space, let go of Down
@@ -3432,6 +3448,7 @@
     if (p.inWater) { g *= c.swims ? 0.3 : 0.45; maxFall = c.swims ? 4 : 6; }
     switch (p.state) {
       case "homing": case "seek": case "climb": case "dive": g = 0; break;
+      case "burst": if (p.st > 0.15) { g = 0; p.vy *= Math.pow(0.02, dt); } else g *= 0.5; break;   // hanging in the blast
       case "fly":
         if (c.air === "hover") {                                   // Gamma and Eggman: no climbing, held up, sinking
           if (p.flyLeft > 0) { g = 0; p.vy = lerp(p.vy, -(c.sink || 0), Math.min(1, dt * 5)); }
@@ -3974,6 +3991,12 @@
     if (!framesOf(p.c.id, "fx.spark")) return;
     effect(p.c.id, "fx.spark", p.x + (Math.random() - 0.3) * p.face * 0.9, p.y + 0.15 + Math.random() * 0.55, Math.random() < 0.5 ? 1 : -1, 32, true);
   }
+  /** A ring of light that grows and fades (a parry, a burst). */
+  function ring(x, y, color, size) {
+    const m = new THREE.Mesh(new THREE.RingGeometry(0.82, 1, 48), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide }));
+    m.position.set(x, y, 0.5); m.scale.setScalar(0.1); world.group.add(m);
+    world.flashes.push({ s: m, size, t: 0, life: 0.35, ring: true });
+  }
   /** A burst of light that swells and fades. */
   function flash(x, y, size, color) {
     const sp = new THREE.Sprite(glowMat(color || 0xffffff, 0.95)); sp.position.set(x, y, 0.4); sp.scale.setScalar(size * 0.3);
@@ -4248,6 +4271,11 @@
     for (const f of w.flashes) {
       if (f.gone) continue;
       f.t += dt; const k = f.t / f.life;
+      if (f.ring) {
+        const sc = f.size * (0.15 + Math.sqrt(Math.min(1, k)) * 0.85); f.s.scale.set(sc, sc, 1); f.s.material.opacity = 0.9 * (1 - Math.min(1, k));
+        if (k >= 1) { f.gone = true; w.group.remove(f.s); f.s.geometry.dispose(); f.s.material.dispose(); }
+        continue;
+      }
       if (f.spark) {                                       // a hit spark: pops, then shrinks away
         const sc = f.size * (k < 0.3 ? 1 + k * 0.6 : 1.18 - (k - 0.3) * 1.4);
         f.s.scale.setScalar(Math.max(0.01, sc)); f.s2.scale.setScalar(Math.max(0.01, sc * 0.5));
@@ -4638,10 +4666,11 @@
   const hitStop = s => { stopT = Math.max(stopT, s); };
   /* a smash: the world runs at a third of its speed for a moment after the freeze */
   const slowMo = s => { slowT = Math.max(slowT, s); };
-  /** In a battle, the camera leans in on a big hit: toward (x, y), closer the bigger `k` (1 the
-      most), tilting a little, and eases back over `life` seconds. */
+  /** In a one-on-one battle, the camera leans in on a big hit: toward (x, y), closer the bigger
+      `k` (1 the most), tilting a little, and eases back over `life` seconds. (With three or four
+      fighters it keeps still, framing them all.) */
   const camPunch = (x, y, k, life) => {
-    if (!battle || (punch && punch.k > k && punch.t < punch.life * 0.5)) return;
+    if (!battle || battle.fs.length !== 2 || (punch && punch.k > k && punch.t < punch.life * 0.5)) return;
     punch = { x, y, k, life: life || 0.6, t: 0, roll: (Math.random() < 0.5 ? -1 : 1) * 0.05 * k };
   };
   const shakeCam = s => { if (!root.Settings || Settings.get("shake") !== false) shake = Math.max(shake, s); };   // Options can turn it off
@@ -4659,8 +4688,18 @@
     let name, fps = 10, loop = true, face = p.face, pick = null;
     if (p.dead || p.ko) { name = "out"; fps = 8; loop = false; }
     else switch (p.state) {
-      case "hurt": case "stumble": name = "hit"; fps = 12; loop = false; break;
-      case "down": name = "out"; fps = 14; loop = false; break;          // knocked down: flat out a moment
+      case "hurt": case "stumble":                         // hurt: off a wall, off the floor, flung tumbling, thrown up, or a blow
+        name = "hit"; fps = 12; loop = false;
+        if (p.state !== "hurt" || !battle) break;
+        if (p.wallT > 0 && framesOf(id, "wall")) { name = "wall"; fps = 20; }
+        else if (p.floorT > 0 && framesOf(id, "floor")) { name = "floor"; fps = 20; }
+        else if (p.smashT > 0 && !p.spike && framesOf(id, "back")) { name = "back"; fps = 16; loop = true; }
+        else if (p.juggle && framesOf(id, "up")) { name = "up"; fps = 12; }
+        break;
+      case "down": name = framesOf(id, "floor") ? "floor" : "out"; fps = 18; loop = false; break;   // knocked down: on the ground
+      case "getup": name = framesOf(id, "getup") ? "getup" : "land"; pick = t => Math.min(count(name) - 1, Math.floor(t / GETUP_T * count(name))); break;
+      case "blocked": name = framesOf(id, "blocked") ? "blocked" : "hit"; fps = 8; loop = false; break;   // parried, reeling
+      case "burst": name = framesOf(id, "guard") ? "guard" : "hit"; pick = () => count(name) - 1; break;
       case "atk": name = p.mv.name; pick = () => Math.floor(p.mv.t * p.mv.fps); break;
       case "special":
         name = p.sp.body;
@@ -4672,7 +4711,9 @@
       case "charge": name = "rev"; fps = 14 + p.rev * 22; break;              // Sonic's Spin Dash, in their colours
       case "roll": name = "spin"; fps = 12 + sp * 1.4; break;
       case "dash": name = "dash"; fps = 16; loop = !!c.steer; break;              // Gamma's Drive Mode rolls on
-      case "crouch": {                                     // the landing frames, down to the deepest, held
+      case "crouch": {                                     // the guard; healing; else the landing frames, down to the deepest, held
+        if (battle && p.guardT > 0 && framesOf(id, "guard")) { name = "guard"; fps = 20; loop = false; break; }
+        if (battle && p.healing && framesOf(id, "heal")) { name = "heal"; const n = count("heal"); pick = t => t < 0.12 || n < 3 ? 0 : 1 + Math.floor(t * 7) % (n - 2); break; }
         const L = framesOf(id, "land"); let k = 0;
         L.forEach((f, j) => { if (f[3] < L[k][3]) k = j; });
         name = "land"; pick = t => Math.min(Math.floor(t * 20), k);
@@ -5646,7 +5687,18 @@
   /* how well each heals, held still on Down: Knuckles and Cream best, Sonic worst (as Sonic
      Battle has them), health a second */
   const HEAL = { knuckles: 9, cream: 9, chaos: 8, gamma: 7, sonic: 4, shadow: 4.5, metal: 4.5 };
-  const GUARD_T = 0.55;
+  /* Down tapped on the ground: the guard, Sonic Battle's guard skill, each fighter's as long as
+     theirs is (Rouge's quick, Gamma's Guard Mode long, the Chaos Guard strong). A blow that meets
+     it in its first eighth of a second is parried: it does nothing, the one who threw it reels
+     (Attack blocked) open to anything, and the parrier's burst gauge fills; later in it, a block. */
+  const GUARD = { rouge: 0.22, shadow: 0.28, sonic: 0.3, emerl: 0.3, cream: 0.32, silver: 0.32, tails: 0.34, amy: 0.34,
+                  knuckles: 0.36, metal: 0.36, mighty: 0.36, eggman: 0.4, chaos: 0.42, gamma: 0.45 };
+  const guardOf = c => GUARD[c.id] || 0.32, PARRY_T = 0.12, GETUP_T = 0.32;
+  /* Guilty Gear's Psych Burst: Z and X together with the burst gauge full. Hit (in a combo, down,
+     or reeling), a blue burst: a blast that throws everyone off, no damage, and the combo is over.
+     Otherwise a gold one: it hits, and landing it gives a third of the gauge back. The gauge fills
+     slowly with time, with damage taken, and with every guard and parry (most for a special). */
+  const BURST_MAX = 100;
   const SLOT_C = ["#e8403a", "#3a7ae0", "#e8b020", "#3aa04a"], TEAM_C = ["#e8403a", "#3a7ae0"], TEAM_N = ["Red", "Blue"];
   const tagCol = f => battle && battle.teams ? TEAM_C[f.team] : SLOT_C[f.slot];
   const tagText = f => f.ctl === "p1" ? "1P" : f.ctl === "p2" ? "2P" : "CPU";
@@ -5669,14 +5721,19 @@
     if (hitTok) { if (q.hits.has(hitTok)) return false; q.hits.add(hitTok); }
     const by = actor, from = by ? by.x : cx, away = sgn(q.x - from) || -q.face;
     if (q.guardT > 0) {
-      q.vx = away * 3.5; q.blocked++;
+      const parry = (q.guard0 || 0) - q.guardT <= PARRY_T && !(q.ai && q.ai.dummy === "guard"), big = hitDmg >= 10;
+      q.burst = Math.min(BURST_MAX, (q.burst || 0) + (parry ? 1 : 0.4) * (big ? 30 : 12));
+      q.blocked++;
+      if (parry) { parried(q, by); return false; }
+      q.vx = away * 3.5;
       hitSpark(q.x - away * 0.35, q.y + q.hh * 0.55, 0.85, 0xbfe8ff); SFX.grab(); hitStop(0.03);
       return false;
     }
     const stunned = q.state === "hurt" || down, n = stunned ? q.cmb.n + 1 : 1, wasUp = stunned && q.juggle && !q.ground;
     /* a CPU's blows on a player are softer the easier it is: Easy three-quarters, Normal nine-tenths */
     const soft = by && by.ctl === "cpu" && q.ctl !== "cpu" ? [0.75, 0.9, 1][clamp(by.lvl, 0, 2)] : 1;
-    const dmg = Math.max(1, Math.round(hitDmg * soft * (n <= 3 ? 1 : Math.max(0.3, 1 - 0.1 * (n - 3))))), k = hitKnock;
+    const counter = q.state === "blocked";
+    const dmg = kick && kick.burst === "blue" ? 0 : Math.max(1, Math.round(hitDmg * soft * (counter ? 1.25 : 1) * (n <= 3 ? 1 : Math.max(0.3, 1 - 0.1 * (n - 3))))), k = hitKnock;
     let vx, vy;
     if (kick && kick.r) {
       const dx = q.x - kick.cx, dy = q.y + q.hh / 2 - kick.cy, d = Math.hypot(dx, dy) || 1;
@@ -5695,7 +5752,8 @@
     } else { vx = away * 6; vy = 5; }
     q.cmb = stunned ? Object.assign(q.cmb, { n, dmg: q.cmb.dmg + dmg }) : { n: 1, dmg };
     if (down) q.cmb.otg = true;
-    q.hp = Math.max(0, q.hp - dmg); q.sinceHit = 0; q.lastDmg = dmg;
+    q.hp = Math.max(0, q.hp - dmg); q.sinceHit = 0; q.lastDmg = dmg; q.burst = Math.min(BURST_MAX, (q.burst || 0) + dmg * 0.8);
+    if (counter && by) call(by, "Counter!");
     if (by) { by.dealt += dmg; by.landed++; by.lastCmb = q.cmb; by.lastVic = q; }
     q.state = "hurt"; q.mv = null; q.sp = null; q.hideT = 0; q.tor = null; q.er = null; q.curl = false; q.target = null;
     q.guardT = 0; q.healing = false; q.crouchT = 0;
@@ -5721,7 +5779,7 @@
   /* A smash into a wall: off it and back up into the air, for the combo to go on (once a combo).
      The chase's smash into the floor: up off it the same way (once). */
   function wallBounce(p, d) {
-    p.cmb.wb = true; p.smashT = 0;
+    p.cmb.wb = true; p.smashT = 0; p.wallT = 0.3;
     p.vx = -d * 4.5; p.vy = Math.max(p.vy, 9.5); p.ground = false; p.on = null;
     p.juggle = true; p.st = Math.min(1.4, airTime(p)) + 0.08;
     const x = p.x + d * p.c.w / 2, y = p.y + p.hh * 0.5;
@@ -5729,12 +5787,48 @@
     hitStop(0.09); camPunch(x, y, 0.6, 0.5); SFX.impact(); SFX.stomp();
   }
   function floorBounce(p) {
-    p.cmb.gb = true; p.smashT = 0; p.spike = false;
+    p.cmb.gb = true; p.smashT = 0; p.spike = false; p.floorT = 0.3;
     p.ground = false; p.on = null; p.onTile = null; p.vy = 10.5; p.vx *= 0.4;
     p.juggle = true; p.st = Math.min(1.4, airTime(p)) + 0.08;
     impact(p.x, p.y + 0.1, { c: 0xffffff, flash: 2.4, shake: 0.24 }); burst(p.x, p.y + 0.1, [0xd8d0c0, 0xffffff, 0xa8a090], 18, 6);
     hitStop(0.08); camPunch(p.x, p.y + 0.6, 0.6, 0.5); SFX.impact(); SFX.stomp();
   }
+  /** a guard met a blow in its first moment: nothing comes of the blow, and one who threw it from
+      close reels, open (Attack blocked) */
+  function parried(q, by) {
+    const x = by ? (q.x + by.x) / 2 : q.x + q.face * 0.5, y = q.y + q.hh * 0.6;
+    hitSpark(x, y, 1.7, 0xffffff); flash(x, y, 2.6, 0x9ad8ff); ring(x, y, 0x9ad8ff, 1.6);
+    hitStop(0.14); shakeCam(0.1); camPunch(x, y, 0.45, 0.45);
+    SFX.set(); SFX.hit();
+    q.guardT = Math.max(q.guardT, 0.18); q.parries = (q.parries || 0) + 1;
+    call(q, "Parry!");
+    if (by && by !== q && !by.ko && Math.abs(by.x - q.x) < 3.2) {
+      Object.assign(by, { state: "blocked", st: 0.55, mv: null, sp: null, tor: null, er: null, curl: false, juggle: false, target: null, buf: null, chase: false });
+      by.vx = (sgn(by.x - q.x) || -by.face) * 3.5;
+    }
+  }
+  /** Z and X at once, with the gauge full: the burst (blue, out of a combo; gold, otherwise) */
+  function psychBurst(p) {
+    const blue = p.state === "hurt" || p.state === "down" || p.state === "blocked" || p.state === "getup";
+    const col = blue ? 0x58b8ff : 0xffc828, cx = p.x, cy = p.y + p.hh * 0.55;
+    p.burst = 0; p.bursts = (p.bursts || 0) + 1; p.burstBlue = blue;
+    Object.assign(p, { state: "burst", st: 0.45, mv: null, sp: null, tor: null, er: null, curl: false, juggle: false, smashT: 0, target: null,
+                       buf: null, chase: false, guardT: 0, healing: false, crouchT: 0, vx: 0 });
+    if (!p.ground) p.vy = 1.5;
+    p.inv = Math.max(p.inv, 0.6); p.whiteT = 0.22;
+    p.cmb = { n: 0, dmg: 0 };                               // whatever combo they were in is over
+    tok({}, blue ? 0 : 9, 1);
+    const hit = strike(cx - 3.4, cx + 3.4, cy - 2.6, cy + 2.6, { r: blue ? 15 : 13, cx, cy, burst: blue ? "blue" : "gold" });
+    if (!blue && hit) p.burst = 35;
+    ring(cx, cy, col, 4.2); ring(cx, cy, 0xffffff, 2.6);
+    flash(cx, cy, 6, col); flash(cx, cy, 3, 0xffffff);
+    burst(cx, cy, [col, 0xffffff, mixC(col, 0xffffff, 0.5)], 40, 9);
+    hitStop(0.16); slowMo(0.25); shakeCam(0.32); camPunch(cx, cy, 0.7, 0.6);
+    SFX.blast(); SFX.boom();
+    call(p, "Burst!");
+  }
+  /** a word over a fighter's head a moment: Parry!, Burst!, Counter! */
+  function call(f, text) { f.callTx = text; f.callT = 0.9; f.callN = (f.callN || 0) + 1; }
   function guardUpkeep(p, dt) {
     if (p.guardT > 0 && (p.guardT -= dt) <= 0) { p.guardT = 0; p.guardCd = 0.35; }
     p.guardCd = Math.max(0, (p.guardCd || 0) - dt);
@@ -5742,7 +5836,7 @@
   }
   /* Down, still on the ground: the shield for half a second, then (held) healing */
   function stepGuard(p, dt) {
-    if (!p.crouchT && !(p.guardCd > 0)) { p.guardT = GUARD_T; SFX.set(); }
+    if (!p.crouchT && !(p.guardCd > 0)) { p.guardT = p.guard0 = guardOf(p.c); SFX.set(); }
     p.crouchT = (p.crouchT || 0) + dt;
     p.healing = p.crouchT > 0.8 && p.hp < p.hpMax;
     if (p.healing) p.hp = Math.min(p.hpMax, p.hp + (HEAL[p.c.id] || 6) * dt);
@@ -5934,10 +6028,11 @@
     world = buildWorld(arenaDef(cfg.arena));
     const W = world.W, xs = spawnXs(W);
     const fs = cfg.slots.map((s, i) => {
-      const f = makePlayer(castOf(s.who)), x = xs[i];
+      const who = s.who === "random" ? CAST[Math.floor(Math.random() * CAST.length)].id : s.who;   // Random: anyone, new each fight
+      const f = makePlayer(castOf(who)), x = xs[i];
       return Object.assign(f, { x, y: floorAt(x), face: x < W / 2 ? 1 : -1, slot: i, ctl: s.ctl, lvl: s.lvl == null ? 1 : s.lvl, team: cfg.teams ? s.team : i,
         inp: newInput(), hits: new WeakSet(), hpMax: cfg.hp, hp: cfg.hp, score: 0, lives: cfg.rule === "stock" ? cfg.goal : 0, kos: 0, downs: 0, dealt: 0,
-        landed: 0, blocked: 0, cmb: { n: 0, dmg: 0 }, sinceHit: 9, ai: aiNew(s), alive: true, h: f.hh, guardT: 0, guardCd: 0, check: { x, y: 6 } });
+        landed: 0, blocked: 0, cmb: { n: 0, dmg: 0 }, sinceHit: 9, burst: BURST_MAX, callT: 0, ai: aiNew(s), alive: true, h: f.hh, guardT: 0, guardCd: 0, check: { x, y: 6 } });
     });
     const humans = fs.filter(f => f.ctl !== "cpu");
     battle = { cfg, fs, live: false, over: false, intro: cfg.kind === "training" ? 0.6 : 1.7, clock: cfg.time || 0, duo: fs.some(f => f.ctl === "p2"),
@@ -5977,6 +6072,8 @@
     }
     for (const f of B.fs) {
       f.alive = !f.ko && !f.out; f.h = f.hh; f.sinceHit += h;
+      if (B.live && !f.ko) f.burst = Math.min(BURST_MAX, (f.burst || 0) + h * 2);   // the burst gauge, filling with time
+      if (f.callT > 0) f.callT -= h;
       if (f.out) continue;
       if (f.ctl === "cpu") aiThink(f, h);
       else if (B.live && !B.over) readInput(f.inp, f.ctl === "p2" ? 1 : 0);
@@ -6028,9 +6125,9 @@
      an upper, its power or a trap. When a blow or a shot is coming it may see it in time and
      guard; hurt and out of reach it may stop to heal. */
   const AI_LV = [
-    { think: 0.5, guard: 0.12, sp: 0.1, combo: [1, 2], fin: 0.25, aim: 0.05, jumpIn: 0.15, air: 2, chase: 0.35, launch: 0.2, sj: 0 },
-    { think: 0.28, guard: 0.38, sp: 0.18, combo: [2, 3], fin: 0.55, aim: 0.1, jumpIn: 0.22, air: 5, chase: 0.7, launch: 0.4, sj: 0.25 },
-    { think: 0.15, guard: 0.62, sp: 0.24, combo: [3, 3], fin: 0.85, aim: 0.14, jumpIn: 0.26, air: 9, chase: 0.95, launch: 0.55, sj: 0.55 },
+    { think: 0.5, guard: 0.12, sp: 0.1, combo: [1, 2], fin: 0.25, aim: 0.05, jumpIn: 0.15, air: 2, chase: 0.35, launch: 0.2, sj: 0, burstN: 9, burst: 0.3 },
+    { think: 0.28, guard: 0.38, sp: 0.18, combo: [2, 3], fin: 0.55, aim: 0.1, jumpIn: 0.22, air: 5, chase: 0.7, launch: 0.4, sj: 0.25, burstN: 6, burst: 0.55 },
+    { think: 0.15, guard: 0.62, sp: 0.24, combo: [3, 3], fin: 0.85, aim: 0.14, jumpIn: 0.26, air: 9, chase: 0.95, launch: 0.55, sj: 0.55, burstN: 4, burst: 0.8 },
   ];
   const aiNew = s => ({ t: 0.4 + Math.random() * 0.4, q: [], qt: 0, dir: 0, hold: 0, D: 0, U: 0, mU: 0, mD: 0, mod: 0, jt: 0, ct: 0,
                         dummy: s.dummy || null, wander: Math.random() < 0.5 ? -1 : 1, wt: 0 });
@@ -6069,6 +6166,11 @@
     if (A.ct > 0) A.ct -= dt;
     I.L = A.dir < 0 ? 1 : 0; I.R = A.dir > 0 ? 1 : 0; I.U = A.U || A.mU ? 1 : 0; I.D = A.D || A.mD ? 1 : 0; I.J = A.jt > 0 ? 1 : 0;
     I.Z = 0; I.X = 0; I.C = A.ct > 0 ? 1 : 0;
+    /* caught in a long combo with the gauge full: the burst, once a combo (if it thinks of it) */
+    if (!A.dummy && f.burst >= BURST_MAX && (f.state === "hurt" || f.state === "down") && f.cmb.n >= L.burstN && A.burstFor !== f.cmb) {
+      A.burstFor = f.cmb;
+      if (Math.random() < L.burst) { I.zp = I.xp = 1; I.Z = I.X = 1; return; }
+    }
     if (A.q.length) { A.qt += dt; while (A.q.length && A.qt >= A.q[0].at) press(f, A.q.shift()); }
     const tgt = aiTarget(f);
     if (A.dummy && A.dummy !== "fight") return dummyThink(f, dt);
@@ -6169,12 +6271,15 @@
     const box = host.querySelector(".adv-3d"), wrap = host.querySelector(".adv-tags"); if (!box || !wrap) return;
     camera.updateMatrixWorld();
     const W = box.clientWidth, Hh = box.clientHeight;
+    const calls = host.querySelectorAll(".adv-call");
     battle.fs.forEach((f, i) => {
       const el = wrap.children[i]; if (!el) return;
       if (f.out || f.ko) { el.style.display = "none"; return; }
       TV.set(f.x, f.y + f.hh + (f.c.lift || 0) + 0.3, 0).project(camera);
       el.style.display = "";
-      el.style.transform = `translate(${Math.round((TV.x + 1) / 2 * W)}px,${Math.round((1 - TV.y) / 2 * Hh)}px) translate(-50%,-100%)`;
+      const sx = Math.round((TV.x + 1) / 2 * W), sy = Math.round((1 - TV.y) / 2 * Hh);
+      el.style.transform = `translate(${sx}px,${sy}px) translate(-50%,-100%)`;
+      if (calls[i]) calls[i].style.transform = `translate(${sx}px,${sy - 30}px) translate(-50%,-100%)`;   // a call over the tag
     });
   }
   function padHtml() {
@@ -6199,6 +6304,7 @@
           <div class="adv-fc-r">
             <div class="adv-fc-nm"><b>${esc(f.c.name)}</b><i>${tagText(f)}</i></div>
             <div class="adv-hp"><span></span></div>
+            <div class="adv-bu" title="Burst: Z + X when full"><span></span></div>
             <div class="adv-fc-sc"></div>
           </div>
         </div>`).join("")}</div>
@@ -6206,9 +6312,10 @@
         ${B.cfg.time && B.cfg.kind === "battle" ? `<span class="adv-clock num"></span>` : ""}
         <button class="adv-pause" title="Pause (Enter)" aria-label="Pause">II</button>
       </div>
-      ${tr ? `<div class="adv-combo"><b class="num"></b><i></i></div>` : ""}
+      <div class="adv-combo"><b class="num"></b><i></i></div>
       <div class="adv-cap"></div>
       <div class="adv-tags">${B.fs.map(f => `<span class="adv-tag" style="--tc:${tagCol(f)}">${tagText(f)}</span>`).join("")}</div>
+      <div class="adv-calls">${B.fs.map(() => `<b class="adv-call"></b>`).join("")}</div>
       ${TOUCH && B.fs.some(f => f.ctl === "p1") ? padHtml() : ""}`;
     h.querySelectorAll(".adv-fc-face").forEach((cv, i) => paintCard(cv, B.fs[i].c.id, "portrait", 1));
     h.querySelector(".adv-pause").onclick = () => togglePause();
@@ -6231,12 +6338,23 @@
       set("sc" + i, scoreHtml(f), v => { card.querySelector(".adv-fc-sc").innerHTML = v; });
       set("out" + i, !!f.out, v => card.classList.toggle("out", v));
       set("heal" + i, !!f.healing, v => card.classList.toggle("heal", v));
+      set("bu" + i, Math.floor(f.burst || 0), v => { card.querySelector(".adv-bu span").style.width = v + "%"; card.classList.toggle("bfull", v >= BURST_MAX); });
+      const cl = h.querySelectorAll(".adv-call")[i];
+      if (cl) set("call" + i, f.callT > 0 ? f.callN + "|" + f.callTx : "", v => {
+        cl.className = "adv-call"; void cl.offsetWidth;
+        if (v) { cl.textContent = f.callTx; cl.className = "adv-call on " + (f.callTx === "Burst!" ? (f.burstBlue ? "blue" : "gold") : f.callTx === "Parry!" ? "parry" : "counter"); }
+      });
     });
     const ck = h.querySelector(".adv-clock");
     if (ck) set("clk", Math.ceil(B.clock), v => { ck.textContent = Math.floor(v / 60) + ":" + String(v % 60).padStart(2, "0"); ck.classList.toggle("low", v <= 10); });
     const cb = h.querySelector(".adv-combo");
     if (cb) {                                              // training: what the last string did
-      const me = B.lead, c = me.lastCmb, live = c && c.n >= 1 && B.fs.some(f => f !== me && f.sinceHit < 1.6);
+      /* whoever has a combo going: the longest one live (in Training, the player's) */
+      const going = f => f.lastVic && f.lastVic.cmb === f.lastCmb && f.lastVic.sinceHit < 1.2 ? f.lastCmb.n : 0;
+      let me = B.lead;
+      if (B.cfg.kind !== "training") for (const f of B.fs) if (going(f) > going(me)) me = f;
+      const c = me.lastCmb, live = c && (B.cfg.kind === "training" ? c.n >= 1 && B.fs.some(f => f !== me && f.sinceHit < 1.6) : going(me) >= 2);
+      cb.style.setProperty("--tc", tagCol(me));
       set("cmb", live ? c.n + "|" + c.dmg : "", v => {
         cb.classList.toggle("on", !!v);
         if (v) { cb.querySelector("b").textContent = c.n > 1 ? c.n + " hits" : "1 hit"; cb.querySelector("i").textContent = c.dmg + " damage"; }
@@ -6321,8 +6439,9 @@
   function bset() {
     const d = { slots: [{ who: castId, ctl: "p1", lvl: 1, team: 0 }, { who: "shadow", ctl: "cpu", lvl: 1, team: 1 },
                         { who: "knuckles", ctl: "off", lvl: 1, team: 0 }, { who: "amy", ctl: "off", lvl: 1, team: 1 }],
-                teams: false, arena: 0, rule: "ko", goal: 3, time: 180, hp: 100 };
+                teams: false, arena: 0, rule: "stock", goal: 3, time: 180, hp: 100 };
     const b = saveData.battle = Object.assign(d, saveData.battle || {});
+    if (!b.v2) { b.rule = "stock"; b.v2 = 1; }               // Survival is the default now (a setup kept from before was on KOs by default)
     b.slots = d.slots.map((s, i) => Object.assign({}, s, (b.slots || [])[i] || {}));
     return b;
   }
@@ -6336,8 +6455,8 @@
     return `
       <div class="adv-slot ${off ? "off" : ""}" style="--tc:${col}">
         <button class="adv-slot-ctl" data-ctl="${i}" data-k="ctl-${i}">${o.fixed ? o.fixed : off ? "Add a fighter" : CTL_N[s.ctl]}</button>
-        <div class="adv-slot-face"><canvas class="adv-spr" width="176" height="144" data-who="${off ? "" : s.who}"></canvas></div>
-        ${off ? "" : arrows("who" + i, esc(castOf(s.who).name))}
+        <div class="adv-slot-face">${!off && s.who === "random" ? `<b class="adv-rand">?</b>` : `<canvas class="adv-spr" width="176" height="144" data-who="${off ? "" : s.who}"></canvas>`}</div>
+        ${off ? "" : arrows("who" + i, s.who === "random" ? "Random" : esc(castOf(s.who).name))}
         ${!off && s.ctl === "cpu" && !o.noLevel ? seg("lvl" + i, LV_N.map((l, k) => [k, l]), s.lvl) : ""}
         ${!off && o.teams ? seg("team" + i, TEAM_N.map((l, k) => [k, l]), s.team) : ""}
       </div>`;
@@ -6371,7 +6490,7 @@
             <button class="btn ghost" id="advBSk" data-k="emskill">Emerl's Skills</button>
             <button class="btn ghost" id="advBBack" data-back data-k="back">${ico("back")}Main menu</button>
           </div>
-          <div class="adv-keys">${duo ? keysLine() + "<br>" : ""}<b>Down</b> guards, and held still heals &middot; Options sets the two players' keys</div>
+          <div class="adv-keys">${duo ? keysLine() + "<br>" : ""}<b>Down</b> guards (just as a blow lands, a parry), held still heals &middot; <b>Z + X</b> bursts &middot; Options sets the two players' keys</div>
         </div>
       </div>`;
     paintSlots(ov); paintArena(ov);
@@ -6393,7 +6512,7 @@
     ov.querySelectorAll("[data-arr]").forEach(el => el.onclick = () => {
       const key = el.dataset.arr, d = +el.dataset.d;
       if (key === "arena") b.arena = (b.arena + d + stages().length) % stages().length;
-      else { const s = b.slots[+key.slice(3)]; s.who = cycle(CAST.map(c => c.id), s.who, d); }
+      else { const s = b.slots[+key.slice(3)]; s.who = cycle(CAST.map(c => c.id).concat(key.startsWith("who") ? ["random"] : []), s.who, d); }   // (and Random, after the last)
       redo();
     });
     ov.querySelectorAll("[data-seg]").forEach(el => el.onclick = () => {
@@ -6482,7 +6601,8 @@
       ${R("C", "Shot. Up + C power, Down + C trap (again to set it off); each has an air version")}
       ${R("Space", "Jump; again in the air, " + airDesc(c))}
       ${R("Twice left or right", "Dash")}
-      ${R("Down", "Guard (half a second); held still, heal")}
+      ${R("Down", "Guard (a tap); just as a blow lands, a parry: it reels, open. Held still, heal")}
+      ${R("Z + X", "Burst, with the gauge full: out of a combo it throws everyone off; otherwise it hits")}
       ${c.spinDash ? R("Down + Space", "Spin Dash: tap Space to rev, let go of Down") : ""}
       <p>${esc(c.text)}</p>
     </div>`;

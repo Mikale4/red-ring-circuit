@@ -264,6 +264,8 @@
 .adv-slot.off:hover{border-color:var(--sx-yel)}
 .adv-slot-face{width:100%;height:96px;display:flex;align-items:flex-end;justify-content:center}
 .adv-slot-face canvas{width:118px;height:96px;image-rendering:pixelated;filter:drop-shadow(2px 2px 0 var(--sx-ink))}
+/* Random: a big question mark where the fighter would stand */
+.adv-rand{font:italic 900 76px/1 var(--sx-big);color:var(--sx-yel);paint-order:stroke fill;-webkit-text-stroke:8px var(--sx-ink);align-self:center}
 .adv-pick{display:flex;align-items:center;gap:6px;justify-content:center;min-width:0;max-width:100%}
 .adv-pick b{font-size:16px;line-height:1.15;color:#fff;-webkit-text-stroke-width:5px;text-align:center;min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:2px 2px 3px}
 .adv-arr{flex:none;width:30px;height:30px;display:grid;place-items:center;border:3px solid var(--sx-ink);border-radius:50%;background:var(--sx-yel);cursor:pointer;padding:0;color:var(--sx-ink);
@@ -288,6 +290,7 @@
   .adv-bset .adv-slot{gap:6px;padding-bottom:8px}
   .adv-bset .adv-slot-face{height:72px}
   .adv-bset .adv-slot-face canvas{width:88px;height:72px}
+  .adv-bset .adv-rand{font-size:58px}
   .adv-bset .setrow{padding:4px 2px}
   .adv-bset .adv-arena-pic{flex-basis:120px;width:120px}
   .adv-bset .adv-go{padding:6px 12px 8px}
@@ -316,6 +319,11 @@
 .adv-hp span{display:block;height:100%;width:100%;background:var(--sx-org);box-shadow:inset 0 3px 0 #ffd27a;transition:width .15s}
 .adv-fc.low .adv-hp span{background:var(--sx-red);box-shadow:inset 0 3px 0 #ff9a9a}
 .adv-fc.heal .adv-hp span{background:var(--sx-grn);box-shadow:inset 0 3px 0 #9af0a6}
+/* the burst gauge under the health: filling blue; full, it shines gold (Z + X bursts) */
+.adv-bu{height:10px;width:72%;margin:3px 0 0 9px;background:var(--sx-ink);border:2px solid var(--sx-ink);transform:skewX(-24deg);overflow:hidden}
+.adv-bu span{display:block;height:100%;width:0;background:#58b8ff;transition:width .2s}
+.adv-fc.bfull .adv-bu span{background:#ffc828;animation:adv-bu .5s steps(2) infinite}
+@keyframes adv-bu{50%{background:#fff3a0}}
 .adv-fc.out{opacity:.4}
 .adv-fc-sc{display:flex;align-items:baseline;gap:3px;height:18px;margin-left:4px}
 .adv-fc-sc b{font-size:20px;line-height:1;color:var(--sx-cyan);-webkit-text-stroke-width:5px}
@@ -331,6 +339,13 @@
 @keyframes advCap{0%{opacity:0;transform:translate(-50%,-50%) scale(1.6)}15%,70%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-64%) scale(1)}}
 @keyframes advCapIn{0%{opacity:0;transform:translate(-50%,-50%) scale(1.6)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}
 .adv-tags{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+/* a word over a fighter a moment: Parry!, Burst! (blue or gold), Counter! */
+.adv-calls{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.adv-call{position:absolute;left:0;top:0;display:none;font:italic 900 22px/1 var(--sx-big);white-space:nowrap;text-transform:uppercase;color:#fff;
+  paint-order:stroke fill;-webkit-text-stroke:5px var(--sx-ink)}
+.adv-call.on{display:block;animation:adv-call .9s ease-out forwards}
+.adv-call.parry{color:#9ad8ff}.adv-call.blue{color:#58b8ff}.adv-call.gold{color:#ffc828}.adv-call.counter{color:#ff8a5a}
+@keyframes adv-call{0%{opacity:0;margin-top:10px}12%{opacity:1;margin-top:0}75%{opacity:1}100%{opacity:0;margin-top:-12px}}
 .adv-tag{position:absolute;left:0;top:0;font:700 12px/1 var(--sx-pix);color:#fff;background:var(--tc);padding:3px 6px 2px;border:2px solid var(--sx-ink);border-radius:5px;margin-top:-6px;text-shadow:var(--sx-out1)}
 .adv-tag::after{content:"";position:absolute;left:50%;bottom:-8px;margin-left:-6px;border:6px solid transparent;border-bottom:0;border-top-color:var(--sx-ink)}
 .adv-combo{position:absolute;left:50%;top:78px;transform:translateX(-50%);display:none;flex-direction:column;align-items:center;gap:2px}

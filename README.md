@@ -107,10 +107,10 @@ talks and acts as their own games have them. A chapter cleared opens the next.
 
 **Battle** is Sonic Battle's fighting with health (60, 100 or 150): one to four fighters, any
 runner, each a player or a CPU (Easy, Normal or Hard): 1P vs CPU, 1P vs 2P, CPU vs CPU, 1P & 2P
-vs CPU, three-way, four-way, or 2 vs 2; everyone for themselves or Red against Blue; a KO
-match or Survival (lives); a time limit or none; in any runner's arena, which the setup shows
-in a picture (built from that arena's own world, once, and kept). Down guards, and held
-still heals. **Training** is the same fight on a dummy that stands, guards, walks, jumps or
+vs CPU, three-way, four-way, or 2 vs 2; everyone for themselves or Red against Blue; Survival
+(lives; the default) or a KO match; a time limit or none; in any runner's arena, which the setup shows
+in a picture (built from that arena's own world, once, and kept). Down guards (just as a blow
+lands, a parry), and held still heals; Z + X bursts. **Training** is the same fight on a dummy that stands, guards, walks, jumps or
 fights back, and never ends. **Options** set the music, sounds, screen shake and the two
 players' keys (any key can be rebound; a second gamepad is player 2's).
 
@@ -194,8 +194,25 @@ Capcom 3), borrowing their mechanics, not their look:
   seventh they are held a little less and fall a little faster; at eighteen they break out.
 - **Weight.** Hits freeze the picture longer the heavier they are; the one hit flashes white
   and shakes through the freeze. A combo's smash, or the chase, freezes it longest, slows the
-  world to a third for a moment, and the camera leans in, tilting; a launch, a bounce and a
-  heavy lean it in a little. The camera keeps right up with a juggle.
+  world to a third for a moment, and in a one-on-one fight the camera leans in, tilting (a
+  launch, a bounce, a parry and a heavy lean it in a little); with three or four fighters it
+  keeps still, framing them all. The camera keeps right up with a juggle.
+- **Guard and parry (Sonic Battle's).** Down tapped is the fighter's own guard skill, as long as
+  theirs is in Sonic Battle (Rouge's quick, behind her wings; Gamma's Guard Mode long; the Chaos
+  Guard strong; Cream's Chao Knight, Cheese in front of her; Metal's and Eggman's shields). A blow
+  that meets it in its first eighth of a second is parried: nothing comes of it, and whoever threw
+  it reels ("Attack blocked"), open to a counter that does a quarter more. Later in the guard, a
+  plain block. Held still on Down, they heal, in their own healing frames.
+- **Burst (Guilty Gear's Psych Burst).** **Z + X** together with the burst gauge full (under the
+  health). Caught in a combo, knocked down or reeling, it is a blue burst: a blast that throws
+  everyone near away, does no damage, and ends the combo. Otherwise it is gold: it hits, and
+  landing it gives a third of the gauge back. The gauge starts full and fills with time, with
+  damage taken, and with every guard and parry -- most for guarding a special, as Sonic Battle
+  fills its gauge.
+- **Every hurt has its frames,** from rows of the sheets the game had not used: knocked upward off
+  a launch, knocked back (tumbling) off a smash, hitting a wall, hitting the ground, getting up,
+  the attack blocked. A knockdown ends in getting up, untouchable for a moment. "Parry!", "Burst!"
+  and "Counter!" pop up over whoever did it, and the hit counter shows in every fight.
 - **The CPUs combo too:** jabs into the launcher or the heavy, then the chase, a super jump and
   air attacks, the OTG; Hard most often.
 
