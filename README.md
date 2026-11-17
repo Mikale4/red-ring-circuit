@@ -113,9 +113,11 @@ Every episode is open from the start, and in each a chapter cleared opens the ne
 episode is his own story: woken by Eggman's dig, named by Sonic, he spars with eight of the cast
 and learns from each (below).
 
-**Battle** is Sonic Battle's fighting with health (200, 300 or 400; more or less by runner,
-from Chaos Gamma's quarter more, Eggman's fifth and Knuckles' and Mighty's 15% to Tails' 10% and
-Cream's 15% less): one to four fighters, any
+**Battle** is Sonic Battle's fighting with health (150, 200 or 250, so three lives are done
+inside the three minutes: CPU matches at 200 end in about one and a half to two and a half;
+more or less by runner, from Chaos Gamma's quarter more, Eggman's fifth and Knuckles' and
+Mighty's 15% to Tails' 10% and Cream's 15% less; a story fight, with its one life, has 300):
+one to four fighters, any
 runner, each a player or a CPU (Easy, Normal or Hard): 1P vs CPU, 1P vs 2P, CPU vs CPU, 1P & 2P
 vs CPU, three-way, four-way, or 2 vs 2; everyone for themselves or Red against Blue; Survival
 (lives; the default) or a KO match; a time limit or none; in any runner's arena, which the setup shows
@@ -209,7 +211,13 @@ Capcom 3), borrowing their mechanics, not their look:
   when it was pressed, and the moment the blow lands it goes straight into the next (a
   cancel), or when the blow is over if it missed. The route: the jabs 1-2-3 into the heavy
   (just mash Z); X after any jab for the heavy, Up + X the launcher, Down + X the aim attack;
-  C after anything that lands, a special.
+  C after anything that lands, a special (the one reeling waits for the shot to come out).
+- **Shots in a combo.** A shot that lands opens the next move: the rest of the special (or
+  Sonic's recoil) cuts short into whatever is pressed -- Down + X the chase, which goes up with
+  them, Space a super jump into an air combo, a dash, a blow, the power. Jab, jab, shot, chase
+  is four hits for anyone; jab, jab, shot, super jump, air, air, chase six to eight. Shot point
+  blank, a shot still hits (it sweeps from the hand out to the muzzle). Knuckles' rock is
+  lobbed over anyone close: his lands on them at range.
 - **The launcher, a super jump, an air combo.** Every fighter's upper throws whoever it hits
   straight up, the same five metres or so. Space as it lands jumps after them, as high as they
   will go; air attacks then chain three to a jump, and while they land both fighters fall
@@ -294,14 +302,22 @@ from the frame the cannon or hand is there, a glow swelling at it as it fills. T
 flashes that colour, jolts the picture and, for the shots, pushes the runner back; Tails'
 and Rouge's blow their sparks out of the muzzle the way the shot goes, rather than up in a
 spray, and the shot leaves from it. The heaviest (Deep Impact, Chaos Burst, Major Eruption,
-the Big Hand, Silent Size) freeze the world for a few hundredths of a second. Shots fly
-faster and bigger and leave a trail of their colour -- Tails' Energy Ball at 20 m/s,
-Shadow's Chaos Spear at 30, Amy's Pink Typhoon and Rouge's Beauty Shock see-through (wind
-and sound). A shot stops in the fighter it hits (or a boss), with weight: the picture freezes
-and jolts, a ring of light swells, sparks blow out the way it was going, and in a one-on-one
-the camera leans in. A guard catches it. Badniks and blocks it breaks, it goes on through. A
-tornado (Amy's Pink Typhoon, the Mighty Cyclone) throws its mark straight up, as the launcher
-does. Knuckles' specials raise no
+the Big Hand, Silent Size) freeze the world for a few hundredths of a second. Shots are big
+and leave a trail of their colour, at 8 to 18 m/s (the Mighty Cyclone slowest, the Chaos
+Spear fastest; Tails' Energy Ball 12) -- slow enough to see coming and guard, Amy's Pink
+Typhoon and Rouge's Beauty Shock see-through (wind and sound). Each flickers as the Egg
+Mobile's booster does: it grows in, then a new frame of its body every thirtieth of a second
+in no steady order, now and then a frame dropped, and one that runs out dies away through its
+last frames. A shot stops in the fighter it hits (or a boss), with weight: the picture
+freezes and jolts, a ring of light swells, sparks blow out the way it was going, and in a
+one-on-one the camera leans in. A guard catches it. Badniks and blocks it breaks, it goes on
+through. Every shot throws its mark its own way (`kn` in `SPECIALS`: how far, how high, how
+long they float coming down): the Mighty Cyclone launches tallest (about six metres) and Amy's
+Pink Typhoon next, both straight up as the launcher does; the Chaos Spear and Gamma's
+Devastator (more, charged) knock furthest; Sonic Wave skims them away low; Cream's Chao Cannon
+and Eggman's cannon bounce them high; Tails' Energy Ball pops them up where they stood; the
+Electric Bolt, the Beauty Shock and the Psycho Knife hold them up, floating down, a second or
+so; Chaos' water splashes them a way off. Knuckles' specials raise no
 dust and throw no bits: his rocks, Deep Impact, Major Eruption and Mole Bomb land on their
 light, the jolt and the freeze alone. Sonic Meteor and Spiral Dive come down in dust; Girl
 Tornado whirls wind round Amy; every trap goes off in Knuckles' Deep Impact explosion. Each

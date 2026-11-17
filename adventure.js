@@ -293,7 +293,9 @@
 
      The specials, as Sonic Battle has each one (Sonic Center's character FAQ and the Green
      Hill Zone's guide): `body` the runner's frames, `at` the frame it happens on, then what
-     happens. Shots fly (`wave` ones run along the ground, `lob` ones arc and burst); powers
+     happens. Shots fly (`wave` ones run along the ground, `lob` ones arc and burst), each with its
+     own knock, `kn`: [how far it throws them, how high, how long they float coming down, and 1 for
+     a launch] -- the Chaos Spear furthest, the Mighty Cyclone tallest, the Electric Bolt longest; powers
      strike an `area` in front or around, or move the runner (`drive`, `dive`, `tornado`);
      traps sit, or `chase`, or `orbit`, till something touches them or Down + C sets them off. */
   const SPECIALS = {
@@ -301,16 +303,16 @@
       /* Sonic Wave: he spins in place, faster and faster, then lets go a sonic boom -- air
          breaking the sound barrier, so you can see through it -- that tears along the ground
          and throws him back. Sonic Storm is the same from the air, angled down. */
-      shot:     { body: "rev", windup: 0.5, wave: "fx.shot", speed: 28, life: 0.5, recoil: 7, ghost: 1.3 },
-      airshot:  { body: "rev", windup: 0.4, fly: "fx.airshot", speed: 26, down: 0.55, life: 0.45, recoil: 6, ghost: 1.3 },
+      shot:     { body: "rev", windup: 0.5, wave: "fx.shot", speed: 16, life: 0.85, kn: [9, 5.5, 0], recoil: 7, ghost: 1.3 },
+      airshot:  { body: "rev", windup: 0.4, fly: "fx.airshot", speed: 15, down: 0.55, life: 0.75, kn: [4, 7.5, 0], recoil: 6, ghost: 1.3 },
       power:    { body: "power", fps: 18, at: 3, drive: true, pow: { c: 0x9ad4ff, flash: 2.2, shake: 0.12 } },   // Sonic Drive: throws a ring, spins after it
       airpower: { body: "ball", fps: 24, at: 0, dive: "meteor", pow: { c: 0x9ad4ff, flash: 2.8, shake: 0.26, stop: 0.05 } }, // Sonic Meteor
       trap:     { body: "trap", fps: 16, at: 4, trap: "mine" },                                                 // Sonic Cracker: a landmine
       airtrap:  { body: "airtrap", fps: 16, at: 4, trap: "mine", toss: true } },
     tails: {
-      shot:     { body: "shot", fps: 30, at: 9, fly: "fx.shot", speed: 20, life: 0.7, loop: true, k: 1.5, trail: 0xfff070,   // Energy Ball, from his arm cannon
+      shot:     { body: "shot", fps: 30, at: 9, fly: "fx.shot", speed: 12, life: 1.1, kn: [2, 9.5, 0.15], loop: true, k: 1.5, trail: 0xfff070,   // Energy Ball, from his arm cannon
                   muzzle: [0.68, 0.55], gfrom: 6, charge: 0xfff070, pow: { c: 0xfff070, flash: 2.2, shake: 0.12, recoil: 3 } },
-      airshot:  { body: "shot", fps: 30, at: 9, fly: "fx.shot", speed: 20, down: 0.6, life: 0.6, loop: true, k: 1.5, trail: 0xfff070,
+      airshot:  { body: "shot", fps: 30, at: 9, fly: "fx.shot", speed: 12, down: 0.6, life: 0.95, kn: [2, 8.5, 0.15], loop: true, k: 1.5, trail: 0xfff070,
                   muzzle: [0.68, 0.55], gfrom: 6, charge: 0xfff070, pow: { c: 0xfff070, flash: 2.2, shake: 0.12, recoil: 3 } },
       power:    { body: "power", fps: 16, at: 3, area: "fx.power", ax: 1.5, ay: 0.7, w: 2.1, h: 2.2, k: 1.5,           // Flick: a Big Hand
                   charge: 0xffffff, pow: { c: 0xffffff, flash: 3, shake: 0.22, stop: 0.06 } },
@@ -332,9 +334,9 @@
       airtrap:  { body: "airtrap", fps: 18, at: 3, trap: "mine", toss: true } },
     amy: {
       /* Pink Typhoon: a tornado off her hammer -- wind, so you can see through it */
-      shot:     { body: "shot", fps: 24, at: 7, wave: "fx.shot", speed: 15, life: 0.8, ghost: 1.5, trail: 0xffa0d0, twister: true,
+      shot:     { body: "shot", fps: 24, at: 7, wave: "fx.shot", speed: 9, life: 1.3, kn: [1.5, 18, 0.3, 1], ghost: 1.5, trail: 0xffa0d0, twister: true,
                   charge: 0xff80c0, pow: { c: 0xff80c0, flash: 2.2, shake: 0.14, recoil: 2.5 } },
-      airshot:  { body: "airshot", fps: 22, at: 4, fly: "fx.airshot", speed: 16, down: 0.6, life: 0.6, ghost: 1.5, trail: 0xffa0d0, twister: true,
+      airshot:  { body: "airshot", fps: 22, at: 4, fly: "fx.airshot", speed: 10, down: 0.6, life: 0.95, kn: [3, 12, 0.25, 1], ghost: 1.5, trail: 0xffa0d0, twister: true,
                   pow: { c: 0xff80c0, flash: 2.2, shake: 0.14, recoil: 2.5 } },
       power:    { body: "shot", fps: 22, at: 4, tornado: [4, 7], charge: 0xff80c0, pow: { c: 0xff80c0, flash: 2.2, shake: 0.1 } }, // Girl Tornado: frames 4-7, six times round
       airpower: { body: "airshot", fps: 22, at: 4, tornado: [4, 6], pow: { c: 0xff80c0, flash: 2.2, shake: 0.1 } },
@@ -342,9 +344,9 @@
       airtrap:  { body: "airtrap", fps: 18, at: 4, trap: "gift", toss: true } },
     rouge: {
       /* Beauty Shock: an ultrasonic shriek -- sound, so you can see through it; short reach */
-      shot:     { body: "shot", fps: 22, at: 7, fly: "fx.shot", speed: 18, life: 0.35, loop: true, ghost: 1.6, trail: 0xffb0f0,
+      shot:     { body: "shot", fps: 22, at: 7, fly: "fx.shot", speed: 11, life: 0.55, kn: [1.5, 8, 0.6], loop: true, ghost: 1.6, trail: 0xffb0f0,
                   muzzle: [0.64, 0.68], gfrom: 4, charge: 0xff70d0, pow: { c: 0xff70d0, flash: 2, shake: 0.1, recoil: 2 } },
-      airshot:  { body: "airshot", fps: 22, at: 6, fly: "fx.shot", speed: 18, down: 0.7, life: 0.35, loop: true, ghost: 1.6, trail: 0xffb0f0,
+      airshot:  { body: "airshot", fps: 22, at: 6, fly: "fx.shot", speed: 11, down: 0.7, life: 0.55, kn: [1.5, 7, 0.6], loop: true, ghost: 1.6, trail: 0xffb0f0,
                   muzzle: [0.63, 0.72], gfrom: 3, charge: 0xff70d0, pow: { c: 0xff70d0, flash: 2, shake: 0.1, recoil: 2 } },
       power:    { body: "power", fps: 22, at: 3, area: "fx.power", ax: 1.5, ay: 0.6, w: 2.4, h: 1.8, k: 1.5,           // Silent Size
                   charge: 0xa0ff70, pow: { c: 0xa0ff70, flash: 3, shake: 0.22, stop: 0.06 } },
@@ -352,9 +354,9 @@
       trap:     { body: "trap", fps: 22, at: 7, trap: "chase", flies: true },                                   // Bat Cracker: a bat mine that hunts
       airtrap:  { body: "airtrap", fps: 22, at: 6, trap: "chase", flies: true } },
     shadow: {
-      shot:     { body: "shot", fps: 22, at: 6, fly: "fx.shot", speed: 30, life: 0.4, hold: 0.25, k: 1.25, trail: 0xffe060, // Chaos Magic (Chaos Spear): held, it flies further
+      shot:     { body: "shot", fps: 22, at: 6, fly: "fx.shot", speed: 18, life: 0.65, kn: [11, 6.5, 0], hold: 0.4, k: 1.25, trail: 0xffe060, // Chaos Magic (Chaos Spear): held, it flies further
                   charge: 0xff4060, pow: { c: 0xffe060, flash: 2.4, shake: 0.14, recoil: 3.5 } },
-      airshot:  { body: "airshot", fps: 22, at: 5, fly: "fx.shot", speed: 26, down: 0.6, life: 0.4, ahead: 1.8, k: 1.25, trail: 0xffe060, // appears a few steps ahead
+      airshot:  { body: "airshot", fps: 22, at: 5, fly: "fx.shot", speed: 16, down: 0.6, life: 0.65, kn: [7, 4, 0], ahead: 1.8, k: 1.25, trail: 0xffe060, // appears a few steps ahead
                   charge: 0xff4060, pow: { c: 0xffe060, flash: 2.4, shake: 0.14, recoil: 3.5 } },
       /* Chaos Burst: the burst's frames draw Shadow himself in the sphere, so it goes over him at his
          own size, centred on him, and his own sprite stands aside while it plays (`self`) */
@@ -366,9 +368,9 @@
     cream: {
       /* Cheese does it all: Chao Cannon, Cheese wrapped in energy and flown at what's ahead;
          Chao Rush, a whirlwind round Cheese; Cream Cracker, an Omochao that flies off to hunt */
-      shot:     { body: "shot", fps: 22, at: 3, fly: "fx.shot", speed: 15, life: 0.75, k: 1.2, trail: 0x8ad8ff,
+      shot:     { body: "shot", fps: 22, at: 3, fly: "fx.shot", speed: 10, life: 1.1, kn: [3, 11, 0], k: 1.2, trail: 0x8ad8ff,
                   muzzle: [0.55, 0.55], charge: 0x8ad8ff, pow: { c: 0x8ad8ff, flash: 2, shake: 0.1 } },
-      airshot:  { body: "airshot", fps: 14, at: 1, fly: "fx.airshot", speed: 15, down: 0.5, life: 0.65, k: 1.2, trail: 0x8ad8ff,
+      airshot:  { body: "airshot", fps: 14, at: 1, fly: "fx.airshot", speed: 10, down: 0.5, life: 0.95, kn: [3, 10, 0], k: 1.2, trail: 0x8ad8ff,
                   pow: { c: 0x8ad8ff, flash: 2, shake: 0.1 } },
       power:    { body: "power", fps: 20, at: 4, area: "fx.power", ax: 1.7, ay: 1.0, w: 2.4, h: 2.6, k: 1.3,
                   charge: 0x8ad8ff, pow: { c: 0x8ad8ff, flash: 3, shake: 0.2, stop: 0.05 } },
@@ -379,9 +381,9 @@
     chaos: {
       /* Chaos Shot, a ball of water that bursts; Chaos Crush, his arm along the ground (from the
          air, down it: a column of water); Chaos Splash, a puddle that throws up tentacles */
-      shot:     { body: "shot", fps: 20, at: 4, fly: "fx.shot", speed: 14, life: 0.7, k: 1.15, trail: 0x9ad8ff,
+      shot:     { body: "shot", fps: 20, at: 4, fly: "fx.shot", speed: 9, life: 1.05, kn: [4.5, 8, 0.3], k: 1.15, trail: 0x9ad8ff,
                   muzzle: [0.7, 0.55], gfrom: 1, charge: 0x70c8ff, pow: { c: 0x9ad8ff, flash: 2, shake: 0.1 } },
-      airshot:  { body: "airshot", fps: 20, at: 4, fly: "fx.shot", speed: 14, down: 0.5, life: 0.6, k: 1.15, trail: 0x9ad8ff,
+      airshot:  { body: "airshot", fps: 20, at: 4, fly: "fx.shot", speed: 9, down: 0.5, life: 0.9, kn: [4, 7, 0.3], k: 1.15, trail: 0x9ad8ff,
                   muzzle: [0.7, 0.55], pow: { c: 0x9ad8ff, flash: 2, shake: 0.1 } },
       power:    { body: "power", fps: 20, at: 4, area: "fx.power", ax: 2.0, ay: 0.75, w: 3.4, h: 1.7, k: 1.3,
                   charge: 0x70c8ff, pow: { c: 0x9ad8ff, flash: 2.6, shake: 0.2, stop: 0.05 } },
@@ -393,10 +395,10 @@
       /* Devastator, out of his arm cannon; held, it charges -- the charging frames, only while
          the button is down -- and lets go bigger and further. Meltdown: his reactor goes up,
          and him with it (a heart of his own). Blinker: a mine, blinking. */
-      shot:     { body: "shot", fps: 16, at: 4, fly: "fx.shot", speed: 21, life: 0.6, loop: true, k: 1.3, trail: 0xc0b0ff,
+      shot:     { body: "shot", fps: 16, at: 4, fly: "fx.shot", speed: 13, life: 0.95, kn: [8, 9.5, 0], loop: true, k: 1.3, trail: 0xc0b0ff,
                   muzzle: [1.0, 0.62], gfrom: 1, charge: 0xc0b0ff, pow: { c: 0xc0b0ff, flash: 2.4, shake: 0.14, recoil: 2 },
                   charged: { at: 2, body: "shotcharge", max: 1.2, release: "shotfull", rat: 8 } },
-      airshot:  { body: "airshot", fps: 16, at: 3, fly: "fx.shot", speed: 21, down: 0.4, life: 0.6, loop: true, k: 1.3, trail: 0xc0b0ff,
+      airshot:  { body: "airshot", fps: 16, at: 3, fly: "fx.shot", speed: 13, down: 0.4, life: 0.95, kn: [7, 8, 0], loop: true, k: 1.3, trail: 0xc0b0ff,
                   muzzle: [1.0, 0.5], gfrom: 1, charge: 0xc0b0ff, pow: { c: 0xc0b0ff, flash: 2.4, shake: 0.14, recoil: 2 },
                   charged: { at: 2, body: "airshotcharge", max: 1.2, release: "airshotfull", rat: 7 } },
       power:    { body: "power", fps: 8, at: 3, blast: true, w: 5.4, h: 4.4, k: 3.2, charge: 0xff6040,
@@ -409,22 +411,22 @@
       /* (his muzzles are where they are with the Egg Mobile off the ground) the Death Egg Cannon
          out of the Egg Mobile's front, a ball of fire; Missile Launch, a
          missile that goes off where it hits; Bomb Drop, a bomb out of the bottom, its fuse lit */
-      shot:     { body: "shot", fps: 18, at: 7, fly: "fx.shot", speed: 17, life: 0.75, loop: true, k: 1.45, trail: 0xff7040,
+      shot:     { body: "shot", fps: 18, at: 7, fly: "fx.shot", speed: 11, life: 1.15, kn: [5, 11.5, 0], loop: true, k: 1.45, trail: 0xff7040,
                   muzzle: [0.95, 0.87], gfrom: 3, charge: 0xff7040, pow: { c: 0xff9050, flash: 3, shake: 0.2, recoil: 3 } },
-      airshot:  { body: "airshot", fps: 18, at: 7, fly: "fx.shot", speed: 17, down: 0.45, life: 0.7, loop: true, k: 1.45, trail: 0xff7040,
+      airshot:  { body: "airshot", fps: 18, at: 7, fly: "fx.shot", speed: 11, down: 0.45, life: 1.05, kn: [5, 10, 0], loop: true, k: 1.45, trail: 0xff7040,
                   muzzle: [0.95, 0.87], gfrom: 3, charge: 0xff7040, pow: { c: 0xff9050, flash: 3, shake: 0.2, recoil: 3 } },
-      power:    { body: "power", fps: 14, at: 3, fly: "fx.power", range: [0, 7], speed: 13, life: 1.1, k: 1.4, trail: 0xc8c8c8,
+      power:    { body: "power", fps: 14, at: 3, fly: "fx.power", range: [0, 7], speed: 9, life: 1.55, k: 1.4, trail: 0xc8c8c8,
                   muzzle: [0.8, 0.77], bursts: 1.6, boom: 1.4, land: { c: 0xffa040, flash: 3, shake: 0.26, stop: 0.04 } },
-      airpower: { body: "airpower", fps: 14, at: 3, fly: "fx.power", range: [0, 7], speed: 13, down: 0.35, life: 1.0, k: 1.4, trail: 0xc8c8c8,
+      airpower: { body: "airpower", fps: 14, at: 3, fly: "fx.power", range: [0, 7], speed: 9, down: 0.35, life: 1.4, k: 1.4, trail: 0xc8c8c8,
                   muzzle: [0.8, 0.77], bursts: 1.6, boom: 1.4, land: { c: 0xffa040, flash: 3, shake: 0.26, stop: 0.04 } },
       trap:     { body: "trap", fps: 10, at: 2, trap: "mine" },
       airtrap:  { body: "airtrap", fps: 10, at: 2, trap: "mine", toss: true } },
     metal: {
       /* Electric Bolt; Black Shield, a crystal round him that nothing gets through and that
          breaks what it meets; Plasma Grenade, thrown */
-      shot:     { body: "shot", fps: 20, at: 6, fly: "fx.shot", speed: 24, life: 0.55, loop: true, k: 1.25, trail: 0xfff070,
+      shot:     { body: "shot", fps: 20, at: 6, fly: "fx.shot", speed: 15, life: 0.85, kn: [2, 7.5, 0.8], loop: true, k: 1.25, trail: 0xfff070,
                   muzzle: [0.6, 0.6], charge: 0x80c0ff, pow: { c: 0xfff070, flash: 2.4, shake: 0.14, recoil: 2.5 } },
-      airshot:  { body: "airshot", fps: 20, at: 5, fly: "fx.shot", speed: 24, down: 0.55, life: 0.5, loop: true, k: 1.25, trail: 0xfff070,
+      airshot:  { body: "airshot", fps: 20, at: 5, fly: "fx.shot", speed: 15, down: 0.55, life: 0.8, kn: [2, 7, 0.8], loop: true, k: 1.25, trail: 0xfff070,
                   muzzle: [0.6, 0.6], charge: 0x80c0ff, pow: { c: 0xfff070, flash: 2.4, shake: 0.14, recoil: 2.5 } },
       power:    { body: "power", fps: 10, at: 1, shield: true, pow: { c: 0x9ad4ff, flash: 3, shake: 0.18 } },
       airpower: { body: "airpower", fps: 10, at: 1, shield: true, pow: { c: 0x9ad4ff, flash: 3, shake: 0.18 } },
@@ -434,9 +436,9 @@
       /* Mighty Cyclone, a tornado along the ground (a ring of fire from the air); Hammer Spin,
          curled and spinning on, three times round; Hammer Drop (Sonic Mania Plus), straight
          down, through cracked rock, a shockwave both ways where he lands; Peacemaker */
-      shot:     { body: "shot", fps: 24, at: 7, wave: "fx.shot", speed: 11, life: 1.0, k: 1.15, trail: 0xffc080, twister: true,
+      shot:     { body: "shot", fps: 24, at: 7, wave: "fx.shot", speed: 8, life: 1.35, kn: [0.5, 20.5, 0.5, 1], k: 1.15, trail: 0xffc080, twister: true,
                   pow: { c: 0xffa060, flash: 2.2, shake: 0.14, recoil: 2 } },
-      airshot:  { body: "airshot", fps: 22, at: 2, fly: "fx.airshot", speed: 14, down: 0.5, life: 0.75, k: 1.2, trail: 0xff8040,
+      airshot:  { body: "airshot", fps: 22, at: 2, fly: "fx.airshot", speed: 9, down: 0.5, life: 1.1, kn: [6, 7.5, 0], k: 1.2, trail: 0xff8040,
                   pow: { c: 0xffa060, flash: 2.2, shake: 0.14, recoil: 2 } },
       power:    { body: "power", fps: 18, at: 4, tornado: [5, 8], pow: { c: 0xff4a4a, flash: 2.2, shake: 0.1 } },
       airpower: { body: "airpower", fps: 20, at: 0, dive: "hammer", bits: 0, pow: { c: 0xffa060, flash: 4.5, shake: 0.42, stop: 0.08, bits: 0 } },
@@ -445,9 +447,9 @@
     silver: {
       /* Psycho Knife, a blade of psychokinesis, gone in a moment; Psycho Surge, a whirlwind of
          it round him; Psycho Orb, sent ahead to hang in the air -- one at a time */
-      shot:     { body: "shot", fps: 20, at: 4, fly: "fx.shot", speed: 19, life: 0.45, k: 1.15, trail: 0x70f0d0,
+      shot:     { body: "shot", fps: 20, at: 4, fly: "fx.shot", speed: 12, life: 0.7, kn: [2.5, 8.5, 0.5], k: 1.15, trail: 0x70f0d0,
                   muzzle: [0.6, 0.65], charge: 0x70f0d0, pow: { c: 0x70f0d0, flash: 2.2, shake: 0.12, recoil: 2 } },
-      airshot:  { body: "airshot", fps: 18, at: 3, fly: "fx.shot", speed: 19, down: 0.45, life: 0.45, k: 1.15, trail: 0x70f0d0,
+      airshot:  { body: "airshot", fps: 18, at: 3, fly: "fx.shot", speed: 12, down: 0.45, life: 0.7, kn: [2.5, 7.5, 0.5], k: 1.15, trail: 0x70f0d0,
                   muzzle: [0.6, 0.65], pow: { c: 0x70f0d0, flash: 2.2, shake: 0.12, recoil: 2 } },
       power:    { body: "power", fps: 18, at: 4, area: "fx.power", ax: 0, ay: 0.95, w: 3.4, h: 3.2, around: true, k: 1.3,
                   charge: 0x70f0d0, pow: { c: 0x70f0d0, flash: 4, shake: 0.32, stop: 0.08 } },
@@ -3328,6 +3330,7 @@
     else if (p.buf && p.state !== "atk" && (p.buf.t -= dt) <= 0) p.buf = null;
     p.jbuf = input.jp ? 0.15 : Math.max(0, (p.jbuf || 0) - dt);
     if (p.hang > 0) p.hang -= dt;
+    if (p.shotHit > 0) p.shotHit -= dt;
     if (p.hideT > 0) p.hideT -= dt;
     if (p.wallT > 0) p.wallT -= dt;
     if (p.floorT > 0) p.floorT -= dt;
@@ -3399,6 +3402,7 @@
         if (p.st <= 0) { if (p.state === "psy") p.floatT = 1.6; p.state = "run"; }
         break;
       case "recoil":                                       // thrown back by his own blast, braking
+        if (p.recoilLanded && battle && shotCancel(p)) break;
         p.vx = Math.abs(p.vx) <= 16 * dt ? 0 : p.vx - sgn(p.vx) * 16 * dt;
         if (p.st <= 0) p.state = "run";
         break;
@@ -3437,6 +3441,7 @@
       if (input.D && onPlank) { p.drop = true; p.ground = false; p.y -= 0.12; p.state = "run"; }
       else if (input.D && p.ground && c.spinDash && p.state !== "roll") startCharge(p);
       else if (input.D && p.ground && !c.spinDash) { /* no Spin Dash (Rouge, Chaos, Gamma, Eggman): Down + Space does nothing */ }
+      else if (battle && p.ground && p.shotHit > 0 && juggled(p)) { p.shotHit = 0; superJump(p); }   // a shot of theirs threw someone up: after them
       else if ((p.ground || p.coyote > 0) && p.state !== "fly" && p.state !== "glide") jump(p, mud);
       else airAction(p);
     }
@@ -3471,7 +3476,8 @@
       case "psy": g = 0; p.vy = lerp(p.vy, 0, Math.min(1, dt * 10)); break;
       case "atk": if (p.mv.air) g *= p.hang > 0 ? 0.3 : 0.6; break;
       case "hurt":
-        if (p.hang > 0 && p.juggle) g *= 0.3 * (1 + Math.min(0.8, p.cmb.n * 0.05));   // an air combo: falling slowly, with the one hitting them (a long one less so)
+        if (p.dazeT > 0 && p.juggle && p.vy < 1 && !(p.hang > 0)) { p.dazeT -= dt; g *= 0.15; maxFall = 1.5; }   // held up by a shot: floating down
+        else if (p.hang > 0 && p.juggle) g *= 0.3 * (1 + Math.min(0.8, p.cmb.n * 0.05));   // an air combo: falling slowly, with the one hitting them (a long one less so)
         else if (p.smashT > 0 && !p.spike) g *= 0.45;                             // smashed: flying, low and far
         else if (p.juggle && p.cmb) g *= 1 + Math.min(0.8, p.cmb.n * 0.05);       // a long juggle falls faster and faster
         break;
@@ -3696,7 +3702,13 @@
   }
   function doLink(p, nx, q) {
     emit("link", { p, nx });
-    if (nx === "special") return startSpecial(p, q.U, q.D);
+    if (nx === "special") {
+      startSpecial(p, q.U, q.D);
+      /* (the one this string is on, reeling on the ground, reels till the shot is out) */
+      const v = p.lastVic, S = p.state === "special" && p.sp;
+      if (battle && S && v && v.state === "hurt" && !v.juggle) v.st = Math.max(v.st, (S.windup || (S.at || 0) / (S.fps || 16)) + 0.18);
+      return;
+    }
     if (nx === "aim") {                                   // (its dash takes a moment: the one reeling on the ground waits for it)
       startSeek(p);
       const v = p.lastVic; if (battle && v && v.state === "hurt" && !v.juggle) v.st = Math.max(v.st, 0.45);
@@ -3878,6 +3890,8 @@
   function stepSeek(p) {
     const t = p.target, chase = p.chase && t && t.juggle;
     const strikeNow = met => {
+      /* (the chase off the floor, beside one just thrown up -- off a shot -- goes up with them) */
+      if (chase && met && p.ground && t.vy > 2) { p.ground = false; p.on = null; }
       const air = !p.ground; startBlow(p, "aim"); p.mv.air = air; p.chase = false;
       if (chase && met) { p.mv.chase = true; p.mv.runs = [[0, p.mv.h1]]; p.mv.h0 = 0; p.vx = t.vx; p.vy = Math.max(t.vy, 1); }    // at once, keeping with them
       else { p.vx = p.face * 2; if (air) p.vy = Math.max(p.vy, 3); }
@@ -3933,9 +3947,23 @@
     if (air && !S.dive) p.vy = Math.max(p.vy, 1);
     SFX.cast();
   }
+  /* A shot of theirs has landed: what is pressed next cuts the rest of the move (or Sonic's recoil)
+     short -- Space a super jump after one it threw up, a dash, a blow (Down + X the chase or the
+     aim attack), another special. */
+  function shotCancel(p) {
+    const sj = p.jbuf > 0 && p.ground && juggled(p), dash = input.dash && p.ground;
+    if (!(sj || dash || p.buf)) return false;
+    p.sp = null; p.state = "run"; p.recoilLanded = false;
+    if (sj) { p.jbuf = 0; p.shotHit = 0; input.jp = 0; superJump(p); }   // (the press used up: not the air action as well)
+    else if (dash) { startDash(p, input.dash); input.dash = 0; }
+    else { const b = p.buf; p.buf = null; freshPress(p, b); }
+    emit("link", { p, nx: "shotcancel" });
+    return true;
+  }
   function stepSpecial(p, dt) {
     const s = p.sp;
     s.t += dt;
+    if (s.landed && battle && shotCancel(p)) return;
     if (s.windup) return stepWindup(p, s, dt);
     if (s.charged && stepCharged(p, s, dt)) return;
     const i = Math.floor(s.t * s.fps);
@@ -3976,6 +4004,7 @@
       const k = 1 + Math.min(1, s.ct / H.max) * 0.8;
       s.phase = "release"; s.body = H.release; s.t = 0; s.at = H.rat; s.n = framesOf(p.c.sheet || p.c.id, H.release).length;
       s.k = (s.k || 1) * k; s.life *= k; s.speed *= 1.1; s.pow = Object.assign({}, s.pow, { flash: s.pow.flash * k, shake: s.pow.shake * k });
+      if (s.kn) s.kn = s.kn.map((v, j) => j < 2 ? v * (0.7 + 0.3 * k) : v);
     }
     return true;
   }
@@ -4004,7 +4033,7 @@
       burst(p.x + f * 0.8, p.y + 0.4, [0xffffff, 0xcfe8ff, 0x9ad4ff], 16, 6);
       if (p.ground && framesOf(fw, "fx.dust")) effect(fw, "fx.dust", p.x - f * 0.5, p.y, -f, 24, false);
       shakeCam(0.28); SFX.blast();
-      p.sp = null; p.state = "recoil"; p.st = 0.32; p.curl = false;
+      p.sp = null; p.state = "recoil"; p.st = 0.32; p.curl = false; p.recoilLanded = false;
       p.vx = -f * s.recoil;
       if (s.air) p.vy = Math.max(p.vy, 3.5);
     }
@@ -4104,13 +4133,13 @@
     }
     const k = s.k || s.ghost || 1;
     if (s.wave) shoot(who, { fx: s.wave, x: p.x + f * 0.7, y: p.y, vx: f * s.speed, vy: 0, life: s.life, ground: true,
-                             w: 1.0 * k, h: 1.3 * k, k, face: f, ghost: s.ghost, trail: s.trail, twister: s.twister });
+                             w: 1.0 * k, h: 1.3 * k, k, face: f, ghost: s.ghost, trail: s.trail, twister: s.twister, kn: s.kn });
     else if (s.fly) {
       const held = s.hold && input.C ? s.hold : 0;
-      shoot(who, { fx: s.fly, x: mz ? p.x + f * (mz[0] + 0.3 * k) : p.x + f * (0.6 + (s.ahead || 0)), y: mz ? p.y + mz[1] : p.y + p.hh * 0.55,
+      shoot(who, { fx: s.fly, x: mz ? p.x + f * (mz[0] + 0.3 * k) : p.x + f * (0.6 + (s.ahead || 0)), y: mz ? p.y + mz[1] : p.y + p.hh * 0.55, x0: p.x + f * 0.3,
                    vx: f * s.speed, vy: -(s.down || 0) * s.speed,
                    life: s.life + held, loop: s.loop, mid: true, w: 0.8 * k, h: 0.8 * k, k, face: f, ghost: s.ghost, trail: s.trail,
-                   range: s.range, bursts: s.bursts, boom: s.boom, land: s.land, twister: s.twister });
+                   range: s.range, bursts: s.bursts, boom: s.boom, land: s.land, twister: s.twister, kn: s.kn });
       if (!s.ghost) SFX.shot();
     } else if (s.lob) {
       shoot(who, { fx: s.lob, x: p.x + f * 0.5, y: p.y + p.hh + 0.5, vx: f * s.speed, vy: s.rise, g: 26, life: 3, loop: true, mid: true,
@@ -4268,7 +4297,7 @@
     const w = world;
     for (const s of w.shots) {
       if (s.gone) continue;
-      actor = s.owner || null; tok(s, s.dmg || 8);
+      actor = s.owner || null; tok(s, s.dmg || 8, s.kn ? 1 : 0.85);
       s.t += dt; s.life -= dt;
       if (s.g) s.vy -= s.g * dt;
       s.x += s.vx * dt; s.y += s.vy * dt;
@@ -4277,14 +4306,24 @@
       if (t === "X" || t === "B") breakTile(Math.floor(s.x), Math.floor(ty));
       else if (solid(t) || (s.mid && (t === "/" || t === "\\"))) { if (s.bursts) boomAt(s.x, s.y, s.bursts, s); s.life = 0; }
       if (s.life > 0) {
-        /* a tornado (Pink Typhoon, Mighty Cyclone) throws them straight up, as the launcher does */
-        const n = strike(s.x - s.w / 2, s.x + s.w / 2, s.mid ? s.y - s.h / 2 : s.y, s.mid ? s.y + s.h / 2 : s.y + s.h,
-                         s.bursts ? null : s.twister ? { vx: sgn(s.vx) * 1.5, vy: LAUNCH.vy, launch: true } : { vx: sgn(s.vx) * 11, vy: 5 });
+        /* each shot throws them its own way (`kn`): a tornado (Pink Typhoon, Mighty Cyclone)
+           straight up, as the launcher does, others further, higher, or floating them down */
+        const kn = s.kn, sd = sgn(s.vx) || s.face || 1;
+        const kick = s.bursts ? null : kn ? (kn[3] ? { vx: sd * kn[0], vy: kn[1], launch: true, lvx: kn[0], lvy: kn[1], float: kn[2] } : { vx: sd * kn[0], vy: kn[1], float: kn[2] })
+                   : s.twister ? { vx: sd * 1.5, vy: LAUNCH.vy, launch: true } : { vx: sd * 11, vy: 5 };
+        /* (on its first step it sweeps back to the hand: point-blank, one already past the muzzle is hit) */
+        let sx0 = s.x - s.w / 2, sx1 = s.x + s.w / 2;
+        if (s.x0 != null) { sx0 = Math.min(sx0, s.x0); sx1 = Math.max(sx1, s.x0); s.x0 = null; }
+        const n = strike(sx0, sx1, s.mid ? s.y - s.h / 2 : s.y, s.mid ? s.y + s.h / 2 : s.y + s.h, kick);
         /* a shot lands with weight: it stops in whoever it hits (a fighter, a boss) with a freeze,
            a jolt, a flash ring and sparks blown on the way it was going; a guard catches it.
            (Badniks and blocks it breaks, it goes on through.) */
         const big = world.hitBig, hx = world.hitAt ? world.hitAt.x : s.x, hy = world.hitAt ? world.hitAt.y : s.mid ? s.y : s.y + 0.5;
-        if (n && s.bursts) { SFX.hit(); boomAt(s.x, s.y, s.bursts, s); s.life = 0; }
+        if (n && s.bursts) {
+          SFX.hit(); boomAt(s.x, s.y, s.bursts, s); s.life = 0;
+          const o = s.owner;                                // (a rock or missile that bursts on someone opens a combo too)
+          if (battle && o && big) { o.shotHit = 0.6; if (o.state === "special" && o.sp && o.sp.fired) o.sp.landed = true; }
+        }
         else if (n && big) {
           const col = s.trail || HIT_C[s.who] || 0xffffff;
           impact(hx, hy, { c: col, flash: 2.4, shake: 0.16, stop: s.twister ? 0.09 : 0.07 });
@@ -4292,6 +4331,10 @@
           ring(hx, hy, col, s.twister ? 2.2 : 1.6); hitSpark(hx, hy, 1.3, col);
           if (battle && battle.fs.length === 2) camPunch(hx, hy, 0.22, 0.3);
           SFX.hit(); SFX.impact(); s.life = 0;
+          /* it lands, and the combo can go on: the rest of the move cancels into the next press, and
+             Space is a super jump after one it threw up */
+          const o = s.owner;
+          if (battle && o) { o.shotHit = 0.6; if (o.state === "special" && o.sp && o.sp.fired) o.sp.landed = true; if (o.state === "recoil") o.recoilLanded = true; }
         } else if (n) { SFX.hit(); impact(s.x, s.mid ? s.y : s.y + 0.5, { c: s.trail || 0xffffff, flash: 1.3, shake: 0.06 }); hitStop(0.03); }
         else if (world.guarded) { burst(s.x, s.mid ? s.y : s.y + 0.5, [s.trail || 0xffffff, 0xbfe8ff, 0xffffff], 10, 4); s.life = 0; }
       }
@@ -4841,14 +4884,40 @@
     const n = framesOf(p.c.id, "fx.rev").length;
     setFrame(d, "fx.rev", Math.floor(p.dustT) % n, -p.face, p.x - p.face * 0.62, p.y, false, 0.12, 0.8 + rev * 0.55 + p.revKick * 0.25);
   }
+  /* A shot's frames: those it grows in through, its body (the frames at or near its full
+     size), and those it dies away through. */
+  const SHOT_ANIM = {};
+  function shotAnim(who, fx) {
+    const key = who + "|" + fx; if (SHOT_ANIM[key]) return SHOT_ANIM[key];
+    const L = framesOf(who, fx) || [[0, 0, 1, 1]], area = L.map(f => f[2] * f[3]), big = Math.max(...area);
+    let a = area.findIndex(v => v >= big * 0.6), b = L.length - 1;
+    while (b > a && area[b] < big * 0.6) b--;
+    return (SHOT_ANIM[key] = { n: L.length, a: Math.max(0, a), b });
+  }
+  /* Like the Egg Mobile's booster, a shot flickers: it grows in, then a new frame of its body
+     every thirtieth of a second in no steady order (now and then a frame dropped), and if it
+     runs out unspent, it dies away through its last frames. */
+  function shotFrame(s) {
+    const A = shotAnim(s.who, s.fx), tick = Math.floor(s.t * 30);
+    const flick = (a, b) => {                             // a new one each tick, never the same twice running
+      const len = b - a + 1;
+      if (tick !== s.ft) { s.ft = tick; let r = Math.floor(Math.random() * len); if (len > 1 && r === s.fi) r = (r + 1) % len; s.fi = r; }
+      return a + Math.min(s.fi, len - 1);
+    };
+    if (s.range) return flick(s.range[0], s.range[1]);   // a part of the row (Eggman's missile)
+    const out = A.n - 1 - A.b;
+    if (tick < A.a) return tick;
+    if (out > 0 && !s.loop && s.life < out / 30) return Math.min(A.n - 1, A.b + 1 + Math.floor((out / 30 - s.life) * 30));
+    return flick(A.a, A.b);
+  }
   /* Shots, effects and traps, each at its frame. A trap about to go off blinks. */
   function drawCards() {
     const w = world;
     for (const s of w.shots) if (!s.gone) {
-      const n = framesOf(s.who, s.fx).length;
-      const i = s.range ? s.range[0] + Math.floor(s.t * 16) % (s.range[1] - s.range[0] + 1)          // a part of the row, round (Eggman's missile)
-              : s.loop ? Math.floor(s.t * 16) % n : Math.min(n - 1, Math.floor((1 - s.life / s.life0) * n));
-      setFrame(s.card, s.fx, i, s.face, s.x, s.y, s.mid, 0.2, s.k || s.ghost);
+      if (s.seed == null) s.seed = Math.floor(Math.random() * 24);
+      setFrame(s.card, s.fx, shotFrame(s), s.face, s.x, s.y, s.mid, 0.2, s.k || s.ghost);
+      const tick = Math.floor(s.t * 30) + s.seed;
+      s.card.visible = !(s.t > 0.07 && tick % 6 === 0);                                          // a dropped frame now and then
     }
     for (const e of w.fx) if (!e.gone) setFrame(e.card, e.name, e.from + Math.floor(e.t * e.fps), e.face, e.x, e.y, e.mid, e.mid ? 0.25 : 0.04, e.k);
     for (const t of w.traps) if (!t.gone) {
@@ -5741,7 +5810,8 @@
      theirs is (Rouge's quick, Gamma's Guard Mode long, the Chaos Guard strong). A blow that meets
      it in its first eighth of a second is parried: it does nothing, the one who threw it reels
      (Attack blocked) open to anything, and the parrier's burst gauge fills; later in it, a block. */
-  /* Health, by the fighter: the match's figure (Battle's setup: 200, 300 or 400) times their own,
+  /* Health, by the fighter: the match's figure times their own (Battle's setup: 150, 200 or 250,
+     so three lives are done inside three minutes; a story fight 300, with one life),
      the heavy and sturdy more (Gamma, Eggman, Knuckles, Mighty), the light and quick less (Cream,
      Tails); whatever it is, healing and Training's refill come back at the same share of it. */
   const HP_K = { sonic: 1, shadow: 1, emerl: 1, metal: 1.05, chaos: 1.1, knuckles: 1.15, mighty: 1.15, eggman: 1.2, gamma: 1.25,
@@ -5796,7 +5866,7 @@
     if (kick && kick.r) {
       const dx = q.x - kick.cx, dy = q.y + q.hh / 2 - kick.cy, d = Math.hypot(dx, dy) || 1;
       vx = dx / d * kick.r * 0.8 + (sgn(dx) || away) * 1.5; vy = Math.max(5, dy / d * kick.r * 0.8 + 4);
-    } else if (kick && kick.launch) { vx = (sgn(kick.vx) || away) * LAUNCH.vx; vy = LAUNCH.vy; }   // the upper: straight up, everyone's alike
+    } else if (kick && kick.launch) { vx = (sgn(kick.vx) || away) * (kick.lvx || LAUNCH.vx); vy = kick.lvy || LAUNCH.vy; }   // the upper: straight up, everyone's alike (a tornado shot, its own)
     else if (down) { vx = (sgn(kick.vx) || away) * 1.5; vy = 9; }                              // OTG: up off the floor into the air
     else if (kick && kick.hold) {                                                               // an early swing: held there for the next
       const air = by && !by.ground;
@@ -5820,12 +5890,14 @@
     if (by) { by.dealt += dmg; by.landed++; by.lastCmb = q.cmb; by.lastVic = q; }
     q.state = "hurt"; q.mv = null; q.sp = null; q.hideT = 0; q.tor = null; q.er = null; q.curl = false; q.target = null;
     q.guardT = 0; q.healing = false; q.crouchT = 0;
+    q.dazeT = (kick && kick.float) || 0;                  // a shot that holds them up: they float down
     q.vx = vx;
     if (vy > 3 || !q.ground) { q.vy = vy; q.ground = false; q.on = null; }
     q.juggle = !q.ground; q.jBy = by;
     q.smashT = kick && kick.smash ? 0.9 : 0; q.spike = !!(kick && kick.spike);
     const decay = Math.max(0.55, 1 - 0.035 * Math.max(0, n - 6));
     q.st = (q.juggle ? Math.min(1.6, airTime(q, q.smashT > 0 && !q.spike ? 0.45 : 0)) + 0.08 : 0.24 + hitDmg * 0.014) * decay;
+    if (q.dazeT && q.juggle) q.st += q.dazeT * 0.8 * decay;
     q.whiteT = kick && (kick.smash || kick.launch) ? 0.12 : 0.07;
     if (n >= 18) { q.inv = Math.max(q.inv, 0.6); q.st = Math.min(q.st, 0.3); }   // a long combo: they break out of it
     emit("hit", { by, q, name: by ? (by.mv ? (by.mv.chase ? "chase" : by.mv.name) : by.state) : "", n, juggle: q.juggle, otg: down, counter,
@@ -6203,11 +6275,11 @@
      chases its own launches and picks up its own knockdowns (OTG), and heals when hurt and far. */
   const AI_LV = [
     { think: 0.5, guard: 0.12, shotGuard: 0.4, lead: 0.22, sp: 0.1, aim: 0.05, jumpIn: 0.15, air: 2, chase: 0.35, launch: 0.2, sj: 0, burstN: 9, burst: 0.3, drop: 0.14, punish: 0.4, aa: 0.25,
-      routes: [0.05, 0.25, 0.3, 0.2, 0.1, 0.1] },
+      routes: [0.05, 0.25, 0.3, 0.2, 0.08, 0.07, 0.05, 0] },
     { think: 0.28, guard: 0.38, shotGuard: 0.75, lead: 0.13, sp: 0.18, aim: 0.1, jumpIn: 0.22, air: 5, chase: 0.7, launch: 0.4, sj: 0.25, burstN: 6, burst: 0.55, drop: 0.04, punish: 0.75, aa: 0.55,
-      routes: [0.3, 0.25, 0.2, 0.1, 0.1, 0.05] },
+      routes: [0.27, 0.2, 0.15, 0.08, 0.06, 0.04, 0.1, 0.1] },
     { think: 0.15, guard: 0.62, shotGuard: 0.92, lead: 0.07, sp: 0.24, aim: 0.14, jumpIn: 0.26, air: 9, chase: 0.95, launch: 0.55, sj: 0.55, burstN: 4, burst: 0.8, drop: 0, punish: 0.95, aa: 0.85,
-      routes: [0.55, 0.15, 0.15, 0.05, 0.05, 0.05] },
+      routes: [0.42, 0.1, 0.1, 0.04, 0.04, 0.04, 0.12, 0.14] },
   ];
   const AI_STYLE = { sonic: "rush", shadow: "rush", knuckles: "rush", amy: "rush", mighty: "rush", metal: "rush", emerl: "rush",
                      tails: "zone", cream: "zone", gamma: "zone", eggman: "zone", silver: "zone", rouge: "counter", chaos: "counter" };
@@ -6273,6 +6345,8 @@
     () => [{ k: "z" }, { k: "z" }, { k: "z" }, { k: "x" }],
     () => [{ k: "z" }, { k: "z" }, { k: "c" }],
     () => [{ k: "z" }, { k: "z" }, { k: "x", D: 1 }],
+    () => [{ k: "z" }, { k: "z" }, { k: "c" }, { k: "x", D: 1, shot: 1 }],                                   // jabs, the shot, the aim attack after
+    () => [{ k: "z" }, { k: "z" }, { k: "c" }, { k: "j", sj: 1, shot: 1 }, { k: "z", air: 1 }, { k: "z", air: 1 }, { k: "x", D: 1, air: 1 }],   // jabs, the shot, a super jump, an air combo
   ];
   function aiPlan(f, L, steps) {
     if (!steps) {
@@ -6295,10 +6369,11 @@
     if (pending) return true;
     const open = tgt.state === "hurt" || tgt.state === "blocked";
     /* the last blow is over and they aren't reeling: the combo dropped (or never started) */
-    if (P.pressed && !m && f.state !== "seek" && f.state !== "special" && !open && !(s.air && !f.ground)) return end();
+    if (P.pressed && !m && f.state !== "seek" && f.state !== "special" && !open && !(s.air && !f.ground) && !(s.shot && f.shotHit > 0)) return end();
     const linkable = m && m.struck && m.t - m.struckAt >= 0.02;
     let go;
-    if (s.sj) go = m && m.name === "upper" && m.struck;
+    if (s.sj) go = s.shot ? f.shotHit > 0 && !!juggled(f) : m && m.name === "upper" && m.struck;
+    else if (s.shot) go = f.shotHit > 0;
     else if (s.air) { if (f.ground && P.pressed && !(m && m.name === "upper")) return end(); go = !f.ground && ((f.state === "run" && Math.hypot(tgt.x - f.x, tgt.y - f.y) < 2.4) || linkable); }
     else if (P.i === 0 && s.aa) { const ddy = tgt.y - f.y; go = (f.state === "run" || f.state === "crouch") && f.ground && Math.abs(tgt.x - f.x) < 1.6 && ddy > 0.5 && ddy < 2.8 && aiOpen(tgt); }
     else if (P.i === 0) go = (f.state === "run" || f.state === "crouch") && f.ground && aiReach(f, tgt) && aiOpen(tgt);
@@ -6658,10 +6733,11 @@
   function bset() {
     const d = { slots: [{ who: castId, ctl: "p1", lvl: 1, team: 0 }, { who: "shadow", ctl: "cpu", lvl: 1, team: 1 },
                         { who: "knuckles", ctl: "off", lvl: 1, team: 0 }, { who: "amy", ctl: "off", lvl: 1, team: 1 }],
-                teams: false, arena: 0, rule: "stock", goal: 3, time: 180, hp: 300 };
+                teams: false, arena: 0, rule: "stock", goal: 3, time: 180, hp: 200 };
     const b = saveData.battle = Object.assign(d, saveData.battle || {});
     if (!b.v2) { b.rule = "stock"; b.v2 = 1; }
-    if (!b.v3) { b.hp = { 60: 200, 100: 300, 150: 400 }[b.hp] || 300; b.v3 = 1; }   // three times the health now (a setup kept from before)               // Survival is the default now (a setup kept from before was on KOs by default)
+    if (!b.v3) { b.hp = { 60: 200, 100: 300, 150: 400 }[b.hp] || 300; b.v3 = 1; }
+    if (!b.v4) { b.hp = { 200: 150, 300: 200, 400: 250 }[b.hp] || 200; b.v4 = 1; }   // less again: three lives took longer than the three minutes   // three times the health now (a setup kept from before)               // Survival is the default now (a setup kept from before was on KOs by default)
     b.slots = d.slots.map((s, i) => Object.assign({}, s, (b.slots || [])[i] || {}));
     return b;
   }
@@ -6703,7 +6779,7 @@
             ${row("Rule", b.rule === "stock" ? "Each fighter has lives; the last side standing wins." : "The first to so many KOs wins.", seg("rule", [["ko", "KO match"], ["stock", "Survival"]], b.rule))}
             ${row(b.rule === "stock" ? "Lives" : "KOs to win", "", seg("goal", [[1, "1"], [3, "3"], [5, "5"]], b.goal))}
             ${row("Time", "", seg("time", [[120, "2:00"], [180, "3:00"], [300, "5:00"], [0, "None"]], b.time))}
-            ${row("Health", "Each fighter's own share of it: the heavy have more, the light less.", seg("hp", [[200, "200"], [300, "300"], [400, "400"]], b.hp))}
+            ${row("Health", "Each fighter's own share of it: the heavy have more, the light less.", seg("hp", [[150, "150"], [200, "200"], [250, "250"]], b.hp))}
           </div>
           <div class="adv-go">
             <button class="btn lg" id="advFight" data-enter data-focus data-k="fight" ${n < 2 ? "disabled" : ""}>${ico("flag")}Fight</button>
