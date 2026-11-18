@@ -956,3 +956,8 @@
   .gp-place{font-size:46px;bottom:auto;top:96px}
   .gp-pow{top:86px;width:52px;height:52px}.gp-pow canvas{width:40px;height:40px}
 }
+/* a screen drawn again (a setting changed, an update came) doesn't pop in again: only a new screen does */
+.adv-ov.steady .pop,.adv-ov.steady .pop-d1,.adv-ov.steady .pop-d2,.adv-ov.steady .pop-d3,.adv-ov.steady .pop-d4{animation:none}
+/* the lobby's connection bars: beside a player's name, and yours by the Online line */
+.ao-who-b b .ao-ping,.ao-net .ao-ping{margin-left:6px}
+.ao-net .ao-ping{vertical-align:-1px}

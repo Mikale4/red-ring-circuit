@@ -7682,6 +7682,24 @@
   const runnerId = () => NP.on && NP.who ? NP.who : storyRun ? storyRun.ch.who : castId;
   /* the menus glide over one of the stages, never an arena */
   function ensureStageWorld() { if (!world || world.demo || world.def !== actDef(stageIdx, actIdx)) { demo = null; load3d(stageIdx); } }
+  /* A screen drawn again -- a setting changed on it, a room's update, a list refreshed -- is the
+     same screen: it mustn't pop in again (that is the flicker), and whatever it was scrolled to
+     stays. Only a different screen pops in. A screen is known by its outer block and its title. */
+  function steadyRedraws(ov) {
+    if (!ov || ov._steady) return; ov._steady = true;
+    const sig = () => { const r = ov.firstElementChild; if (!r) return ""; const hd = r.querySelector(".ao-head h2, .panel-hd, h2, .adv-ulk-name"); return r.className.replace(/\b(pop|kb)\b/g, "").replace(/\s+/g, " ").trim() + "|" + (hd ? hd.textContent.trim().slice(0, 80) : ""); };
+    const pathOf = el => { const p = []; while (el && el !== ov) { const par = el.parentElement; if (!par) return null; p.unshift([...par.children].indexOf(el)); el = par; } return el === ov ? p.join(".") : null; };
+    const at = path => { let el = ov; for (const i of path.split(".")) { el = el && el.children[+i]; if (!el) return null; } return el; };
+    let last = sig(), scrolls = {};
+    ov.addEventListener("scroll", e => { const k = pathOf(e.target); if (k != null) scrolls[k] = e.target.scrollTop; }, true);
+    new MutationObserver(() => {
+      const s = sig(), same = !!s && s === last;
+      ov.classList.toggle("steady", same);
+      if (same) for (const k in scrolls) { const el = at(k); if (el && !el.scrollTop && scrolls[k]) el.scrollTop = scrolls[k]; }   // (unless the screen has set it itself)
+      else scrolls = {};
+      last = s;
+    }).observe(ov, { childList: true });
+  }
   function screenOn(m) {
     endBattle();
     /* a screen drawn again (a setting changed on it) stays where it was scrolled to; another
@@ -11383,6 +11401,7 @@
     actIdx = firstAct(stageIdx);
     el.innerHTML = `<div class="adv"><div class="adv-3d"></div><div class="adv-hud"></div><div class="adv-ov"></div></div>`;
     host = el.querySelector(".adv");
+    steadyRedraws(host.querySelector(".adv-ov"));
     host.addEventListener("pointerdown", () => { kbUsed = false; if (kbFocus) kbFocus.classList.remove("kb"); kbFocus = null; });
     if (root.AdventureOnline) { AdventureOnline.init(onlineApi()); AdventureOnline.resume(); }
     load3d(stageIdx);

@@ -549,6 +549,10 @@ fighters, readying up and chatting (and quick lines). Beside each player's name 
 bars: the host times a round trip to every player every two seconds and shares the table, four
 bars green under 60 ms, three under 120, two (orange) under 200, one (red) over that; the time
 shows on hover, and the host's own are full (the room runs on their connection).
+The lobby's player list has bars too, for each player's own connection: every game sends itself a
+note through the brokers every ten seconds and times it there and back, and sends the result with
+its presence (four bars under 150 ms, three under 250, two under 400, one over); yours shows by the
+Online line at the top.
 
 - **Battle**: up to four, the host's arena, rules, lives or KOs, time and health, teams or not,
   CPUs to fill. The host runs the fight and sends it out twenty times a second; everyone's

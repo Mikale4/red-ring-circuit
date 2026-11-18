@@ -127,8 +127,10 @@
         will: { topic: PRE + 'pres/' + K.id, payload: '', retain: true, qos: 0 } });
       c.on('connect', () => {
         if (session !== S0) return;
-        c.subscribe({ [PRE + 'pres/+']: { qos: 0 }, [PRE + 'prof/+']: { qos: 0 }, [PRE + 'chat/+']: { qos: 0 }, [PRE + 'rooms/+']: { qos: 0 }, [PRE + 'in/' + K.id + '/+']: { qos: 1 } });
+        c.subscribe({ [PRE + 'pres/+']: { qos: 0 }, [PRE + 'prof/+']: { qos: 0 }, [PRE + 'chat/+']: { qos: 0 }, [PRE + 'rooms/+']: { qos: 0 }, [PRE + 'in/' + K.id + '/+']: { qos: 1 },
+          [PRE + 'echo/' + K.id]: { qos: 0 } });
         setState('up');
+        setTimeout(pingProbe, 1200);
         presence(); Net.profile(); pushChat();
         const q = outbox; outbox = []; for (const f of q) f();
       });
@@ -137,7 +139,7 @@
       c.on('error', () => {});
       return c;
     });
-    timers = [setInterval(presence, PRES_EVERY), setInterval(() => Net.profile(), 5 * 60e3), setInterval(prune, 5000)];
+    timers = [setInterval(presence, PRES_EVERY), setInterval(() => Net.profile(), 5 * 60e3), setInterval(prune, 5000), setInterval(pingProbe, 10000)];
     setTimeout(() => { if (session === S0 && Net.state === 'connecting') setState('down'); }, 12000);
     // leaving the page: wipe the presence note now rather than when the broker notices
     window.addEventListener('pagehide', bye);
@@ -149,7 +151,7 @@
     const cl = Net.clients; Net.clients = null; session = null;
     timers.forEach(clearInterval); timers = []; outbox = [];
     setTimeout(() => cl.forEach(c => { try { c.end(true); } catch (e) { /* fine */ } }), 400);
-    Net.players.clear(); Net.chat = []; Net.rooms.clear(); shared.clear(); Net.me = null;
+    Net.players.clear(); Net.chat = []; Net.rooms.clear(); shared.clear(); Net.me = null; Net.ping = null; probe = null;
     setState('off'); Net.emit('players'); Net.emit('chat'); Net.emit('rooms');
   };
   Net.retry = () => { Net.stop(); Net.start(); };
@@ -160,6 +162,7 @@
     const parts = topic.slice(PRE.length).split('/'), kind = parts[0], who = parts[1];
     const s = td.decode(msg);
     if (kind === 'rooms') return gotRoom(who, s);
+    if (kind === 'echo') { if (who === Net.me) gotEcho(s); return; }
     if (!s) { if (kind === 'pres' && Net.players.delete(who)) Net.emit('players'); return; }
     let e; try { e = JSON.parse(s); } catch (x) { return; }
     if (kind === 'in') { if (who === Net.me) gotInbox(e, topic); return; }
@@ -169,13 +172,31 @@
     else if (kind === 'chat' && e.k === 'chat') gotChat(e);
   }
   const num = (v, d = 0) => (typeof v === 'number' && isFinite(v) ? v : d);
+  /* YOUR CONNECTION: a note to yourself through the brokers every ten seconds, timed there and back
+     (the quickest broker's), smoothed into Net.ping and sent with your presence -- the lobby shows
+     everyone's as bars by their name */
+  let probe = null;
+  function pingProbe() {
+    if (!anyUp() || !Net.me) return;
+    probe = { s: Math.round(performance.now() * 10) / 10, done: false };
+    pub(PRE + 'echo/' + Net.me, String(probe.s));
+  }
+  function gotEcho(s) {
+    if (!probe || probe.done || +s !== probe.s) return;
+    probe.done = true;
+    const rtt = performance.now() - probe.s; if (!(rtt >= 0 && rtt < 20000)) return;
+    Net.ping = Net.ping == null ? Math.round(rtt) : Math.round(Net.ping * 0.6 + rtt * 0.4);
+    const me = Net.players.get(Net.me); if (me) me.pg = Net.ping;
+    later('ping', 100);
+  }
   function gotPres(e) {
     const age = Date.now() - e.t; if (age > PRES_STALE || age < -300e3) return;
     const b = e.b || {}, old = Net.players.get(e.f);
     if (old && old.t > e.t) return;
     if (!old && Net.players.size >= MAX_PLAYERS) return;
     Net.players.set(e.f, { id: e.f, n: e.n, t: e.t, seen: Date.now(), a: String(b.a || 'menu').slice(0, 12), x: U.clean(b.x, 48), rm: /^[A-Z0-9]{5}$/.test(b.rm || '') ? b.rm : null,
-      r: Math.round(num(b.r, 1000)), lv: num(b.lv, 1) | 0, fav: U.clean(b.fav, 12), epk: okPk(e.epk) ? e.epk : old && old.epk, spk: e.spk });
+      r: Math.round(num(b.r, 1000)), lv: num(b.lv, 1) | 0, fav: U.clean(b.fav, 12), pg: typeof b.pg === 'number' && isFinite(b.pg) && b.pg >= 0 ? Math.round(b.pg) : null,
+      epk: okPk(e.epk) ? e.epk : old && old.epk, spk: e.spk });
     later('players', 150);
   }
   function gotProf(e) {
@@ -237,9 +258,10 @@
     if (!Net.clients || !Auth.user) return;
     const S = Auth.S, K = await Auth.keys(), st = Net.status;
     const fav = Net.myProfile().fav;
-    const e = await seal('pres', { a: st.a, x: st.x, rm: st.rm || null, r: S.rank.rating, lv: Auth.lv(), fav }, { epk: true });
+    const pg = Net.ping == null ? undefined : Net.ping;
+    const e = await seal('pres', { a: st.a, x: st.x, rm: st.rm || null, r: S.rank.rating, lv: Auth.lv(), fav, pg }, { epk: true });
     pub(PRE + 'pres/' + K.id, JSON.stringify(e), { retain: true });
-    Net.players.set(K.id, { id: K.id, n: Auth.name, t: e.t, seen: Date.now(), a: st.a, x: st.x, rm: st.rm, r: S.rank.rating, lv: Auth.lv(), fav, epk: K.epk, spk: K.spk });
+    Net.players.set(K.id, { id: K.id, n: Auth.name, t: e.t, seen: Date.now(), a: st.a, x: st.x, rm: st.rm, r: S.rank.rating, lv: Auth.lv(), fav, pg: pg == null ? null : pg, epk: K.epk, spk: K.spk });
     Net.emit('players');
   }
   Net.setStatus = (a, x, rm) => {

@@ -293,6 +293,14 @@
   }
   /* the bars: four, lit by how quick (60, 120, 200 ms and over), the time on hover */
   const pingLevel = ms => ms == null ? 0 : ms < 60 ? 4 : ms < 120 ? 3 : ms < 200 ? 2 : 1;
+  /* in the lobby: each player's own connection, through the brokers (slower than a room's link:
+     150, 250, 400 ms), from their presence; yours from your game */
+  function netBars(id) {
+    const ms = id === Auth.id ? Net.ping : (Net.online(id) || {}).pg;
+    if (typeof ms !== 'number') return '';
+    const lv = ms < 150 ? 4 : ms < 250 ? 3 : ms < 400 ? 2 : 1, tip = (id === Auth.id ? 'Your connection ' : 'Connection ') + ms + ' ms';
+    return `<i class="ao-ping p${lv}" title="${tip}" aria-label="${tip}"><s></s><s></s><s></s><s></s></i>`;
+  }
   function pingBars(m) {
     const lv = m.host ? 4 : pingLevel(m.ping);
     const tip = m.host ? 'Host: the room runs on their connection' : m.ping == null ? 'Measuring the ping…' : 'Ping ' + Math.round(m.ping) + ' ms';
@@ -587,12 +595,12 @@
     ov.innerHTML = `<div class="panel adv-small pop ao-wait"><div class="ao-spin"></div><p>${esc(text)}</p><div class="adv-btns"><button class="btn ghost" data-back>${ico('back')}Cancel</button></div></div>`;
     ov.querySelector('[data-back]').onclick = () => { Online.leave(true); AO.lobby(); };
   }
-  const netLine = () => Net.state === 'up' ? `<em class="ao-dot up"></em>Online · ${Net.players.size} here` : Net.state === 'connecting' ? '<em class="ao-dot connecting"></em>Connecting…' : '<em class="ao-dot down"></em>Offline';
+  const netLine = () => Net.state === 'up' ? `<em class="ao-dot up"></em>Online${netBars(Auth.id)} · ${Net.players.size} here` : Net.state === 'connecting' ? '<em class="ao-dot connecting"></em>Connecting…' : '<em class="ao-dot down"></em>Offline';
   const tabsHtml = (tabs, cur) => `<div class="ao-tabs">${tabs.map(([k, t]) => `<button class="${k === cur ? 'on' : ''}" data-tab="${k}">${t}</button>`).join('')}</div>`;
   /* every player's row: their fighter, name, what they're doing, and buttons */
   const rowHtml = (id, n, sub, on, acts) => `
     <div class="ao-row${on ? ' on' : ''}">
-      <button class="ao-who-b" data-card="${esc(id)}">${face(favOf(id))}<i class="ao-dot ${on ? 'up' : 'off'}"></i><span><b>${esc(n)}<i>${tagOf(id)}</i></b><small>${esc(sub)}</small></span></button>
+      <button class="ao-who-b" data-card="${esc(id)}">${face(favOf(id))}<i class="ao-dot ${on ? 'up' : 'off'}"></i><span><b>${esc(n)}<i>${tagOf(id)}</i>${on ? netBars(id) : ''}</b><small>${esc(sub)}</small></span></button>
       <div class="ao-acts">${acts || ''}</div>
     </div>`;
   const wireCards = el => el.querySelectorAll('[data-card]').forEach(b => b.onclick = () => AO.card(b.dataset.card));
@@ -675,6 +683,7 @@
     };
     const drawNet = () => { netEl.innerHTML = netLine(); };
     const offs = [Net.on('rooms', () => tab === 'rooms' && drawList()), Net.on('players', () => { if (tab === 'players') drawList(); drawNet(); }), Net.on('profiles', () => tab === 'top' && drawList()),
+      Net.on('ping', drawNet),
       Net.on('chat', drawChat), Net.on('state', () => { drawNet(); drawList(); drawChat(); })];
     const alive = setInterval(() => { if (!ov.isConnected || !ov.querySelector('.ao-list')) { clearInterval(alive); offs.forEach(f => f()); } }, 1000);
     drawList(); drawChat(); drawNet(); log.scrollTop = 1e6;
