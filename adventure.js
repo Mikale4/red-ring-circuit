@@ -1115,9 +1115,13 @@
       if (!s.m) { s.m = badCard(); s.m.castShadow = false; w.group.add(s.m); }
       if (s.burst && s.vy < 0) { badBoom(s.x, s.y, "hanabii", 1.1); s.gone = true; }
       else if (solid(tile(Math.floor(s.x), Math.floor(s.y))) || s.y < -3 || s.t > 6) { if (s.boom) badBoom(s.x, s.y + 0.2, "kiki", 0.75); s.gone = true; }
-      else if (!p.dead && Math.abs(p.x - s.x) < p.c.w / 2 + s.r && s.y > p.y - s.r && s.y < p.y + p.hh + s.r) {
-        if (s.boom) badBoom(s.x, s.y, "kiki", 0.75); else hurt(p, s.x);
-        s.gone = true;
+      else {
+        const r = (CPUS.length ? racers() : [p]).find(q => !q.dead && Math.abs(q.x - s.x) < q.c.w / 2 + s.r && s.y > q.y - s.r && s.y < q.y + q.hh + s.r);
+        if (r) {
+          const keep = cpuNow; cpuNow = r.cpuQ || null;
+          if (s.boom) badBoom(s.x, s.y, "kiki", 0.75); else hurt(r, s.x);
+          cpuNow = keep; s.gone = true;
+        }
       }
       if (s.gone) { w.group.remove(s.m); s.m.geometry.dispose(); }
     }
@@ -1128,7 +1132,7 @@
       b.t += dt;
       const n = badFrames(b.key, "boom").length;
       if (b.t * 14 >= n) { b.gone = true; w.group.remove(b.m); b.m.geometry.dispose(); continue; }
-      if (b.t < 0.25 && !p.dead && Math.hypot(p.x - b.x, p.y + p.hh / 2 - b.y) < b.r + 0.3) hurt(p, b.x);
+      if (b.t < 0.25) for (const r of CPUS.length ? racers() : [p]) if (!r.dead && Math.hypot(r.x - b.x, r.y + r.hh / 2 - b.y) < b.r + 0.3) { const keep = cpuNow; cpuNow = r.cpuQ || null; hurt(r, b.x); cpuNow = keep; }
     }
     if (w.booms.length > 16) w.booms = w.booms.filter(b => !b.gone);
   }
@@ -3503,9 +3507,10 @@
   // ---------------------------------------------------------------- sound
   /* Little synthesised effects, at the game's own sfx volume. The music is Sound's. */
   let AC = null;
+  let CPUS = [], cpuNow = null, cpuMode = null;       // (the CPU runners in the world, the one taking its step, and the mode a step of theirs left the race in)
   let demoQuiet = false;                              // (the demo's own steps: nobody hears its runner)
   const demoOn = () => !!demo && (mode === "title" || mode === "main");
-  function sfxVol() { if (SIM || demoQuiet) return 0; try { const v = root.Settings && Settings.get("sfxVolume"); return v == null ? 0.7 : v; } catch (e) { return 0.7; } }
+  function sfxVol() { if (SIM || demoQuiet) return 0; const k = cpuNow ? cpuHear(cpuNow.p) : 1; if (!k) return 0; try { const v = root.Settings && Settings.get("sfxVolume"); return (v == null ? 0.7 : v) * k; } catch (e) { return 0.7 * k; } }
   function tone(f0, f1, dur, type, vol, delay) {
     try {
       AC = AC || new (root.AudioContext || root.webkitAudioContext)();
@@ -3622,7 +3627,7 @@
   const ZONE_BGM = { cape: "splash-hill", works: "sky-fortress", parlour: "spring-yard", peak: "ice-cap", club: "casino-night", expressway: "star-light",
     museum: "marble", springs: "hydrocity", canyon: "sandopolis", ruins: "lava-reef", depot: "metropolis", stars: "half-pipe", station: "death-egg" };
   const BATTLE_BGM = ["battle-azure-lake", "battle-balloon-park", "battle-chrome-gadget", "battle-desert-palace", "battle-endless-mine"];
-  const SCREEN_BGM = { title: "title", main: "main-menu", menu: "zone-select", options: "options", setup: "competition-menu", story: "story", scene: "story" };
+  const SCREEN_BGM = { title: "title", main: "main-menu", menu: "zone-select", options: "options", setup: "competition-menu", tourney: "competition-menu", story: "story", scene: "story" };   // (every screen its own: a battle's music stops with the battle)
   const BOSS_BGM = { mecha: "metal-battle", frog: "final-boss" };
   const musicVol = () => { try { const v = root.Settings && Settings.get("musicVolume"); return v == null ? 0.55 : v; } catch (e) { return 0.55; } };
   const BGM = { els: [], cur: 0, key: null, at: {}, over: null };
@@ -3885,6 +3890,7 @@
   }
 
   function disposeWorld() {
+    CPUS = []; cpuNow = null;
     if (!scene) return;
     scene.traverse(o => {
       if (o.geometry && !o.userData.keep && !Object.values(PROPS).includes(o.geometry)) o.geometry.dispose();
@@ -3990,8 +3996,8 @@
     e.coil.position.y = 3 / 16; e.coil.scale.y = s;
     e.cap.position.y = (3 + 8 * s) / 16;
   }
-  function spawnCritter(x, y) {
-    if (!SIM && saveData && !(player && player.demo)) PROG().animals++;     // (toward Mighty)
+  function spawnCritter(x, y, cpu) {
+    if (!SIM && !cpu && saveData && !(player && (player.demo || player.cpu))) PROG().animals++;     // (toward Mighty: yours, not a CPU's)
     const bird = Math.random() < 0.5, m = new THREE.Mesh(propGeo(bird ? "bird" : "bunny"), materials().vox);
     m.position.set(x, y, 0.2); world.group.add(m);
     world.ents.push({ t: "critter", bird, x, y, vx: (Math.random() < 0.5 ? -1 : 1) * (bird ? 3.5 : 3), vy: bird ? 5 : 6, m, life: 2.6 });
@@ -4130,7 +4136,7 @@
     p.inv = 1.6;
     p.vx = -sgn(fromX - p.x || p.face) * 7; p.vy = 8; p.ground = false;
     p.state = "hurt"; p.st = 0.45; p.curl = false; p.mv = null; p.sp = null;
-    SFX.hurt(); flashHud();
+    SFX.hurt(); if (!p.cpu) flashHud();
     burst(p.x, p.y + 1, [0xffffff, 0xf2d040], 8, 4);
     if (p.shield) { p.shield = false; burst(p.x, p.y + p.hh / 2, [0x6ac8ff, 0xffffff], 14, 5); return; }
     if (p.carrots > 0) scatterRings(p);
@@ -4145,13 +4151,13 @@
   function respawn(p) {
     p.dead = 0; p.carrots = 0; p.shield = false; p.speedT = 0; p.x = p.check.x; p.y = p.check.y + 0.02; p.vx = 0; p.vy = 0; p.inv = 1.4;
     p.state = "run"; p.ground = false; p.air = AIR; p.star = 0; p.rev = 0; p.mv = null; p.sp = null; p.curl = false;
-    snapCamera();
+    if (!p.cpu) snapCamera();
   }
 
   // ---------------------------------------------------------------- moving
   function step(dt) {
     const p = player, w = world, c = p.c;
-    if (!battle) w.t += dt;                               // (a battle keeps one clock for everyone)
+    if (!battle && !p.cpu) w.t += dt;                     // (a battle keeps one clock for everyone; so does a race: yours)
     if (p.ko) { stepKO(p, dt); return; }
     if (p.dead) {
       p.dead -= dt;
@@ -4178,7 +4184,7 @@
       if (p.air < 6 && w.t > p.warnAt) { SFX.warn(); p.warnAt = w.t + 1; }
       if (p.air <= 0) { die(p, "air"); return; }
     } else p.air = AIR;
-    let top = c.run * (p.star > 0 ? 1.22 : 1) * (p.speedT > 0 ? 1.35 : 1), acc = (p.ground ? c.accel : c.airAccel) * (p.speedT > 0 ? 1.3 : 1), fr = p.ground ? 30 : 4;
+    let top = c.run * (p.star > 0 ? 1.22 : 1) * (p.speedT > 0 ? 1.35 : 1) * (p.paceK || 1), acc = (p.ground ? c.accel : c.airAccel) * (p.speedT > 0 ? 1.3 : 1), fr = p.ground ? 30 : 4;
     if (p.inWater) { if (c.swims) { acc *= 1.2; fr = 12; } else { top *= 0.62; acc *= 0.6; fr = 8; } }
     if (mud) top *= 0.5;
     if (ice) { acc *= 0.32; fr = 2.2; }
@@ -5353,13 +5359,16 @@
     const w = world;
     const bx0 = p.x - p.c.w / 2, bx1 = p.x + p.c.w / 2, by0 = p.y, by1 = p.y + p.hh;
     const touches = (x, y, r) => x + r > bx0 && x - r < bx1 && y + r > by0 && y - r < by1;
-    // rings -- and with the magnetic shield, the ones near fly in
-    if (p.shield === "magnet") for (const k of w.carrots) {
+    // rings -- and with the magnetic shield, the ones near fly in (only those in the columns about
+    // the runner are looked at: a course has hundreds, and the CPUs look too)
+    if (!w.ringCol) { w.ringCol = []; for (const k of w.carrots) { const i = Math.floor(k.x); (w.ringCol[i] = w.ringCol[i] || []).push(k); } }
+    const c0 = Math.max(0, Math.floor(p.x) - 5), c1 = Math.floor(p.x) + 5;
+    if (p.shield === "magnet") for (let i = c0; i <= c1; i++) for (const k of w.ringCol[i] || []) {
       if (k.got) continue;
       const dx = p.x - k.x, dy = p.y + 0.4 - k.y, d = Math.hypot(dx, dy);
       if (d < 3.4 && d > 0.05) { k.x += dx / d * 10 * dt; k.y += dy / d * 10 * dt; }
     }
-    for (const k of w.carrots) if (!k.got && touches(k.x, k.y + 0.35, 0.38)) {
+    for (let i = c0; i <= c1; i++) for (const k of w.ringCol[i] || []) if (!k.got && touches(k.x, k.y + 0.35, 0.38)) {
       k.got = true; p.carrots++; p.ringsGot++; SFX.coin();
       burst(k.x, k.y + 0.4, [0xfff3a0, 0xffffff], 4, 2);
     }
@@ -5400,17 +5409,19 @@
         }
       }
     }
-    for (const s of w.shoes) if (!s.got && touches(s.x, s.y + 0.4, 0.45)) {
+    if (!p.cpu) for (const s of w.shoes) if (!s.got && touches(s.x, s.y + 0.4, 0.45)) {     // (the Red Star Rings are yours to find)
       s.got = true; s.m.visible = false; p.shoes[s.n] = true; SFX.shoe();
       burst(s.x, s.y + 0.5, [0xf2b705, 0xfff3c4], 14, 4);
       hudToast("Red Star Ring " + (s.n + 1) + " of 3");
     }
-    // checkpoints and the post
-    for (const k of w.checks) if (!k.on && p.x >= k.x - 0.3) {
-      k.on = true; p.check = { x: k.x, y: k.y }; SFX.check();
-      k.m.geometry = propGeo("poleDone"); k.spin = 1; hudToast("Star Post: you'll start again here");
+    /* checkpoints and the post: a Star Post spins for each runner who passes it (lit by the first),
+       and each starts again from the last they passed themselves */
+    for (const k of w.checks) if (p.x >= k.x - 0.3 && !(k.by && k.by.has(p))) {
+      (k.by = k.by || new Set()).add(p); p.check = { x: k.x, y: k.y }; SFX.check();
+      if (!k.on) { k.on = true; k.m.geometry = propGeo("poleDone"); }
+      k.spin = 1; if (!p.cpu) hudToast("Star Post: you'll start again here");
     }
-    if (w.goal && p.x >= w.goal.x && mode === "play") { if (!w.def.story) w.goal.spin = 2.6; finish(p); }
+    if (w.goal && p.x >= w.goal.x && mode === "play") { if (!w.def.story) w.goal.spin = 2.6; if (p.cpu) cpuHome(p.cpuQ); else finish(p); }
     // thorns
     const shell = p.c.id === "mighty" && p.curl;             // Mighty's shell shrugs off spikes (Sonic Mania Plus)
     for (const z of w.hazards) if (bx1 > z.x0 && bx0 < z.x1 && by0 < z.y1 && by1 > z.y0 && !shell) hurt(p, p.x + p.face);
@@ -5474,7 +5485,7 @@
       from a point -- it shows white through the freeze-frame, then flies off tumbling and
       bursts where it hits something or after a moment; stomped, it bursts at once. */
   function defeat(e, kick) {
-    e.alive = false;
+    e.alive = false; e.byCpu = !!(cpuNow || (player && player.cpu));
     if (kick) {
       let vx = kick.vx, vy = kick.vy;
       if (kick.r) {
@@ -5494,7 +5505,7 @@
     if (!lost) {                                           // Sonic Advance's puff of smoke, and the animal it was running on
       const m = badCard(); m.castShadow = false; world.group.add(m);
       world.booms.push({ key: "boom", x: e.x, y: e.y + e.h / 2, r: -9, t: 0, m });
-      spawnCritter(e.x, e.y + 0.3);
+      spawnCritter(e.x, e.y + 0.3, e.byCpu);
     }
   }
   /* A blow that does not land: a white spark and a clink, and nothing else. */
@@ -5532,6 +5543,7 @@
       q.dx = nx - q.x; q.dy = ny - q.y; q.x = nx; q.y = ny;
       q.m.position.set(q.x, q.y, 0);
       if (p.on === q && p.ground) { p.y = q.y + 1; }
+      for (const cq of CPUS) if (cq.p.on === q && cq.p.ground) cq.p.y = q.y + 1;
     }
     for (const e of w.enemies) if (e.fling) {               // knocked flying: tumbles off, bursts where it hits
       const F = e.fling; F.t += dt;
@@ -5545,9 +5557,14 @@
       if (F.t > 0.45 || ny < -2 || solid(mc) || inSlope) pop(e, ny < -2);
       else { e.x = nx; e.y = ny; }
     }
-    for (const e of w.enemies) {                            // the badniks near enough to matter
-      if (!e.alive || Math.abs(e.x - p.x) > 28) continue;
-      stepBadnik(e, dt, p);
+    for (const e of w.enemies) {                            // the badniks near enough to matter (to you, or to a CPU: after the nearest)
+      if (!e.alive) continue;
+      let tg = p, d = Math.abs(e.x - p.x);
+      for (const cq of CPUS) { const dd = Math.abs(e.x - cq.p.x); if (dd < d && !cq.p.dead) { d = dd; tg = cq.p; } }
+      if (d > 28) continue;
+      const keep = cpuNow; cpuNow = tg.cpu ? tg.cpuQ : null;
+      stepBadnik(e, dt, tg);
+      cpuNow = keep;
       if (e.y < -3) e.alive = false;
     }
     stepEnemyShots(dt, p);
@@ -5574,8 +5591,10 @@
       const below = tile(Math.floor(e.x), Math.floor(e.y)), side = tile(Math.floor(e.x + sgn(e.vx) * 0.2), Math.floor(e.y + 0.3));
       if ((solid(below) || below === "-") && e.vy < 0) { e.y = Math.floor(e.y) + 1; e.vy = -e.vy * 0.6; e.vx *= 0.85; }
       if (solid(side)) e.vx = -e.vx * 0.6;
-      if (e.wait <= 0 && Math.abs(e.x - p.x) < 0.7 && e.y > p.y - 0.4 && e.y < p.y + p.hh && !p.dead) {
-        e.gone = true; e.m.visible = false; p.carrots++; if (!e.own) p.ringsGot++; SFX.coin();
+      if (e.wait <= 0) for (const r of racers()) if (Math.abs(e.x - r.x) < 0.7 && e.y > r.y - 0.4 && e.y < r.y + r.hh && !r.dead) {   // (whoever's there: you, or a CPU)
+        e.gone = true; e.m.visible = false; r.carrots++; if (!e.own) r.ringsGot++;
+        const keep = cpuNow; cpuNow = r.cpuQ || null; SFX.coin(); cpuNow = keep;
+        break;
       }
       if (e.life <= 0 || e.y < -3) { e.gone = true; e.m.visible = false; }
       e.m.position.set(e.x, e.y, 0); e.m.rotation.y += dt * 9; e.m.visible = !e.gone && (e.life > 1.2 || Math.sin(e.life * 30) > 0);
@@ -5636,7 +5655,7 @@
 
   // ---------------------------------------------------------------- the picture
   let camX = 0, camY = 0, shake = 0, stopT = 0, slowT = 0, punch = null;
-  let hitStop = s => { stopT = Math.max(stopT, s); };
+  let hitStop = s => { if (!cpuNow) stopT = Math.max(stopT, s); };       // (a CPU's hit doesn't freeze your race)
   /* a smash: the world runs at a third of its speed for a moment after the freeze */
   let slowMo = s => { slowT = Math.max(slowT, s); };
   /** In a one-on-one battle, the camera leans in on a big hit: toward (x, y), closer the bigger
@@ -5657,7 +5676,7 @@
   };
   /* a tight spot: low on health (on their last life, in Survival) */
   const clutch = q => !!q && q.hp <= q.hpMax * 0.25;
-  let shakeCam = s => { if (!root.Settings || Settings.get("shake") !== false) shake = Math.max(shake, s); };   // Options can turn it off
+  let shakeCam = s => { if (!cpuNow && (!root.Settings || Settings.get("shake") !== false)) shake = Math.max(shake, s); };   // Options can turn it off
   const CAM_D = 17;
   function snapCamera() { if (!player) return; camX = player.x + 2; camY = Math.max(6.1, player.y + 2.1); }
   const EGG_FLAME = [2, 3, 1, 2, 3, 2, 1, 3, 2, 0, 3, 1, 2, 3, 3, 1, 2, 1, 3, 2, 0, 2, 3, 1];   // big and middling mostly, now and then a gutter
@@ -5850,9 +5869,13 @@
     if (battle) {                                          // everyone in the fight, each with their own hands
       for (const f of battle.fs) { input = f.inp; drawRunner(f, dt); drawDust(f, dt); drawAura(f, dt); }
       input = INPUT0;
-    } else { drawRunner(p, dt); drawDust(p, dt); drawAura(p, dt); if (NP.on && NP.ghosts.size) npDrawGhosts(dt); }
+    } else {
+      drawRunner(p, dt); drawDust(p, dt); drawAura(p, dt);
+      if (CPUS.length) { const keep = input; for (const q of CPUS) { input = q.D.inp; drawRunner(q.p, dt); drawDust(q.p, dt); drawAura(q.p, dt); } input = keep; }   // the CPU runners, each with its own hands
+      if (NP.on && NP.ghosts.size) npDrawGhosts(dt);
+    }
     drawCards();
-    for (const f of battle ? battle.fs : [p]) {
+    for (const f of battle ? battle.fs : [p].concat(CPUS.filter(q => Math.abs(q.p.x - camX) < 30).map(q => q.p))) {
       if (f.out || f.ko) continue;
       if (f.star > 0 && Math.random() < (ITEMS ? 0.15 : 0.5)) burst(f.x, f.y + Math.random() * f.hh, [0xffffff, 0x9ad8ff, 0xfff070], 1, 1);
       if ((Math.abs(f.vx) > 13 || f.speedT > 0) && f.ground && Math.random() < (f.speedT > 0 ? 0.8 : 0.4)) burst(f.x - f.face * 0.3, f.y + 0.05, [0xd8d0c0, 0xffffff], 1, 1.5);
@@ -6677,11 +6700,12 @@
         let n = 0;
         while (acc >= h && n < 14 && (mode === "play" || mode === "goal")) {
           if (battle) battleTick(h);
-          else if (NP.on && NP.watch) { world.t += h; worldStep(h); }   // a spectator's race: they run nothing; the world goes on round whoever they watch
+          else if (NP.on && NP.watch) { world.t += h; cpuStep(h, gpHold()); worldStep(h); }   // a spectator's race: they run nothing; the world goes on round whoever they watch
           else {
             readInput();
             if (npHold() || rivalHold() || gpHold()) { const I = INPUT0; I.L = I.R = I.U = I.D = I.J = I.Z = I.X = I.C = 0; I.jp = I.zp = I.xp = I.cp = 0; I.dash = 0; }   // (an online race: nobody moves till Go)
             if (!(gpFrozen() && GPR.freezeBy !== "you")) step(h);        // (Chaos Control: time stops for you)
+            cpuStep(h, gpHold());                                         // the CPU runners, after you
             worldStep(h); input.jp = input.zp = input.xp = input.cp = 0; input.dash = 0;
           }
           acc -= h; n++;
@@ -8873,8 +8897,8 @@
     if (from >= 1) { zoneAct(1); music(); playScene(ch.mid, () => play()); return; }             // back at Act 2
     zoneAct(0); music(); playScene(ch.before, () => play());
   }
-  /* A race chapter (`kind: "race"`): the zone's Act 3, the racecourse, against `rival` -- their run
-     the robot's, played straight; first to the post wins, and the story goes on */
+  /* A race chapter (`kind: "race"`): the zone's Act 3, the racecourse, against `rival` -- a CPU
+     runner on the course with you; first to the post wins, and the story goes on */
   function playRaceChapter(ch) {
     const R = storyRun, def = raceDef(stageAt(ch.zone));
     R.def = def; loadDef(def); glideX = 12; camX = 15; music();
@@ -9288,12 +9312,131 @@
     return D.band;
   }
   /* back on the road, `dist` metres or more on from x: the nearest standing place to the height it was at */
-  /* The robot: the title demo's runner, and (out of sight) a racing rival's. It holds right; jumps
-     walls, gaps, badniks and a slow-down; uses the air action for a wall or a drop (Knuckles
-     climbs). Played straight: no help, nothing skipped -- it breathes as a runner does and is hit
-     as one is. Stuck at something, it backs off for a run at it (three tries); a fall, a hit it
-     can't take, or no way past, and its run is over: "fail". */
-  const newBot = p => ({ t: 0, best: p.x, still: 0, hold: 0, jt: 0, zt: 0, back: 0, tries: 0, airUsed: false, done: 0, goal: null, gt: 0, tried: [], dashT: 0, inp: newInput() });
+  /* The robot: the title demo's runner, and every CPU runner in a race or the grand prix. It runs
+     as a player who knows the road would: it holds right and looks ahead (further the faster it
+     goes) for what's in the way -- walls, hurdles, monitors, thorns, badniks, the end of the road,
+     water -- and jumps each in good time for how tall it is, held till it's cleared; rolls through
+     cracked rock it can't jump; never rolls or runs into a badnik with its spikes out, a shut shell
+     or an armoured face (over those it goes); Spin Dashes off the line and out of a stop; and on a
+     clear road uses its own dash (`skill.dash`: how often, in seconds; none without). In the air,
+     its air action for a wall or a drop (Knuckles climbs). Played straight: nothing skipped -- it
+     breathes as a runner does and is hit as one is. Stuck, it backs off for a run at it or goes up
+     by the ledges; a fall, a hit it can't take, or no way past, and the run is "fail" (a CPU in a
+     race gets up again from its Star Post, as you do). */
+  const newBot = (p, skill) => ({ t: 0, best: p.x, still: 0, hold: 0, jt: 0, zt: 0, back: 0, tries: 0, airUsed: false, done: 0, goal: null, gt: 0, tried: [], dashT: 0,
+                                  rev: 0, revTap: 0, skill: skill || {}, inp: newInput() });
+  /* a jump's time to rise `hgt` metres over the feet, and to come back down past it again (null:
+     out of its reach) */
+  function riseFall(c, hgt, mud) {
+    const v0 = c.jump * (mud ? 0.82 : 1), d = v0 * v0 - 2 * GRAV * hgt;
+    return d <= 0 ? null : [(v0 - Math.sqrt(d)) / GRAV, (v0 + Math.sqrt(d)) / GRAV];
+  }
+  /* badniks it mustn't touch at all, however it's going: spikes out, spinning shut, crackling, spike
+     balls going round */
+  const SPIKY = { guardshoot: 1, guardfly: 1, guardhover: 1, orbit: 1 };
+  const BOT_NEED = { wall: -0.4, monitor: -0.3, hurdle: 0.15, thorns: 0.2, bumper: 0.2 };   // (over a thing's top: how high its feet must get to be past it)
+  /* What's ahead of a runner, within R metres of its front: the things in its way, nearest first,
+     measured from its front and its feet -- { x0, x1, top, kind, rock (cracked rock it could roll
+     through), spiky, hard (it bounces a roll off) } -- and where the road ends, if it does
+     (gap: [from, to]; water counts). */
+  const botBrk = t => t === "X" || t === "B";
+  function botFloorIn(i, fy) {                              // 1 ground (or a step up), 0 water, -1 a drop
+    for (let j = fy; j >= Math.max(0, fy - 10); j--) {
+      const t = tile(i, j);
+      if (t === "~") return 0;
+      if (solid(t) || t === "-" || t === "/" || t === "\\") return 1;
+    }
+    return -1;
+  }
+  /* (its look ahead is made in buffers it keeps -- B -- so seven of them thinking a hundred and
+     twenty times a second make nothing new to throw away) */
+  function botAhead(p, w, R, B) {
+    B = B || { obs: [], pool: [], fl: [], rp: [], gap: [0, 0] };
+    const c = p.c, half = c.w / 2, front = p.x + half, fy = Math.floor(p.y + 0.05), obs = B.obs, fl = B.fl, rp = B.rp;
+    obs.length = 0; fl.length = 0; rp.length = 0;
+    let np = 0;
+    const ob = (x0, x1, top, kind, rock, spiky, hard) => { const o = B.pool[np] || (B.pool[np] = {}); np++; o.x0 = x0; o.x1 = x1; o.top = top; o.kind = kind; o.rock = !!rock; o.spiky = !!spiky; o.hard = !!hard; obs.push(o); return o; };
+    let gap = null, wall = null, ramp = null;
+    const i0 = Math.floor(front + 0.02);                        // (fl: the ground's height, column by column, over its feet: -99 none, or water; rp: a slope's, or what it leads onto)
+    for (let i = i0; i <= Math.floor(front + R + 12); i++) {
+      const dx = i - front;
+      if (dx > R + 6 && !gap) break;                            // (the ground a little past R too: where a jump comes down)
+      const t0 = tile(i, fy), s0 = solid(t0);
+      let k = 0; if (s0) while (k < 12 && solid(tile(i, fy + k))) k++;
+      let g = -99;
+      if (s0) g = fy + k - p.y;
+      else for (let j = fy; j >= Math.max(0, fy - 10); j--) { const t = tile(i, j); if (t === "~") break; if (t === "/" || t === "\\") { g = j + 0.5 - p.y; break; } if (solid(t) || t === "-") { g = j + 1 - p.y; break; } }
+      /* a column standing up from its feet: a wall, or a step -- not the ground under a slope
+         running up, nor what it leads onto, nor a lip the runner just runs up onto */
+      const top = fy + k - p.y;
+      const up = s0 && (tile(i, fy + k) === "/" || tile(i - 1, fy + k - 1) === "/" || tile(i - 1, fy + k) === "/" || (ramp != null && top <= ramp + 0.05));
+      if (!s0) ramp = null; else if (up) ramp = Math.max(top, ramp == null ? top : ramp);
+      fl.push(g); rp.push(up || t0 === "/" ? 1 : 0);
+      if (!gap && dx <= R) { if (botFloorIn(i, fy) < 1) { gap = B.gap; gap[0] = Math.max(0, dx); gap[1] = dx + 1; } }
+      else if (gap && gap[1] === dx) { if (botFloorIn(i, fy) < 1) gap[1] = dx + 1; }
+      if (dx > R) continue;
+      if (!s0) { wall = null; continue; }
+      if (up || top <= 0.55) { wall = null; continue; }
+      if (wall && wall.x1 === dx) { wall.x1 = dx + 1; wall.top = Math.max(wall.top, top); wall.rock = wall.rock && botBrk(t0); }
+      else wall = ob(dx, dx + 1, top, "wall", botBrk(t0) && k >= 2);
+    }
+    for (const b of w.solids) { const x0 = b.x0 - front; if (b.alive && x0 > -1.2 && x0 < R && b.y0 < p.y + 0.6 && b.y1 > p.y + 0.05) ob(x0, b.x1 - front, b.y1 - p.y, "hurdle"); }
+    for (const e of w.ents) {
+      if (e.gone) continue;
+      if (e.t === "monitor") { const x0 = e.x - 0.42 - front; if (x0 > -1.2 && x0 < R && e.y < p.y + 0.6 && e.y > p.y - 0.4) ob(x0, e.x + 0.42 - front, e.y + 0.95 - p.y, "monitor"); }
+      else if (e.t === "bumper") { const x0 = e.x - 0.7 - front; if (x0 > -1.2 && x0 < R && e.y - 0.66 < p.y + p.hh && e.y + 0.66 > p.y) ob(x0, e.x + 0.7 - front, e.y + 0.7 - p.y, "bumper"); }
+    }
+    for (const z of w.hazards) { const x0 = z.x0 - front; if (x0 > -1.2 && x0 < R && z.y0 < p.y + 0.4 && z.y1 > p.y - 0.4) ob(x0, z.x1 - front, z.y1 - p.y, "thorns", false, true); }
+    for (const e of w.enemies) {
+      if (!e.alive || e.hidden) continue;
+      const EB = e.B, ext = EB.act === "orbit" ? 1.0 : 0, rch = e.reach || EB.reach || 0;
+      let x0 = e.x - e.w / 2 - ext - front, x1 = e.x + e.w / 2 + ext - front;
+      if (rch && e.face < 0) x0 -= rch; else if (rch) x1 += rch;
+      if (!(x0 > -1.2 && x0 < R) && !(x0 < 0 && x1 > -0.4)) continue;
+      const bot = e.y - ext, top = e.y + e.h + ext - p.y;
+      if (bot > p.y + p.hh + 0.2 || top < -0.15) continue;        // (over its head, or down below)
+      ob(x0, x1, top, "foe", false, SPIKY[EB.act] || EB.zap || e.guard, EB.armor === "front" || EB.armor === "shell");
+    }
+    if (obs.length > 1) obs.sort(botByX);
+    B.gapOn = gap; B.front = front; B.i0 = i0;
+    return B;
+  }
+  const botByX = (a, b) => a.x0 - b.x0;
+  /* A jump planned before it's made: how long to hold Jump. Flown out step by step, the shortest
+     hold that takes it over everything in its way -- walls by their top lip, the rest clear -- and
+     down again on ground, far enough short of the next thing to run and jump again (or past it
+     too); none will, and the full jump. Returns seconds (9: all the way up). */
+  function botPlan(p, A, v, mud, roofH) {
+    const c = p.c, half = c.w / 2, v0 = c.jump * (mud ? 0.82 : 1), dt = 1 / 60;
+    const ground = x => { const k = Math.floor(A.front + x) - A.i0; return k < 0 ? 0 : k < A.fl.length ? A.fl[k] : -99; };
+    const rampAt = x => { const k = Math.floor(A.front + x) - A.i0; return k >= 0 && k < A.rp.length && A.rp[k]; };
+    const needOf = o => Math.max(0.3, o.top + (BOT_NEED[o.kind] != null ? BOT_NEED[o.kind] : o.spiky ? 0.5 : 0.3));
+    let fallback = 9, far = -1, farHold = null;
+    for (const hold of [0.05, 0.09, 0.13, 0.18, 0.24, 0.31, 0.4, 9]) {
+      let t = 0, y = 0, vy = v0, cut = false, ok = true, land = null;
+      while (t < 1.8 && ok) {
+        t += dt;
+        if (!cut && t >= hold) { cut = true; if (vy > 5) vy = 5; }
+        vy -= GRAV * dt; y += vy * dt;
+        if (y + p.hh > roofH && vy > 0) vy = 0;                    // (a roof: it bumps its head)
+        const x = v * t, g = ground(x + 0.02);                      // (its front, over the ground there)
+        if (g > -50 && y < g - 0.45 && !rampAt(x + 0.02)) { ok = false; break; }   // into a wall too high to run up onto
+        for (const o of A.obs) if (o.kind !== "wall" && x > o.x0 - 0.05 && x - c.w < o.x1 + 0.05 && y < needOf(o)) { ok = false; break; }
+        const gb = Math.max(ground(x - 0.05), ground(x - c.w + 0.05));
+        if (vy < 0 && gb > -50 && y <= gb) { land = x; break; }
+      }
+      if (!ok || land == null) { if (ok && fallback === 9) fallback = hold; continue; }
+      if (land > far) { far = land; farHold = hold; }
+      /* down: room before the next thing (or nothing more within reach) */
+      const next = A.obs.find(o => o.x0 > land - c.w - 0.1);
+      const gapNext = A.gapOn && A.gapOn[1] > land ? A.gapOn[0] - land : 99;
+      if (gapNext < 0) continue;                                    // (down into the gap)
+      if (!next) return hold;
+      const rf = riseFall(c, needOf(next), mud), room = next.x0 - land;
+      if (room >= v * (rf ? rf[0] : 0.2) + 0.5) return hold;
+    }
+    return farHold != null ? farHold : fallback;
+  }
   /* stuck: a way up -- a ledge or a plank higher than it is, within a jump (its own, and its air
      action's), back the way it came or just ahead, with room over it to jump (not up into a roof) */
   /* how many rows up a runner really gets: its jump (about three), and what its air action adds
@@ -9303,7 +9446,7 @@
     const c = p.c, reach = jumpRows(c), x0 = Math.floor(p.x), y0 = Math.floor(p.y + 0.01);
     const open = (i, j) => { const t = tile(i, j); return !solid(t) || t === "-"; };
     let best = null, bs = 1e9;
-    for (let i = x0 - 24; i <= x0 + 4; i++) for (let j = y0 + 1; j <= y0 + Math.ceil(reach); j++) {
+    for (let i = x0 - 24; i <= x0 + 4; i++) for (let j = y0 + 1; j <= y0 + reach; j++) {        // (as high as it really gets: one step at a time)
       const under = tile(i, j - 1);
       if (!(solid(under) || under === "-") || !open(i, j) || !open(i, j + 1) || tile(i, j) === "~") continue;
       if (tried.some(a => Math.abs(a.x - (i + 0.5)) < 1.5 && a.y === j)) continue;
@@ -9324,15 +9467,29 @@
     if (p.x > D.best + 0.4) { D.best = p.x; D.still = 0; } else D.still += h;
     if (p.ground) D.airUsed = false;
     if (D.t > 220) return "fail";
+    if (D.rev > 0) {                                                   // a Spin Dash: Down, Jump tapped to rev it, then let go
+      D.rev -= h; D.revTap -= h; I.R = 0; I.D = 1;
+      if (D.rev < 0.3 && D.revTap <= 0) { I.jp = 1; D.revTap = 0.06; }
+      if (D.rev <= 0 || (p.state !== "charge" && p.state !== "crouch" && D.rev < 0.26)) { D.rev = 0; I.D = 0; I.R = 1; }
+      I.J = I.jp ? 1 : 0;
+      return;
+    }
     if (D.back > 0) { I.R = 0; I.L = 1; I.J = 0; return; }            // backing off, for a run at it
     if (D.goal) {                                                      // on the way up to a ledge
       const g = D.goal, dx = g.x - p.x;
       D.gt += h;
-      if (p.ground && p.y >= g.y - 0.3 && Math.abs(dx) < 1.6) { D.goal = null; D.best = p.x; D.still = 0; D.tries = 0; }
+      if (p.ground && p.y >= g.y - 0.3 && (Math.abs(dx) < 1.6 || dx < 0)) { D.goal = null; D.best = p.x; D.still = 0; D.tries = 0; }
+      else if (dx < -3 && p.y >= g.y - 0.3 && p.ground) { D.goal = null; D.still = 0; }           // (up there already, past it, another way)
       else if (D.gt > 4.5) { D.tried.push(g); D.goal = null; D.still = 0; }                      // (it gave that one a fair go)
       else {
         I.R = dx > 0.35 ? 1 : 0; I.L = dx < -0.35 ? 1 : 0;
-        if (p.ground && Math.abs(dx) < 2.4 && D.jt <= 0) { I.jp = 1; D.hold = 0.5; D.jt = 0.4; }
+        /* coming in fast for a ledge a plain jump reaches (or faster than it runs: a dash, a dash
+           pad): braking, so as not to fly past it; a ledge it needs its air action for, it keeps
+           its speed for */
+        const lowLedge = g.y - p.y <= (c.jump * c.jump) / (2 * GRAV);
+        const fast = Math.abs(p.vx) > (lowLedge ? 7 : c.run * 1.15) && Math.abs(dx) < 3 + Math.abs(p.vx) * 0.3 && sgn(p.vx) === sgn(dx);
+        if (fast) { I.R = p.vx < 0 ? 1 : 0; I.L = p.vx > 0 ? 1 : 0; }
+        if (p.ground && Math.abs(dx) < 2.4 && D.jt <= 0 && !fast) { I.jp = 1; D.hold = 0.5; D.jt = 0.4; }
         else if (!p.ground && !D.airUsed && p.vy < 1 && p.y < g.y + 0.2 && D.jt <= 0) { I.jp = 1; D.airUsed = true; D.hold = 0.7; D.jt = 0.25; }
         else if (p.state === "fly" && p.y < g.y + 0.5 && D.jt <= 0) { I.jp = 1; D.jt = 0.22; }
         I.J = D.hold > 0 || I.jp ? 1 : 0;
@@ -9346,46 +9503,64 @@
       if (g) { D.goal = g; D.gt = 0; } else D.back = 0.45 * Math.min(3, D.tries);             // a way up; else a run at it, further back each time
       return;
     }
-    /* keeping its speed: it looks further ahead the faster it goes, and deals with what's coming
-       before it gets there, never with a move that stops it (no standing attacks). On the ground,
-       those who roll (Down while running: all but Rouge, Chaos, Gamma and Eggman) roll through
-       cracked rock, crates, hurdles and badniks; the rest jump them (the ball breaks what it
-       touches). It jumps thorns, walls and gaps; water is a gap too (stones, a jump, its flight,
-       its glide, a double jump: never wading in if it can help it). A wall of cracked rock it
-       can't roll through it treats as a wall: up and over by its ledges. */
-    const v = Math.max(0, p.vx), half = c.w / 2, look = half + 0.6 + v * 0.17;
-    const T = (dx, dy) => tile(Math.floor(p.x + dx), Math.floor(p.y + dy));
-    const at = (dx, dy) => solid(T(dx, dy));
-    const brk = t => t === "X" || t === "B";
-    const floorAt = dx => { const i = Math.floor(p.x + dx); for (let j = Math.floor(p.y + 0.5); j >= Math.max(1, Math.floor(p.y) - 9); j--) { const t = tile(i, j - 1); if (t === "~") return false; if (solid(t) || t === "-") return true; } return false; };
-    let wall = false, low = false, rockWall = false, rockAt = 99, spikes = false;
-    for (let dx = half + 0.1; dx <= look; dx += 0.3) {
-      const t1 = T(dx, 0.5), t2 = T(dx, 1.3), t3 = T(dx, 2.3);
-      if (brk(t1) || t1 === "h") { if (brk(t2) && (brk(t3) || solid(t3))) { rockWall = true; rockAt = Math.min(rockAt, dx); } else low = true; }
-      else if (solid(t1) || solid(t2)) wall = true;
-      if (T(dx, 0.1) === "^" || T(dx + 0.9, 0.1) === "^") spikes = true;
-    }
-    const near = Math.min(look, 1.6), wet = T(near, -0.5) === "~" || T(look, -0.5) === "~";
-    const gap = p.ground && ((!floorAt(near) && !floorAt(near + 1)) || (!floorAt(look) && !floorAt(look + 1)) || wet);
-    const foe = w.enemies.some(e => e.alive && !e.hidden && e.x - p.x > 0.2 && e.x - p.x < look + 1.2 && e.y + e.h > p.y - 0.6 && e.y < p.y + 2.2);
-    const slow = p.ground && Math.abs(p.vx) < 1.5 && D.t > 0.6;
-    const roof = at(0, 2.3) || at(0.7, 2.3);                     // (a low roof: a jump would only hit it)
+    /* keeping its speed: it looks further ahead the faster it goes and deals with what's coming
+       in good time -- never with a move that stops it -- from the nearest thing on */
     if (p.state === "climb") { I.U = 1; return; }          // Knuckles, on a wall: up and over
-    const rolls = c.spinDash && v > 4;
-    if (p.ground && (rockWall || low || foe) && rolls && !gap && !spikes) { I.D = 1; I.J = 0; return; }   // roll through it: speed kept, it breaks
-    if (rockWall && !rolls) wall = true;                                                             // (no roll: it's a wall, up and over)
-    /* a wall taller than it can jump: up it by its steps, starting now (not once it's stuck) */
-    if (wall && p.ground && !D.goal) {
-      let hgt = 0; const fx = half + 0.6;
-      for (let k = 0; k < 9 && (at(fx, 0.5 + k) || brk(T(fx, 0.5 + k))); k++) hgt = k + 1;
-      if (hgt > jumpRows(c) - 0.4) { const g = stepUp(p, D.tried); if (g) { D.goal = g; D.gt = 0; return; } }
+    const v = Math.max(0, p.vx), half = c.w / 2, S = D.skill;
+    const A = botAhead(p, w, half + 1.4 + v * 0.5, D.buf || (D.buf = { obs: [], pool: [], fl: [], rp: [], gap: [0, 0] })), obs = A.obs, gap = A.gapOn;
+    const mud = p.ground && surfaceAt(p.x, p.y) === "m";
+    const topNow = c.run * (p.star > 0 ? 1.22 : 1) * (p.speedT > 0 ? 1.35 : 1) * (p.paceK || 1);
+    const floorAt = dx => { const i = Math.floor(p.x + dx); for (let j = Math.floor(p.y + 0.5); j >= Math.max(1, Math.floor(p.y) - 9); j--) { const t = tile(i, j - 1); if (t === "~") return false; if (solid(t) || t === "-" || t === "/" || t === "\\") return true; } return false; };
+    let roofH = 99;                                                    // (a low roof over it: as high as a jump goes there)
+    for (let k = 1; k <= 4; k++) if (solid(tile(Math.floor(p.x), Math.floor(p.y + 0.05) + k)) || solid(tile(Math.floor(p.x + half + 0.4), Math.floor(p.y + 0.05) + k))) { roofH = Math.floor(p.y + 0.05) + k - p.y; break; }
+    const clearTo = d => !obs.some(o => o.x0 < d && o.x1 > -0.3) && !(gap && gap[0] < d);   // (nothing in the way for d metres)
+    if (!p.ground && D.hold > 1 && p.vy <= 0) D.hold = 0;            // (a full jump: held to the top)
+    if (p.ground) {
+      const rolling = p.state === "roll", rolls = c.spinDash && v > 4;
+      if (p.state === "dash" && c.steer && !clearTo(v * 0.8 + 3)) I.R = 0;                      // (Gamma's Drive Mode goes on while it's held: let go of it before what's coming)
+      /* the first thing in the way: through it, over it, or up by the ledges */
+      let jumpFor = null;
+      for (const o of obs) {
+        if (o.rock && (rolls || rolling) && !(gap && gap[0] < o.x0)) { if (o.x0 < 1.4 + v * 0.06) { if (!rolling) { I.D = 1; I.J = 0; return; } } break; }   // cracked rock: roll through it
+        /* how high its feet must get: onto a wall (its top lip it runs up onto), a monitor; over
+           a hurdle, thorns, a badnik (one with spikes out, well over) */
+        const need = Math.max(0.3, o.top + (BOT_NEED[o.kind] != null ? BOT_NEED[o.kind] : o.spiky ? 0.5 : 0.3));
+        const rf = riseFall(c, need, mud);
+        if (!rf || need > roofH - 0.2) {
+          if (o.kind === "wall" && o.top <= jumpRows(c) - 0.4 && roofH > o.top + 1) { if (o.x0 <= v * 0.3 + 0.6) jumpFor = o; break; }   // (its air action takes it the rest of the way)
+          if (o.top > 1.2 && !D.goal) { const g = stepUp(p, D.tried); if (g) { D.goal = g; D.gt = 0; return; } }   // too tall: up it by its steps, starting now
+          if (o.top <= 1.2 && o.x0 <= v * 0.12 + 0.5) jumpFor = o;      // (a low thing under a roof: hop it anyway)
+          break;
+        }
+        if (o.x0 <= v * rf[0] + 0.35 + (o.kind === "foe" ? 0.6 : 0)) jumpFor = o;
+        break;
+      }
+      /* the end of the road: off the very edge, held all the way */
+      const atEdge = gap && gap[0] <= Math.max(0.3, v * 0.05);
+      if (rolling && !jumpFor && !atEdge && D.jt <= 0) {                 // out of a roll once it's as slow as running: up, and running again
+        const rock = obs.find(o => o.rock && o.x0 < 2.5);
+        if (!rock && v <= topNow + 0.4 && roofH > 2.4) { I.jp = 1; D.jt = 0.25; D.hold = 0.1; }
+      }
+      if (D.jt <= 0 && (atEdge || jumpFor)) {                        // a jump: held as long as its plan says
+        I.jp = 1; D.jt = 0.22;
+        D.hold = atEdge ? 9 : botPlan(p, A, v, mud, roofH);
+      } else if (!I.jp && !rolling && p.state === "run" && D.jt <= 0) {
+        /* stopped (by a hit, a wall, the start): a Spin Dash, if the road's clear for it */
+        if (c.spinDash && v < 3.5 && !p.inWater && clearTo(7) && roofH > 1.2 && D.t > 0.02) { D.rev = 0.34; D.revTap = 0; I.R = 0; I.D = 1; return; }
+        if (v < 1.5 && D.t > 0.6) { I.jp = 1; D.hold = 0.42; D.jt = 0.3; }          // (stuck at something low)
+        /* a clear road: its own dash, now and then */
+        else if (S.dash && D.dashT <= 0 && v >= topNow * 0.9 && !p.inWater && !mud && clearTo(v * 0.9 + 2.5) && roofH > 2) { I.dash = 1; D.dashT = S.dash; }
+        /* Chaos: a Chaos Dive under badniks and across thorns -- nothing touches him */
+        else if (c.dashInv && D.dashT <= 0 && obs.some(o => (o.kind === "foe" || o.kind === "thorns") && o.x0 < 3.5) && !(gap && gap[0] < 4)) { I.dash = 1; D.dashT = 1.1; }
+      }
+    } else {
+      /* in the air: its air action for a wall in the way or nowhere to come down; flying, a beat
+         at a time (over water too); gliding, on over it */
+      const wallA = obs.some(o => o.kind === "wall" && o.x0 < 1 + v * 0.1 && o.top > 0.3);
+      if (!D.airUsed && p.vy < 1.5 && D.jt <= 0 && (wallA || !floorAt(0.8) || !floorAt(1.8)) && !obs.some(o => o.spiky && o.x0 < 3)) { I.jp = 1; D.airUsed = true; D.hold = 0.6; D.jt = 0.25; }
+      else if (p.state === "fly" && (wallA || !floorAt(1) || !floorAt(2.2)) && D.jt <= 0) { I.jp = 1; D.jt = 0.22; }
+      if (p.state === "glide" && (!floorAt(0.8) || !floorAt(2))) D.hold = Math.max(D.hold, 0.1);
     }
-    /* Chaos: a Chaos Dive under badniks and across thorns -- nothing touches him, and it's quicker */
-    if (p.ground && c.dashInv && !rolls && (foe || spikes) && !gap && !wall && !low && D.dashT <= 0) { I.dash = 1; D.dashT = 1.1; return; }
-    if (p.ground && D.jt <= 0 && (wall || gap || foe || slow || low || spikes) && !(roof && !wall && !gap && !spikes)) { I.jp = 1; D.hold = gap ? 0.6 : 0.42; D.jt = 0.3; }
-    else if (!p.ground && !D.airUsed && p.vy < 1.5 && (wall || !floorAt(0.8) || !floorAt(1.8)) && D.jt <= 0) { I.jp = 1; D.airUsed = true; D.hold = 0.6; D.jt = 0.25; }
-    else if (p.state === "fly" && (wall || !floorAt(1) || !floorAt(2.2)) && D.jt <= 0) { I.jp = 1; D.jt = 0.22; }     // flying: a beat at a time, over the water too
-    if (p.state === "glide" && (!floorAt(0.8) || !floorAt(2))) D.hold = Math.max(D.hold, 0.1);                       // gliding: on over it
     I.J = D.hold > 0 || I.jp ? 1 : 0;
   }
   function demoTick(dt) {
@@ -9406,10 +9581,11 @@
     input = keep; demoQuiet = false;
   }
   /* A run played out of sight, at the robot's hands: through `def` as `who`, a fixed step at a time,
-     with no sound, no music and nothing counted; the sprite's place and frame kept thirty times a
-     second, for a rival to run it again in a race. The world there was goes (build the next).
-     { ok, time, track: [[t, x, y, frame, i, face]] } */
-  function simRun(def, who, seed) {
+     with no sound, no music and nothing counted -- how the robot is measured (who gets round where:
+     CLEAN, GP_CLEAN; _debug.botStats), its sprite's place and frame kept thirty times a second, and
+     (st) its hits, bumps and time in water. The world there was goes (build the next).
+     { ok, time, track: [[t, x, y, frame, i, face]], st } */
+  function simRun(def, who, seed, skill) {
     const keep = { input, mode, demo, rnd: Math.random }, h = 1 / 120, res = { ok: false, time: 0, track: [] };
     if (seed != null) Math.random = mulberry32(seed);      // (a seeded run: the same on every machine)
     disposeWorld();
@@ -9417,82 +9593,155 @@
     try {
       world = buildWorld(def); world.sim = true;
       const p = player = makePlayer(castOf(who)); p.demo = true;
-      const D = newBot(p);
+      const D = newBot(p, skill);
       input = D.inp; mode = "sim";
       let rec = 0;
+      const st = res.st = { hurt: 0, bump: 0, stumble: 0, water: 0, ev: [] };
       while (world.t < 230) {
         if (demoBot(D, p, world, h) === "fail") break;
+        const ps = p.state, pvx = p.vx;
         step(h); worldStep(h);
+        if (p.state === "hurt" && ps !== "hurt") { st.hurt++; st.ev.push(["hurt", +p.x.toFixed(1), +p.y.toFixed(1)]); }
+        if (p.state === "stumble" && ps !== "stumble") { st.stumble++; st.ev.push(["stumble", +p.x.toFixed(1), +p.y.toFixed(1)]); }
+        if (Math.abs(pvx) > 5 && Math.abs(p.vx) < 1 && p.state !== "hurt" && p.state !== "stumble") { st.bump++; st.ev.push(["bump", +p.x.toFixed(1), +p.y.toFixed(1), +pvx.toFixed(1)]); }
+        if (p.inWater) { if (!st.wet) st.ev.push(["water", +p.x.toFixed(1), +p.y.toFixed(1)]); st.water += h; st.wet = 1; } else st.wet = 0;
+        if (skill && skill.trace && p.x >= skill.trace[0] && p.x <= skill.trace[1]) (res.trace = res.trace || []).push([+world.t.toFixed(3), +p.x.toFixed(2), +p.y.toFixed(2), +p.vx.toFixed(1), +p.vy.toFixed(1), p.state, p.ground ? 1 : 0, D.inp.J, D.inp.jp, D.inp.D, +D.hold.toFixed(2), D.goal ? "goal" + D.goal.x.toFixed(1) + "," + D.goal.y + " gt" + D.gt.toFixed(1) : "", "st" + D.still.toFixed(1), "tr" + D.tries, D.inp.R, D.inp.L].join(" "));
         input.jp = input.zp = input.xp = input.cp = 0; input.dash = 0;
         if (world.t >= rec) { rec += 1 / 30; drawRunner(p, 1 / 30); const f = p._rf || ["idle", 0, 1]; res.track.push([+world.t.toFixed(3), +p.spr.position.x.toFixed(3), +p.spr.position.y.toFixed(3), f[0], f[1], f[2]]); }
         if (world.goal && p.x >= world.goal.x) { res.ok = true; break; }
       }
-      res.time = world.t;
+      res.time = world.t; res.st.dist = (world.goal ? world.goal.x : world.W) - world.start.x; res.st.ideal = res.st.dist / p.c.run; res.st.endX = p.x;
     } catch (e) { console.error(e); }
     finally { disposeWorld(); world = null; player = null; input = keep.input; mode = keep.mode; demo = keep.demo; SIM = false; Math.random = keep.rnd; }
     return res;
   }
-  /* Who the robot gets through each Act 1 (and the story's race stages) fairly: measured with
-     simRun, every runner on every one (_debug.cleanTable() measures them again). */
+  /* Who the robot gets through each Act 1 and Act 3 fairly: measured with simRun, every runner on
+     every one (_debug.botStats; Act 3 with its dash, as a race's CPU runs it), 2026-11-18. */
   const CLEAN = {
-    "seabreeze-1": "tails amy rouge shadow cream chaos gamma eggman metal mighty emerl", "seabreeze-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "airstrip-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "airstrip-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal emerl silver",
-    "parlour-1": "sonic tails knuckles amy rouge shadow cream gamma eggman metal emerl silver", "parlour-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "peak-1": "tails knuckles amy shadow", "peak-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "club-1": "sonic tails knuckles amy rouge shadow cream eggman metal emerl", "club-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "expressway-1": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver", "expressway-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "museum-1": "sonic tails amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "museum-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "springs-1": "tails knuckles amy rouge shadow cream chaos gamma eggman mighty emerl", "springs-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "canyon-1": "sonic tails rouge shadow cream gamma eggman metal mighty", "canyon-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "ruins-1": "knuckles shadow", "ruins-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "depot-1": "sonic tails knuckles amy rouge cream gamma eggman metal mighty", "depot-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "stars-1": "sonic tails rouge shadow cream eggman metal mighty", "stars-3": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver",
-    "station-1": "sonic tails knuckles amy rouge shadow cream gamma eggman metal mighty emerl silver", "station-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "seabreeze-1": "sonic tails knuckles rouge shadow cream gamma eggman metal", "seabreeze-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "airstrip-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "airstrip-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "parlour-1": "sonic tails knuckles amy rouge cream eggman metal mighty emerl", "parlour-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "peak-1": "tails knuckles rouge eggman", "peak-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
+    "club-1": "sonic tails knuckles amy rouge shadow cream chaos gamma metal silver", "club-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
+    "expressway-1": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver", "expressway-3": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver",
+    "museum-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "museum-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
+    "springs-1": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver", "springs-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "canyon-1": "sonic tails knuckles rouge cream eggman metal emerl", "canyon-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "ruins-1": "sonic knuckles amy shadow chaos gamma metal mighty silver", "ruins-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
+    "depot-1": "cream chaos gamma silver", "depot-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
+    "stars-1": "tails knuckles cream gamma eggman mighty", "stars-3": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver",
+    "station-1": "sonic tails knuckles rouge shadow cream chaos gamma eggman metal mighty silver", "station-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
   };
   const cleanRunners = id => (CLEAN[id] || "").split(" ").filter(Boolean);
   /* the same for the grand prix's courses: who gets round each fairly (a cup's rivals are drawn
      from those who get round all four) */
-  const GP_CLEAN = {};                                // (measured 2026-11-18 with _debug.gpSim: everyone gets round all twenty-four)
-  for (const k of "checker coral grove lagoon pinball funfair sweets pier slopes crystal floes tundra dunes town foundry volcano temple windmills fleet spires refinery metro fortress orbit".split(" ")) GP_CLEAN["gp-" + k] = "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver";
+  const GP_CLEAN = {                                 // (measured 2026-11-18 with _debug.botStats, the CPUs' dash and all)
+    "gp-checker": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-coral": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "gp-grove": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-lagoon": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "gp-pinball": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-funfair": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "gp-sweets": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver", "gp-pier": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "gp-slopes": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-crystal": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
+    "gp-floes": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-tundra": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "gp-dunes": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-town": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
+    "gp-foundry": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-volcano": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
+    "gp-temple": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-windmills": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "gp-fleet": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-spires": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver",
+    "gp-refinery": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-metro": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "gp-fortress": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-orbit": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+  };
 
-  /* A RACE: you against a rival's run through an Act 1 (or a story stage) to the goal post -- the
-     rival's run is the robot's, made out of sight just before (simRun) and played back beside you,
-     at the pace asked for (1 its own; more, slower). First to the post wins. Free Exhibition's
-     Stage Racing, the story's race chapters and Metal Sonic's challenge are all one of these. */
+  /* CPU RUNNERS. A race's rival and the grand prix's CPUs are runners in the world as you are: the
+     same bodies, moves and speeds, the same rings, monitors, springs, Star Posts and badniks, with
+     the robot (demoBot) at each one's controls. They're stepped with you, a tick at a time, after
+     you: they take the rings they run through and light the posts they pass, are hit and lose their
+     rings, fall and start again from their last post, as you do. Only what's near you is heard, and
+     nothing of theirs comes up on your HUD, moves your camera or counts toward your records.
+     `paceK` (their top speed, against yours) is how a class or a difficulty holds them back. */
+  function cpuAdd(who, o) {
+    const p = makePlayer(castOf(who)); p.cpu = true; p.paceK = o.paceK || 1;
+    const q = { id: o.id, who, p, D: newBot(p, o.skill), skill: o.skill || {}, home: null, down: false };
+    p.cpuQ = q; CPUS.push(q);
+    return q;
+  }
+  function cpuClear() {
+    if (world) for (const q of CPUS) { const p = q.p; for (const m of [p.spr, p.dust, p.aura, p.shCard, p.gCard].concat(p.spCards || [])) if (m) world.group.remove(m); }
+    CPUS = []; cpuNow = null;
+  }
+  /* how loud a CPU is: as loud as it is near where the camera looks, and never as loud as you */
+  function cpuHear(p) { const d = Math.abs(p.x - camX) + Math.max(0, Math.abs(p.y - camY) - 4); return d < 6 ? 0.55 : d < 16 ? 0.55 * (16 - d) / 10 : 0; }
+  /* a tick for each: the robot's hands, then the same step as yours (held still on the grid; stopped
+     by someone's Chaos Control; home, braking) */
+  function cpuStep(h, hold) {
+    if (!CPUS.length || !world) return;
+    const keepP = player, keepI = input, keepM = mode;
+    for (const q of CPUS) {
+      const p = q.p;
+      if (GPR && gpFrozen() && GPR.freezeBy !== q.id) continue;
+      cpuNow = q; player = p; input = q.D.inp;
+      const I = input;
+      if (hold || q.home != null) { I.L = I.R = I.U = I.D = I.J = I.Z = I.X = I.C = 0; I.jp = I.zp = I.xp = I.cp = 0; I.dash = 0; }
+      else {
+        if (p.dead) q.down = true;
+        else if (q.down) { q.down = false; q.D = Object.assign(newBot(p, q.skill), { inp: I }); }     // (up again at its post: it thinks again)
+        if (!p.dead && demoBot(q.D, p, world, h) === "fail") q.D = Object.assign(newBot(p, q.skill), { inp: I });
+      }
+      mode = q.home != null ? "goal" : "play";
+      step(h);
+      I.jp = I.zp = I.xp = I.cp = 0; I.dash = 0;
+    }
+    cpuNow = null; player = keepP; input = keepI; mode = cpuMode || keepM; cpuMode = null;   // (a race just lost to one of them: over for you too)
+  }
+  /* home: its time, for the race or the grand prix */
+  function cpuHome(q) {
+    if (!q || q.home != null || !world) return;
+    q.home = world.t;
+    if (RACE) raceCpuHome(q);
+    if (GPR) gpCpuHome(q);
+  }
+  /* those in the world, running: you (not a spectator's camera) and the CPUs */
+  const racers = () => (NP.on && NP.watch && !battle ? [] : player ? [player] : []).concat(CPUS.map(q => q.p));
+
+  /* A RACE: you against a rival through an Act 3 (or a story stage) to the goal post -- the rival a
+     CPU runner beside you (cpuAdd), as quick as the pace asked for lets it be (1 flat out; more,
+     slower). First to the post wins. Free Exhibition's Stage Racing, the story's race chapters and
+     Metal Sonic's challenge are all one of these. */
   let RACE = null;
   const PACE = { easy: 1.3, normal: 1.12, hard: 1.0 };
+  const paceK = pace => 1 / (1 + Math.max(0, (pace || 1) - 1) * 0.55);       // (a pace, as the rival's top speed against yours)
+  const paceDash = pace => (pace || 1) <= 1.05 ? 0.9 : (pace || 1) <= 1.15 ? 1.8 : 0;   // (and how often it uses its dash)
   function raceStart(o) {
     RACE = null;
-    let run = null;
-    for (let k = 0; k < 3 && !(run && run.ok); k++) run = simRun(o.def, o.who);     // (its own run; a second go if the first one stumbled)
-    if (!run || !run.ok) { loadDef(o.def); hudToast(castOf(o.who).name + " couldn't make it through here"); if (o.cant) o.cant(); return false; }
     const k = o.pace || 1;
-    RACE = Object.assign({}, o, { track: run.track, simT: run.time, T: run.time * k, k: 1 / k, over: false, card: null, at: 0 });
+    RACE = Object.assign({}, o, { T: null, over: false, won: false, time: null, q: null });
     loadDef(o.def);
     play();
-    RACE.card = makeCard(o.who); world.group.add(RACE.card);
+    RACE.q = cpuAdd(o.who, { id: "rival", paceK: paceK(k), skill: { dash: paceDash(k) } });
     const hudEl = host.querySelector(".adv-hud");
     const tag = document.createElement("div"); tag.className = "adv-race"; tag.innerHTML = `<canvas width="88" height="72"></canvas><div><b>${esc(castOf(o.who).name)}</b><span></span></div>`;
     hudEl.append(tag); paintCard(tag.querySelector("canvas"), o.who);
     caption("Race " + castOf(o.who).name + " to the goal post!");
     return true;
   }
-  /* the rival, where its run had it at this moment of the race; its lead, on the HUD */
+  /* the rival's lead, on the HUD */
   function stepRace(dt) {
-    const R = RACE; if (!R || !world || mode !== "play") return;
-    const u = world.t * R.k, tr = R.track;
-    while (R.at + 1 < tr.length && tr[R.at + 1][0] <= u) R.at++;
-    const a = tr[R.at], b = tr[Math.min(tr.length - 1, R.at + 1)], f = b[0] > a[0] ? clamp((u - a[0]) / (b[0] - a[0]), 0, 1) : 0;
-    setFrame(R.card, a[3], a[4], a[5], 0, 0);
-    R.card.position.set(a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, 0.05);
+    const R = RACE; if (!R || !world || mode !== "play" || !R.q) return;
     const el = host.querySelector(".adv-race span");
-    if (el) { const d = Math.round(R.card.position.x - player.x); el.textContent = Math.abs(d) < 2 ? "neck and neck" : d > 0 ? d + " m ahead" : -d + " m behind"; }
-    if (!R.over && u >= R.simT) { R.over = true; R.won = false; mode = "goal"; SFX.goal(); setTimeout(() => raceEnd(), 1400); }
+    if (el) { const d = Math.round(R.q.p.x - player.x); el.textContent = Math.abs(d) < 2 ? "neck and neck" : d > 0 ? d + " m ahead" : -d + " m behind"; }
+  }
+  /* the rival home first: the race is lost */
+  function raceCpuHome(q) {
+    const R = RACE; if (!R || R.over || q !== R.q) return;
+    R.over = true; R.won = false; R.T = q.home; mode = cpuMode = "goal";
+    const keep = cpuNow; cpuNow = null; SFX.goal(); cpuNow = keep;           // (the race's end: heard, wherever the rival is)
+    setTimeout(() => raceEnd(), 1400);
   }
   /* home first (finish() comes here): the race is won */
   function raceHome(time) { const R = RACE; if (!R || R.over) return; R.over = true; R.won = true; R.time = time; setTimeout(() => raceEnd(), 1700); }
+  /* a CPU still running when the race is decided: when it would be home, at the pace it's going */
+  const cpuETA = q => q.home != null ? q.home : world.t + Math.max(0, (world.goal ? world.goal.x : world.W) - q.p.x) / Math.max(4, q.p.c.run * (q.p.paceK || 1) * 0.92);
   function raceEnd() {
     const R = RACE; if (!R || !host) return;
+    if (R.T == null && R.q && world) R.T = cpuETA(R.q);
     mode = "results";
     host.querySelector(".adv-hud").classList.remove("on");
     const ov = host.querySelector(".adv-ov"), rn = castOf(R.who).name;
@@ -9521,9 +9770,11 @@
      -- you and seven of the cast -- and points for each: 9, 6, 3 and 1 for the first four, nothing
      after. Finish fifth or worse and the race has to be run again. After the fourth, the three with
      the most points stand on the podium, and a trophy is yours if you're one of them.
-     The seven rivals run the robot's own run of each course (simRun, made on the grid before the
-     start), at the class's pace, each a little quicker or slower than the next; held back or let
-     on a bit by how far from you they are; stopped by what hits them, sped on by what they pick up.
+     The seven rivals are CPU runners on the course with you (cpuAdd): the robot at their hands,
+     as quick as the class lets them be (their top speed against yours, and how often they dash),
+     each a little quicker or slower than the next; held back or let on a bit offline by how far
+     from you they are; knocked down by what hits them, sped on by what they pick up. They take
+     the rings and Red Rings they run through and light the Star Posts, as you do.
      Red Rings stand across every road at the power points: run into one and the box spins up a
      power, used with its own button (V or Shift; a pad's left shoulder; Power on a touch screen).
        Speed Shoes, a bubble Shield (one hit), Invincibility (and anyone touched goes down), a
@@ -9533,7 +9784,7 @@
      pace, and how keen they are on powers). Cups open one after another (a trophy in the one
      before, any class), and Storm once you've won a gold at Gale. */
   const GPD = () => root.AdventureGP || { CUPS: [], COURSES: [] };
-  const GP_CLS = { breeze: { name: "Breeze", pace: 1.24, keen: 0.55 }, gale: { name: "Gale", pace: 1.12, keen: 0.8 }, storm: { name: "Storm", pace: 1.02, keen: 1 } };
+  const GP_CLS = { breeze: { name: "Breeze", speed: 0.88, dash: 0, keen: 0.55 }, gale: { name: "Gale", speed: 0.95, dash: 1.8, keen: 0.8 }, storm: { name: "Storm", speed: 1, dash: 0.9, keen: 1 } };   // (speed: the CPUs' top speed against yours; dash: how often they use theirs)
   const GP_PTS = [9, 6, 3, 1, 0, 0, 0, 0];
   const GP_CUP_NAMES = ["Flicky Cup", "Carnival Cup", "Aurora Cup", "Ember Cup", "Skyward Cup", "Emerald Cup"];
   const POWERS = {
@@ -9563,7 +9814,6 @@
     return "shoes";
   }
   let GP = null, GPR = null;                          // the cup being run; the race being run
-  const GP_TRACKS = {};                               // the rivals' runs, made once a session
   const gpCourse = id => GPD().COURSES.find(c => c.id === id);
   const GP_DEFS = {};
   function gpDef(id) {
@@ -9699,7 +9949,7 @@
     GP.runners.forEach(r => { GP.pts[r.id] = 0; });
     gpGrid();
   }
-  /* the starting grid: the course, who's on it, and their runs made while you look */
+  /* the starting grid: the course, who's on it, each to their mark in turn */
   function gpGrid() {
     const G = GP, cup = GPD().CUPS[G.cup], cid = cup.courses[G.race], def = gpDef(cid);
     const ov = screenOn("setup");
@@ -9717,7 +9967,7 @@
     G.ready = new Set(); G.goSent = false; G.goEarly = false;
     let k = 0;
     const bar = ov.querySelector(".gp-load i");
-    const next = () => {
+    const next = () => {                                   // (each to its mark, one after another)
       if (GP !== G) return;
       if (k >= cpus.length) {
         setTimeout(() => {
@@ -9728,42 +9978,31 @@
         }, 350);
         return;
       }
-      const r = cpus[k], key = cid + ":" + r.who;
-      if (!GP_TRACKS[key]) {
-        let run = null;
-        for (let n = 0; n < 2 && !(run && run.ok); n++) run = simRun(def, r.who, 1000 + n * 7919 + G.race * 31);
-        GP_TRACKS[key] = run && run.ok ? run : { ok: false };
-      }
-      k++; bar.style.width = Math.round(k / cpus.length * 100) + "%";
-      setTimeout(next, 16);
+      k++; bar.style.width = Math.round(k / Math.max(1, cpus.length) * 100) + "%";
+      setTimeout(next, 110);
     };
     setTimeout(next, 120);
   }
   /* the race: the course built, the rivals on their marks, the count */
   function gpGo(def) {
-    const G = GP, cid = def.id;
-    const ok = G.runners.filter(r => !r.me && !r.human).map(r => GP_TRACKS[cid + ":" + r.who]).find(t => t && t.ok);
+    const G = GP, cid = def.id, runsHere = !G.online || NP.host;
     GPR = { def, cid, t0: 0, count: G.online && !G.goEarly ? Infinity : 4.2, said: 5, hfin: {}, seen: {}, gT: 0, tid: 0, go: false, over: false, fin: [], rivals: [], rows: [], freeze: 0, freezeBy: null,
             power: null, spin: 0, roll: 0, bombs: [], traps: [], shieldS: null, rnd: mulberry32(7 + G.race * 101), myFin: null, lastV: 0, endT: 0 };
     loadDef(def);
     play();
     world.played = true;
     const W = world;
-    /* the rivals: their runs (a borrowed one if theirs fell through), their cards */
+    /* the rivals: CPU runners on their marks, each a little quicker or slower than the next (online,
+       the host's: a guest sees each where the host's game says it is) */
     for (const r of G.runners) {
       if (r.me || r.human) continue;
-      let tr = GP_TRACKS[cid + ":" + r.who]; const own = tr && tr.ok;
-      if (!own) tr = ok;
-      if (!tr) continue;
-      const card = makeCard(r.who); W.group.add(card);
       const bub = new THREE.Sprite(glowMat(0x6ac8ff, 0.55)); bub.scale.set(2.6, 2.6, 1); bub.visible = false; W.group.add(bub);
-      GPR.rivals.push({ r, who: r.who, track: tr.track, simT: tr.time, own, u: 0, at: 0, x: W.start.x, y: W.start.y, card, bub,
-                        rate: 1 / (G.k.pace * (r.skill || 1)), stun: 0, boost: 0, star: 0, shield: false, pow: null, powT: 0, fin: null, lastX: W.start.x, bumpCd: 0 });
+      const v = { r, who: r.who, q: null, card: null, bub, x: W.start.x, y: W.start.y, tx: W.start.x, ty: W.start.y, rf: null, face: 1,
+                  star: 0, shield: false, pow: null, powT: 0, fin: null, lastX: W.start.x, bumpCd: 0 };
+      if (runsHere) { v.q = cpuAdd(r.who, { id: r.id, paceK: G.k.speed * (0.955 + clamp((r.skill || 1) - 0.97, 0, 0.07) * 0.65), skill: { dash: G.k.dash } }); v.q.k0 = v.q.p.paceK; }
+      else { v.card = makeCard(r.who); W.group.add(v.card); }
+      GPR.rivals.push(v);
     }
-    /* the Red Rings' rows: the rings by their column */
-    const rows = {};
-    for (const e of W.powers) { (rows[e.col] = rows[e.col] || []).push(e); }
-    GPR.rows = Object.keys(rows).map(Number).sort((a, b) => a - b).map(c => ({ x: c + 0.5, rings: rows[c] }));
     /* the HUD: your place, the field along the course, the power box */
     const hudEl = host.querySelector(".adv-hud");
     const box = document.createElement("div"); box.className = "gp-hud";
@@ -9813,26 +10052,25 @@
     const t = w.t, goalX = w.goal ? w.goal.x : w.W - 20;
     Rr.freeze = Math.max(0, Rr.freeze - dt);
     host.classList.toggle("gp-frozen", Rr.freeze > 0 && Rr.freezeBy !== "you");
-    /* the rivals: along their runs */
+    /* the rivals: CPU runners (here, or on a guest's screen the host's, where it says they are) */
     for (const v of Rr.rivals) {
       v.bumpCd = Math.max(0, v.bumpCd - dt);
+      if (!v.q) { gpCard(v, dt); continue; }
+      const cp = v.q.p; v.x = cp.x; v.y = cp.y; v.face = cp.face; v.star = cp.star;
       if (v.fin != null) continue;
-      v.stun = Math.max(0, v.stun - dt); v.boost = Math.max(0, v.boost - dt); v.star = Math.max(0, v.star - dt);
-      let rate = v.rate;
-      if (!G.online && Rr.myFin == null) { const d = v.x - p.x; rate *= d > 40 ? 0.93 : d > 20 ? 0.97 : d < -40 ? 1.08 : d < -20 ? 1.04 : 1; }   // (the pack stays near you)
-      if (v.boost > 0) rate *= 1.45; if (v.star > 0) rate *= 1.22;
-      if (v.stun > 0 || (Rr.freeze > 0 && Rr.freezeBy !== v.r.id)) rate = 0;
-      v.u += dt * rate;
-      if (v.u >= v.simT) { v.fin = t; Rr.fin.push({ id: v.r.id, t }); }
-      gpSample(v);
-      /* a Red Ring row passed: a power, if its hands are free */
-      for (const row of Rr.rows) if (v.lastX < row.x && v.x >= row.x && !v.pow && Rr.rnd() < 0.55 + 0.45 * G.k.keen) {
-        const ring = row.rings.reduce((a, b) => Math.abs(b.y - v.y) < Math.abs(a.y - v.y) ? b : a, row.rings[0]);
-        if (ring && Math.abs(ring.y - v.y) < 3.5 && !ring.back) { ring.back = 4; ring.m.visible = false; }
-        v.pow = rollPower(gpPlace(v.r.id), Rr.rnd); v.powT = 0;
+      if (!G.online && Rr.myFin == null) { const d = v.x - p.x; cp.paceK = v.q.k0 * (d > 40 ? 0.95 : d > 20 ? 0.98 : d < -40 ? 1.05 : d < -20 ? 1.025 : 1); }   // (the pack stays near you)
+      /* a Red Ring run into: a power, if its hands are free (the keener the class, the surer) */
+      for (const e of w.powers) if (!(e.back > 0) && !cp.dead && Math.abs(cp.x - e.x) < 0.75 && cp.y < e.y + 0.8 && cp.y + cp.hh > e.y - 0.3) {
+        e.back = 4; e.m.visible = false; burst(e.x, e.y + 0.4, [0xe42630, 0xffffff, 0xffd21a], 8, 4);
+        cpuNow = v.q; SFX.ring(); cpuNow = null;
+        if (!v.pow && Rr.rnd() < 0.55 + 0.45 * G.k.keen) { v.pow = rollPower(gpPlace(v.r.id), Rr.rnd); v.powT = 0; }
       }
       v.lastX = v.x;
       if (v.pow) { v.powT += dt; gpCpuUse(v); }
+    }
+    if (G.online && NP.host && Rr.rivals.length) {                // the host: where its CPUs are, to the others, ten times a second
+      Rr.cT = (Rr.cT || 0) + dt;
+      if (Rr.cT >= 0.1) { Rr.cT = 0; Online.toAll({ t: "np.gc", c: Rr.rivals.filter(v => v.q).map(v => [v.r.id, r3(v.x), r3(v.y), v.q.p._rf || ["idle", 0, 1], v.fin != null ? 1 : 0, v.shield ? 1 : 0, v.q.p.star > 0 ? 1 : 0]) }, true); }
     }
     /* your Red Rings: run into one and the box spins */
     for (const e of w.powers) {
@@ -9860,7 +10098,7 @@
       if (Math.abs(v.x - p.x) < 0.9 && Math.abs(v.y - p.y) < 1.6) {
         if (p.star > 0 && v.star <= 0) { gpHit(v.r.id, "you"); v.bumpCd = 1.5; }
         else if (v.star > 0 && p.star <= 0) { gpHit("you", v.r.id); v.bumpCd = 1.5; }
-        else if ((p.curl || p.state === "attack" || p.state === "special") && v.stun <= 0) { gpHit(v.r.id, "you", 0.8); v.bumpCd = 1.5; }
+        else if ((p.curl || p.state === "attack" || p.state === "special") && !(v.q && v.q.p.state === "hurt")) { gpHit(v.r.id, "you", 0.8); v.bumpCd = 1.5; }
       }
     }
     gpStepShots(dt);
@@ -9887,12 +10125,23 @@
     else if (Rr.myFin == null && Rr.rivals.every(v => v.fin != null)) { Rr.endT += dt; if (Rr.endT > (G.online ? 25 : 12)) { Rr.myFin = Infinity; Rr.over = true; mode = "goal"; caption("Race over", true);
       if (G.online) { if (NP.host) gpNetFin(NP.me, 9999); else Online.toHost({ t: "np.gfin", time: 9999 }); } else setTimeout(() => gpResults(), 1600); } }
   }
-  /* where a rival's run has it now */
-  function gpSample(v) {
-    const tr = v.track;
-    while (v.at + 1 < tr.length && tr[v.at + 1][0] <= v.u) v.at++;
-    const a = tr[v.at], b = tr[Math.min(tr.length - 1, v.at + 1)], f = b[0] > a[0] ? clamp((v.u - a[0]) / (b[0] - a[0]), 0, 1) : 0;
-    v.x = a[1] + (b[1] - a[1]) * f; v.y = a[2] + (b[2] - a[2]) * f; v.f = a;
+  /* the host's CPU on a guest's screen: on toward where the host last said it was (np.gc), and
+     touching the world here as it does there */
+  function gpCard(v, dt) {
+    const k = Math.min(1, dt * 12);
+    v.x += (v.tx - v.x) * k; v.y += (v.ty - v.y) * k;
+    if (Math.abs(v.tx - v.x) > 6 || Math.abs(v.ty - v.y) > 6) { v.x = v.tx; v.y = v.ty; }
+    if (v.fin == null) ghostTouch(v, v.x, v.y, v.rf);
+    v.lastX = v.x;
+  }
+  function gpNetCpu(d) {
+    const Rr = GPR; if (!Rr || !Array.isArray(d.c)) return;
+    for (const [id, x, y, rf, fin, sh, st] of d.c) {
+      const v = Rr.rivals.find(o => o.r.id === id); if (!v || v.q) continue;
+      v.tx = +x || 0; v.ty = +y || 0; v.rf = Array.isArray(rf) ? rf : v.rf; v.face = (v.rf || [])[2] || 1;
+      v.shield = !!sh; v.star = st ? 1 : 0;
+      if (fin && v.fin == null) { v.fin = world ? world.t : 0; Rr.fin.push({ id, t: v.fin }); }
+    }
   }
   /* places: home first by time, then by how far along */
   function gpOrder() {
@@ -9908,19 +10157,15 @@
   function gpDraw(dt) {
     const Rr = GPR, G = GP, w = world; if (!Rr || !w) return;
     for (const v of Rr.rivals) {
-      if (!v.f) gpSample(v);
-      const a = v.f || [0, w.start.x, w.start.y, "idle", 0, 1];
-      let name = a[3], i = a[4], face = a[5];
+      v.bub.visible = v.shield; v.bub.position.set(v.x, v.y + 1, 0.3);
+      if (!v.card) continue;
+      const a = v.rf || ["idle", 0, 1];
+      let name = a[0], i = a[1] | 0, face = a[2] || 1;
       if (!framesOf(v.who, name)) { name = framesOf(v.who, "run") ? "run" : "idle"; i = Math.floor(w.t * 10); }
-      if (v.stun > 0) { name = framesOf(v.who, "hurt") ? "hurt" : framesOf(v.who, "back") ? "back" : "idle"; i = 0; face = Math.floor(v.stun * 10) % 2 ? 1 : -1; }
-      if (Rr.count > 0) { name = "idle"; i = Math.floor(w.t * 7); face = 1; }
-      if (v.fin != null) { name = "idle"; i = Math.floor(w.t * 7); face = 1; }
       const n = (framesOf(v.who, name) || [0]).length;
       setFrame(v.card, name, i % n, face, 0, 0);
       v.card.position.set(v.x, v.y, 0.04);
-      v.bub.visible = v.shield; v.bub.position.set(v.x, v.y + 1, 0.3);
       if (v.star > 0 && Math.random() < 0.4) burst(v.x, v.y + Math.random() * 1.6, [0xffffff, 0x9ad8ff, 0xfff070], 1, 1);
-      if (v.boost > 0 && Math.random() < 0.5) burst(v.x - 0.4, v.y + 0.05, [0xd8d0c0, 0xffffff], 1, 1.5);
     }
     for (const e of w.powers) if (e.m.visible) { e.m.rotation.y = w.t * 3; e.m.position.y = e.y + Math.sin(w.t * 3 + e.x) * 0.08; }
     /* the HUD: place, the field along the strip */
@@ -9955,9 +10200,9 @@
     const Rr = GPR, p = player, v = gpRunner(id), mine = id === "you", at = gpPos(id);
     if (mine) hudToast(POWERS[k].say);
     switch (k) {
-      case "shoes": if (mine) { p.speedT = 4.5; SFX.dash(); } else v.boost = 3.6; break;
-      case "shield": if (mine) { Rr.myShield = true; SFX.set(); } else v.shield = true; break;
-      case "star": if (mine) { p.star = 7; SFX.star(); } else v.star = 6; break;
+      case "shoes": if (mine) { p.speedT = 4.5; SFX.dash(); } else if (v && v.q) v.q.p.speedT = 4.5; break;
+      case "shield": if (mine) { Rr.myShield = true; SFX.set(); } else if (v) v.shield = true; break;
+      case "star": if (mine) { p.star = 7; SFX.star(); } else if (v && v.q) v.q.p.star = 7; break;
       case "bomb": {
         const ord = gpOrder(), me = ord.findIndex(o => o.id === id), tgt = me > 0 ? ord[me - 1] : null;
         const m = new THREE.Mesh(vox(vx => { for (let a = -3; a <= 3; a++) for (let b = -3; b <= 3; b++) for (let c = -3; c <= 3; c++) if (Math.hypot(a, b, c) <= 3.2) vx.set(a, b, c, (a + b) % 3 ? 0x1a1a2a : 0x3a3a4a); vx.box(0, 4, 0, 0, 5, 0, 0xffd23a); }, 0.09), materials().vox);
@@ -9969,20 +10214,20 @@
         const m = new THREE.Mesh(vox(vx => { vx.box(-5, 0, -4, 5, 11, 4, 0xc8ccd8); vx.box(-4, 3, 5, 4, 9, 5, 0x2a3a6a); vx.box(-2, 4, 6, 2, 8, 6, 0xffc890); vx.box(-3, 4, 6, 3, 4, 6, 0xd8762a); vx.set(-1, 7, 7, 0x1a1a1a); vx.set(1, 7, 7, 0x1a1a1a); vx.box(-2, 8, 6, 2, 8, 6, 0xd8302a); }, 0.08), materials().vox);
         let gy = at.y - 1; for (let j = Math.floor(gy) + 1; j >= 0; j--) if (solid(tile(Math.floor(at.x - 1.6), j)) || tile(Math.floor(at.x - 1.6), j) === "-") { gy = j + 1; break; }
         world.group.add(m); m.position.set(at.x - 1.6, gy, 0.1);
-        const tid = mine ? (NP.me || "me") + ":" + (++Rr.tid) : null;
+        const tid = (mine ? (NP.me || "me") : id) + ":" + (++Rr.tid);
         Rr.traps.push({ from: id, x: at.x - 1.6, y: gy, m, t: 0, life: 40, tid });
-        if (mine) gpSend({ k: "trap", x: at.x - 1.6, y: gy, tid });
+        if (mine) gpSend({ k: "trap", x: at.x - 1.6, y: gy, tid }); else if (v && v.q) gpSend({ k: "trap", by: id, x: at.x - 1.6, y: gy, tid });   // (online, the host's CPU's: on everyone's course)
         SFX.pop(); break;
       }
       case "thunder": {
         burst(at.x, at.y, [0xffe060, 0xffffff, 0x9ad8ff], 26, 9); flash(at.x, at.y, 7, 0xffe060); SFX.impact();
         for (const o of gpOrder()) if (o.id !== id && o.fin == null && (gpRunner(o.id) || o.id === "you")) { const q = gpPos(o.id); if (Math.abs(q.x - at.x) < 13 && Math.abs(q.y - at.y) < 8) gpHit(o.id, id); }
-        if (mine) gpSend({ k: "thunder", x: at.x, y: at.y });
+        if (mine) gpSend({ k: "thunder", x: at.x, y: at.y }); else if (v && v.q) gpSend({ k: "thunder", by: id, x: at.x, y: at.y });
         break;
       }
       case "chaos": {
         Rr.freeze = 2.0; Rr.freezeBy = id; caption("Chaos Control!"); SFX.star();
-        if (mine) gpSend({ k: "chaos" });
+        if (mine) gpSend({ k: "chaos" }); else if (v && v.q) gpSend({ k: "chaos", by: id });
         if (!mine) hudToast(castOf(v.who).name + ": Chaos Control!");
         break;
       }
@@ -10002,11 +10247,24 @@
       return;
     }
     const v = gpRunner(id);
-    if (!v) { if (GP && GP.online && by === "you") gpSend({ k: "hit", to: id }); return; }   // (another player: theirs to take)
-    if (v.fin != null || v.star > 0) return;
-    if (GP && GP.online && by === "you") gpSend({ k: "cpuHit", id });
+    if (!v) {                                              // (another player: theirs to take -- from you, or from the host's CPU)
+      const cv = by !== "you" && gpRunner(by);
+      if (GP && GP.online && (by === "you" || (cv && cv.q))) gpSend(by === "you" ? { k: "hit", to: id } : { k: "hit", to: id, by });
+      return;
+    }
+    if (v.fin != null) return;
+    if (!v.q) {                                            // (on a guest's screen, the host's CPU: the host's to knock down)
+      if (GP && GP.online && by === "you") gpSend({ k: "cpuHit", id, kk: k || 1 });
+      if (v.star <= 0) burst(v.x, v.y + 1, [0xffffff, 0xf2d040], 10, 5);
+      return;
+    }
+    const q = v.q, cp = q.p;
+    if (cp.star > 0 || cp.dead) return;
     if (v.shield) { v.shield = false; burst(v.x, v.y + 1, [0x6ac8ff, 0xffffff], 12, 5); return; }
-    v.stun = 1.3 * (k || 1); burst(v.x, v.y + 1, [0xffffff, 0xf2d040], 10, 5);
+    /* down, as you go down: thrown up, its rings flying out (for anyone to catch) */
+    cp.vx = 0; cp.vy = 6; cp.ground = false; cp.state = "hurt"; cp.st = 0.55 * (k || 1) + 0.25; cp.curl = false; cp.mv = null; cp.sp = null; cp.inv = 1.2;
+    burst(cp.x, cp.y + 1, [0xffffff, 0xf2d040], 10, 5);
+    cpuNow = q; SFX.hurt(); if (cp.carrots > 0) scatterRings(cp); cpuNow = null;
     if (by === "you") hudToast(castOf(v.who).name + " goes down!");
   }
   /* bombs flying, fake monitors lying in wait */
@@ -10033,10 +10291,16 @@
       const armed = tp.t > 0.6;
       const hitBy = [];
       if (armed && Math.abs(p.x - tp.x) < 0.8 && Math.abs(p.y - tp.y) < 1.4 && Rr.myFin == null && !(GP && GP.watch)) hitBy.push("you");
-      for (const v of Rr.rivals) if (armed && v.fin == null && Math.abs(v.x - tp.x) < 0.8 && Math.abs(v.y - tp.y) < 1.4 && Rr.rnd() < 0.85) hitBy.push(v.r.id);
-      if (hitBy.length) { if (tp.tid && hitBy.includes("you")) gpSend({ k: "trapGone", tid: tp.tid }); tp.gone = true; world.group.remove(tp.m); burst(tp.x, tp.y + 0.5, [0xff8a2a, 0xffd23a, 0xc8ccd8], 18, 6); SFX.impact(); hitBy.forEach(id => gpHit(id, tp.from)); }
+      for (const v of Rr.rivals) if (armed && v.q && v.fin == null && Math.abs(v.x - tp.x) < 0.8 && Math.abs(v.y - tp.y) < 1.4 && Rr.rnd() < 0.85) hitBy.push(v.r.id);
+      /* (set off by you, or by the host's CPU: gone for everyone) */
+      if (hitBy.length) { if (tp.tid && (hitBy.includes("you") || (GP && GP.online && NP.host))) gpSend({ k: "trapGone", tid: tp.tid }); tp.gone = true; world.group.remove(tp.m); burst(tp.x, tp.y + 0.5, [0xff8a2a, 0xffd23a, 0xc8ccd8], 18, 6); SFX.impact(); hitBy.forEach(id => gpHit(id, tp.from)); }
     }
     Rr.traps = Rr.traps.filter(tp => !tp.gone);
+  }
+  /* a CPU home: its time */
+  function gpCpuHome(q) {
+    const Rr = GPR, v = Rr && Rr.rivals.find(o => o.q === q); if (!v || v.fin != null) return;
+    v.fin = q.home; Rr.fin.push({ id: v.r.id, t: v.fin });
   }
   /* home (finish() comes here): your time; the rest run on a moment, then the results */
   function gpHome(time) {
@@ -10053,8 +10317,8 @@
     const Rr = GPR, G = GP; if (!Rr || Rr.done) return;
     Rr.done = true; Rr.over = true;
     host.classList.remove("gp-frozen");
-    /* those still running: home when their runs would have them home */
-    for (const v of Rr.rivals) if (v.fin == null) { const rest = (v.simT - v.u) / Math.max(0.3, v.rate); v.fin = world.t + rest; }
+    /* those still running: home when they would be, at the pace they're going */
+    for (const v of Rr.rivals) if (v.fin == null) v.fin = v.q ? cpuETA(v.q) : world.t + 30;
     if (Rr.myFin == null) Rr.myFin = Infinity;
     const ord = net ? net.map(x => ({ id: gpLocalId(x.id), fin: x.t == null || x.t >= 9999 ? Infinity : x.t })) : gpOrder();
     const res = ord.map((o, i) => { const r = G.runners.find(q => q.id === o.id) || G.runners[0]; return { id: r.id, who: r.who, name: r.me ? "You" : r.name, me: !!r.me, t: o.fin == null ? Infinity : o.fin, pts: GP_PTS[i] }; });
@@ -10135,7 +10399,8 @@
     host.classList.remove("gp-frozen");
     const h = host.querySelector(".gp-hud"); if (h) h.remove();
     const pb = host.querySelector(".gp-pwrap"); if (pb) pb.remove();
-    if (Rr && world) { for (const v of Rr.rivals) { world.group.remove(v.card); world.group.remove(v.bub); } }
+    if (Rr && world) { for (const v of Rr.rivals) { if (v.card) world.group.remove(v.card); world.group.remove(v.bub); } }
+    cpuClear();
   }
   /* the award ceremony: the top three on the podium; a trophy for you if you're there */
   function gpPodium() {
@@ -10179,10 +10444,12 @@
 
   /* ---- the grand prix online: a room's players race the cup together. Everyone runs their own
      copy of each course, the other players shown as ghosts; the CPUs filling the eight places are
-     made the same on every machine (the same runners, the same seeded runs). A power that reaches
-     another player goes to them over the room (np.pw); the host gathers everyone's time and sends
-     the one result (np.gres), so the points and standings are the same for all. No retries online:
-     the cup goes on whatever your place. */
+     the host's: its game runs them and says where they are ten times a second (np.gc), and each
+     guest's shows them there, taking the rings and Red Rings they touch as the players' ghosts do.
+     A power that reaches another player goes to them over the room (np.pw) -- a CPU's from the
+     host; a hit on a CPU to the host -- and the host gathers everyone's time and sends the one
+     result (np.gres), so the points and standings are the same for all. No retries online: the
+     cup goes on whatever your place. */
   function npGP(plan) {
     needGP(() => {
       const cup = GPD().CUPS[plan.cup], meM = plan.mem.find(m => m.id === NP.me);
@@ -10208,7 +10475,7 @@
     const p = player;
     switch (d.k) {
       case "hit": if (d.to === NP.me) gpHit("you", d.by); break;
-      case "cpuHit": { const v = gpRunner(d.id); if (v && v.fin == null && v.star <= 0) { if (v.shield) v.shield = false; else v.stun = 1.3; } break; }
+      case "cpuHit": { const v = gpRunner(d.id); if (v && v.q) gpHit(d.id, d.by, +d.kk || 1); break; }   // (a player's hit on the host's CPU: the host's game takes it)
       case "thunder": if (p && Math.abs(p.x - d.x) < 13 && Math.abs(p.y + 1 - d.y) < 8) gpHit("you", d.by); burst(d.x, d.y, [0xffe060, 0xffffff], 14, 7); break;
       case "chaos": Rr.freeze = 2.0; Rr.freezeBy = d.by; caption("Chaos Control!"); SFX.star(); break;
       case "trap": {
@@ -10240,7 +10507,7 @@
   function gpNetResult() {
     const Rr = GPR, G = GP; if (!Rr || !G || Rr.netSent) return;
     Rr.netSent = true; clearTimeout(Rr.netT);
-    for (const v of Rr.rivals) if (v.fin == null) v.fin = world.t + (v.simT - v.u) / Math.max(0.3, v.rate);
+    for (const v of Rr.rivals) if (v.fin == null) v.fin = v.q ? cpuETA(v.q) : world.t + 30;
     const res = G.runners.map(r => ({ id: r.human ? r.netId : r.id, t: r.human ? (Rr.hfin[r.netId] != null ? Rr.hfin[r.netId] : null) : (gpRunner(r.id) || {}).fin }))
       .map(x => ({ id: x.id, t: x.t == null ? null : +x.t.toFixed(2) }))
       .sort((a, b) => (a.t == null) - (b.t == null) || (a.t || 0) - (b.t || 0));
@@ -10508,6 +10775,7 @@
   }
 
   function play() {
+    cpuClear();                                            // (a race adds its rivals once it's set up)
     // the stage the menu has standing is fresh: run it; anything already played is built again
     if (world && world.def === curDef() && !world.played) {
       world.group.remove(player.spr); if (player.dust) world.group.remove(player.dust);
@@ -10563,10 +10831,11 @@
     });
   }
   function hudToast(text) {
+    if (cpuNow) return;                                    // (what a CPU picks up isn't news on your screen)
     const t = host && host.querySelector(".adv-toast"); if (!t) return;
     t.textContent = text; t.classList.remove("on"); void t.offsetWidth; t.classList.add("on");
   }
-  function flashHud() { const h = host && host.querySelector(".adv-car"); if (h) { h.classList.remove("hit"); void h.offsetWidth; h.classList.add("hit"); } }
+  function flashHud() { if (cpuNow) return; const h = host && host.querySelector(".adv-car"); if (h) { h.classList.remove("hit"); void h.offsetWidth; h.classList.add("hit"); } }
 
   function togglePause() {
     if (mode !== "play") return;
@@ -10775,7 +11044,7 @@
       if (GPR && !GPR.done) {
         const Rr = GPR;
         s.gpr = { t: r3(world.t), cnt: Rr.count === Infinity ? null : r3(Rr.count), go: !!Rr.go, hfin: Rr.hfin || {}, seen: Rr.seen || {},
-          rivals: Rr.rivals.map(v => ({ id: v.r.id, u: r3(v.u), fin: v.fin == null ? null : r3(v.fin), stun: r3(v.stun), boost: r3(v.boost), star: r3(v.star), shield: v.shield ? 1 : 0 })) };
+          rivals: Rr.rivals.map(v => ({ id: v.r.id, x: r3(v.x), y: r3(v.y), fin: v.fin == null ? null : r3(v.fin), shield: v.shield ? 1 : 0 })) };
       }
     }
     return s;
@@ -10825,8 +11094,8 @@
     for (const id in q.hfin || {}) Rr.seen[id] = q.hfin[id];
     for (const v of Rr.rivals) {
       const o = (q.rivals || []).find(x => x.id === v.r.id); if (!o) continue;
-      v.u = o.u || 0; v.stun = o.stun || 0; v.boost = o.boost || 0; v.star = o.star || 0; v.shield = !!o.shield; v.fin = o.fin;
-      v.at = 0; gpSample(v); v.lastX = v.x;
+      if (v.q) continue;                                   // (the host's own: nothing to catch up)
+      v.x = v.tx = +o.x || v.x; v.y = v.ty = +o.y || v.y; v.shield = !!o.shield; v.fin = o.fin; v.lastX = v.x;
       if (v.fin != null) Rr.fin.push({ id: v.r.id, t: v.fin });
     }
     for (const id in s.ghosts || {}) npGhost(id, s.ghosts[id]);
@@ -11064,6 +11333,7 @@
         B.over = true; B.winner = d.w; npEndOf(B); break;
       }
       case "np.g": npGhost(d.id, d); break;
+      case "np.gc": gpNetCpu(d); break;
       case "np.go": npRaceGo(); break;
       case "np.fn": npRaceNote(d.id, d.time); break;
       case "np.rr": npRaceResults(d.res); break;
@@ -11099,7 +11369,7 @@
      (In a race the spectator's game still has a runner, for the camera to follow: never seen, and
      put each frame where the one watched is.) */
   const SPI = {}, specTap = {};                          // (the spectator's buttons: keys, a pad, the touch bar; the keys tapped since the last frame)
-  const npWatching = () => !!(NP.on && (NP.watch || (battle && NP.spectator)));
+  const npWatching = () => !!(NP.on && (NP.watch || (battle && NP.spectator))) || !!(battle && battle.cfg && battle.cfg.spec);   // (offline: a tournament's CPU match you watch)
   function npFollowed() {
     const S = NP.sp; if (!battle || !S || S.view !== "follow" || !npWatching()) return null;
     return battle.fs.find(f => "f" + f.slot === S.key) || null;
@@ -11113,7 +11383,7 @@
       const ord = gpOrder(), place = id => ord.findIndex(o => o.id === id) + 1;
       for (const r of GP.runners) {
         if (r.human) { const g = NP.ghosts.get(r.netId); if (g) out.push({ key: r.id, x: g.x, y: g.y, face: (g.rf || [])[2] || 1, name: r.name, sub: castOf(r.who).name + " · " + ORD(place(r.id)) }); }
-        else { const v = gpRunner(r.id); if (v) out.push({ key: r.id, x: v.x, y: v.y, face: (v.f || [])[5] || 1, name: r.name, sub: "CPU · " + ORD(place(r.id)) }); }
+        else { const v = gpRunner(r.id); if (v) out.push({ key: r.id, x: v.x, y: v.y, face: v.face || 1, name: r.name, sub: "CPU · " + ORD(place(r.id)) }); }
       }
       return out;
     }
@@ -11243,7 +11513,26 @@
       const rf = g.rf || ["idle", 0, 1], L = framesOf(g.sheet, rf[0]) || framesOf(g.sheet, "idle");
       g.spr.visible = !!L;
       if (L) setFrame(g.spr, framesOf(g.sheet, rf[0]) ? rf[0] : "idle", Math.min(rf[1] | 0, L.length - 1), rf[2] || 1, g.x, g.y);
+      if (!g.fin && (NP.race || GPR) && !battle) ghostTouch(g, g.x, g.y, rf);
     }
+  }
+  /* Someone seen here but run elsewhere -- another player's ghost, or on a guest's screen the
+     host's CPU -- still takes the rings it runs through, lights the Star Posts it passes, spins the
+     goal post, takes the Red Rings it touches, and breaks the monitors and badniks it comes down
+     on or rolls into, as it did where it's run. */
+  function ghostTouch(g, x, y, rf) {
+    const w = world; if (!w || (mode !== "play" && mode !== "goal")) return;
+    const ball = !!(rf && /^(spin|roll|ball|rev|homing)/.test(rf[0]));
+    const keep = cpuNow; cpuNow = { p: { x, y } };          // (heard as a CPU is, by how near; nothing of it on your HUD)
+    for (let i = Math.max(0, Math.floor(x) - 2); i <= Math.floor(x) + 2; i++) for (const k of (w.ringCol && w.ringCol[i]) || []) if (!k.got && Math.abs(k.x - x) < 0.66 && k.y + 0.73 > y && k.y - 0.03 < y + 1) { k.got = true; burst(k.x, k.y + 0.4, [0xfff3a0, 0xffffff], 4, 2); SFX.coin(); }
+    for (const k of w.checks) if (x >= k.x - 0.3 && !(k.by && k.by.has(g))) { (k.by = k.by || new Set()).add(g); if (!k.on) { k.on = true; k.m.geometry = propGeo("poleDone"); } k.spin = 1; SFX.check(); }
+    if (w.goal && x >= w.goal.x && !g.atGoal) { g.atGoal = true; if (!w.def.story) w.goal.spin = 2.6; }
+    for (const e of w.powers || []) if (!(e.back > 0) && Math.abs(x - e.x) < 0.75 && y < e.y + 0.8 && y + 1 > e.y - 0.3) { e.back = 4; e.m.visible = false; burst(e.x, e.y + 0.4, [0xe42630, 0xffffff, 0xffd21a], 8, 4); }
+    for (const e of w.ents) if (e.t === "monitor" && !e.gone && Math.abs(e.x - x) < 0.7 && y < e.y + 0.95 && y + 1 > e.y && (ball || y > e.y + 0.5)) {
+      e.gone = true; e.m.visible = false; if (ITEMS) effect("items", "smoke", e.x, e.y + 0.45, 1, 16, true, "fx", 0.9); SFX.pop();
+    }
+    if (ball) for (const e of w.enemies) if (e.alive && !e.hidden && !e.guard && Math.abs(e.x - x) < e.w / 2 + 0.3 && e.y < y + 1 && e.y + e.h > y) defeat(e);
+    cpuNow = keep;
   }
   /* their names over the ghosts */
   function npTags() {
@@ -11485,6 +11774,7 @@
     if (ea.cpu && eb.cpu && !watch) { tourSim(m); tourAfter(); return; }
     T.cur = m;
     const cfg = tourCfg(m);
+    if (!T.online && ea.cpu && eb.cpu) cfg.spec = true;     // (two CPUs, watched: you follow either, or the whole arena)
     if (T.online) { Online.toAll({ t: "np.tm", T, cfg }, true); npBattle(cfg); }
     else startBattle(cfg);
   }
@@ -11536,7 +11826,7 @@
         <div class="ao-head">
           <button class="btn ghost" data-quit data-back>${ico("back")}${T.online ? "Leave the room" : "Quit"}</button>
           <h2>${ico("crown")}${T.cup ? "The " + esc(castOf(T.cup).name.replace(/^Dr\. /, "")) + " Cup" : "Tournament · " + T.size}</h2>
-          <span class="ao-net">${T.done ? "Over" : esc(ROUND_N(T.size, T.r))} · ${T.goal} ${T.goal === 1 ? "life" : "lives"} a match</span>
+          <span class="ao-net">${T.watch ? `${ico("eye")}Spectating · ` : ""}${T.done ? "Over" : esc(ROUND_N(T.size, T.r))} · ${T.goal} ${T.goal === 1 ? "life" : "lives"} a match</span>
         </div>
         <div class="panel tr-wrap"><div class="tr-bracket">${T.rounds.map((R, r) => `
           <div class="tr-col"><h4>${esc(ROUND_N(T.size, r))}</h4><div class="tr-ms">${R.map(m => `<div class="tr-m ${m === next ? "cur" : ""} ${m.sim ? "sim" : ""}">${ent(m.a, m)}${ent(m.b, m)}</div>`).join("")}</div></div>`).join("")}
@@ -11547,6 +11837,8 @@
               <div class="adv-btns">${T.online ? `<button class="btn" data-room data-focus>${ico("back")}Back to the room</button>` : `<button class="btn" data-again data-focus>${ico("flag")}New tournament</button><button class="btn ghost" data-menu>Main menu</button>`}</div>`
             : next ? (() => {
               const a = T.ents[next.a], b = T.ents[next.b], cpuOnly = a.cpu && b.cpu, inIt = isMine(a) || isMine(b);
+              if (T.watch && canRun) return `<p class="tr-msg">${ico("eye")}${esc(ROUND_N(T.size, T.r))}: <b>${esc(a.name)}</b> vs <b>${esc(b.name)}</b></p>
+                <div class="adv-btns"><button class="btn lg" data-watch data-focus>${ico("eye")}Watch the match</button><button class="btn ghost" data-go>${ico("next")}Settle it</button><button class="btn ghost" data-skip>Settle the rest</button></div>`;
               return `<p class="tr-msg">${esc(ROUND_N(T.size, T.r))}: <b>${esc(a.name)}</b> vs <b>${esc(b.name)}</b>${cpuOnly ? " (CPUs)" : ""}${rec ? ` · you're out: +${rec.xp} XP` : ""}</p>
                 <div class="adv-btns">${canRun ? `<button class="btn lg" data-go data-focus>${ico(inIt ? "flag" : "next")}${inIt ? "Play your match" : cpuOnly ? "Settle it" : "Start the match"}</button>
                   ${cpuOnly ? `<button class="btn ghost" data-watch>${ico("eye")}Watch it</button><button class="btn ghost" data-skip>Settle every CPU match</button>` : ""}` : `<p class="adv-note">Waiting for the host…</p>`}</div>`;
@@ -11576,7 +11868,7 @@
   /* the offline tournament's setup */
   let tourSet = null;
   function tourSetup() {
-    tourSet = tourSet || { size: 8, lvl: 1, goal: 2, arena: -1 };
+    tourSet = tourSet || { size: 8, lvl: 1, goal: 2, arena: -1, spec: 0 };
     const ov = screenOn("tourney"), t = tourSet, zs = stages(), can16 = PROG().cups >= 1;
     if (!can16) t.size = 8;
     if (t.arena >= 0 && !unlocked(t.arena)) t.arena = -1;
@@ -11585,14 +11877,15 @@
       <div class="adv-menu pop">
         <div class="panel adv-panel">
           <div class="panel-hd">${ico("crown")}Tournament</div>
-          <p class="adv-note">A knock-out bracket: you and CPUs, one battle a match, the winner on to the next round.</p>
+          <p class="adv-note">${t.spec ? "A knock-out bracket of CPUs, one battle a match, the winner on to the next round: you watch each match, or settle it. Nothing counts toward your record." : "A knock-out bracket: you and CPUs, one battle a match, the winner on to the next round."}</p>
+          <div class="setrow"><div class="setlab"><b>You</b><i>${t.spec ? "Watch every fighter in it." : "Fight in it."}</i></div>${segs("spec", [[0, "Fight"], [1, `${ico("eye")}Spectate`]])}</div>
           <div class="setrow"><div class="setlab"><b>Places</b>${can16 ? "" : "<i>16 places open once you've won a tournament of 8.</i>"}</div>${can16 ? segs("size", [[8, "8"], [16, "16"]]) : `<div class="seg adv-seg"><button class="sel">8</button><button disabled title="Win a tournament of 8 first">${ico("lock")}16</button></div>`}</div>
           <div class="setrow"><div class="setlab"><b>CPUs</b><i>Around this level, a little either side.</i></div>${segs("lvl", [[0, "Easy"], [1, "Normal"], [2, "Hard"]])}</div>
           <div class="setrow"><div class="setlab"><b>Lives a match</b></div>${segs("goal", [[1, "1"], [2, "2"], [3, "3"]])}</div>
           <div class="setrow"><div class="setlab"><b>Arena</b></div><div class="adv-pick"><button class="adv-arr" data-ar="-1">${ico("back")}</button><b>${t.arena < 0 ? "A new one every match" : esc(zs[t.arena].name)}</b><button class="adv-arr" data-ar="1">${ico("next")}</button></div></div>
-          <div class="setrow"><div class="setlab"><b>Your fighter</b></div><div class="adv-pick"><button class="adv-arr" data-pk="-1">${ico("back")}</button><canvas width="44" height="40" data-face="${castId}"></canvas><b>${esc(castOf(castId).name)}</b><button class="adv-arr" data-pk="1">${ico("next")}</button></div></div>
+          ${t.spec ? "" : `<div class="setrow"><div class="setlab"><b>Your fighter</b></div><div class="adv-pick"><button class="adv-arr" data-pk="-1">${ico("back")}</button><canvas width="44" height="40" data-face="${castId}"></canvas><b>${esc(castOf(castId).name)}</b><button class="adv-arr" data-pk="1">${ico("next")}</button></div></div>`}
           <div class="adv-go">
-            <button class="btn lg" data-go data-focus data-enter>${ico("flag")}Start the tournament</button>
+            <button class="btn lg" data-go data-focus data-enter>${ico(t.spec ? "eye" : "flag")}${t.spec ? "Watch the tournament" : "Start the tournament"}</button>
             <button class="btn ghost" data-back>${ico("back")}Main menu</button>
           </div>
         </div>
@@ -11603,7 +11896,8 @@
     ov.querySelectorAll("[data-ar]").forEach(b => b.onclick = () => { t.arena = cycle([-1].concat(openArenas()), t.arena, +b.dataset.ar); tourSetup(); });
     ov.querySelectorAll("[data-pk]").forEach(b => b.onclick = () => { castId = cycleTeam(castId, +b.dataset.pk); saveData.cast = castId; save(saveData); tourSetup(); });
     ov.querySelector("[data-go]").onclick = () => {
-      TOUR = tourMake({ size: t.size, lvl: t.lvl, goal: t.goal, arena: t.arena, online: false, humans: [{ name: root.Auth && Auth.user ? Auth.name : "You", who: castId, me: true }] });
+      TOUR = tourMake({ size: t.size, lvl: t.lvl, goal: t.goal, arena: t.arena, online: false, humans: t.spec ? [] : [{ name: root.Auth && Auth.user ? Auth.name : "You", who: castId, me: true }] });
+      TOUR.watch = !!t.spec;                                 // (a spectator's: every place a CPU's)
       tourBracket();
     };
     ov.querySelector("[data-back]").onclick = () => mainMenu();
@@ -11689,13 +11983,19 @@
   }
 
   root.Adventure = { ok: true, open, close, CAST, THEMES,
-    _debug: { get world() { return world; }, get player() { return player; }, get GP() { return GP; }, get GPR() { return GPR; }, gpBegin: o => gpBegin(o), npStart: (h, R, plan, me) => npStart(h, R, plan, me), npPlan: (R, id) => npPlan(R, id), get NP() { return NP; }, gpSim: (id, who, seed) => { const r = simRun(gpDef(id), who, seed == null ? 1000 : seed); return { ok: r.ok, time: r.time, end: r.track.length ? r.track[r.track.length - 1][1] : null }; }, gpUse: (id, k) => gpUse(id, k), gpHit: (id, by) => gpHit(id, by), gpPodium: () => gpPodium(), gpMenu: () => gpMenu(), gpDef: id => gpDef(id), coursePic: id => coursePic(id), gpCleanAdd: (id, list) => { GP_CLEAN[id] = list; }, step: (s, n) => { for (let k = 0; k < (n || 1); k++) { readInput(); step(s); worldStep(s); input.jp = input.zp = input.xp = input.cp = 0; } },
+    _debug: { get cpus() { return CPUS; }, get world() { return world; }, get player() { return player; }, get GP() { return GP; }, get GPR() { return GPR; }, gpBegin: o => gpBegin(o), npStart: (h, R, plan, me) => npStart(h, R, plan, me), npPlan: (R, id) => npPlan(R, id), get NP() { return NP; }, gpSim: (id, who, seed) => { const r = simRun(gpDef(id), who, seed == null ? 1000 : seed); return { ok: r.ok, time: r.time, end: r.track.length ? r.track[r.track.length - 1][1] : null }; }, gpUse: (id, k) => gpUse(id, k), gpHit: (id, by) => gpHit(id, by), gpPodium: () => gpPodium(), gpMenu: () => gpMenu(), gpDef: id => gpDef(id), coursePic: id => coursePic(id), gpCleanAdd: (id, list) => { GP_CLEAN[id] = list; }, step: (s, n) => { for (let k = 0; k < (n || 1); k++) { readInput(); step(s); worldStep(s); input.jp = input.zp = input.xp = input.cp = 0; } },
               play: (i, id, a) => { if (id) castId = id; if (i != null) stageIdx = i; actIdx = a || 0; play(); }, draw: dt => draw(dt || 1 / 60), input: INPUT0, keys, touch, parse,
               get battle() { return battle; }, get punch() { return punch; }, get np() { return NP; }, get tour() { return TOUR; }, frame: t => frame(t), tourSetup, tourMake, tourBracket, tourGo, get demo() { return demo; }, demoTick: (secs, h) => { for (let t = 0; t < secs && demo; t += h || 0.05) demoTick(h || 0.05); }, title, get mode() { return mode; }, get talk() { return talk; }, startBattle, mainMenu, storyMenu, storyEpisode, playChapter, battleSetup, get storyRun() { return storyRun; }, EPS,
               trainingSetup, optionsScreen, arenaDef, emerlLearn, emerlSkills, emerlCast, get saveData() { return saveData; },
               bossWeak: () => world && world.boss && BRAIN[world.boss.key].weak(world.boss),
               simRun: (where, who) => simRun(typeof where === "number" ? actDef(where, 0) : /^r\d+$/.test(where) ? raceDef(+where.slice(1)) : storyStages().find(st => st.id === where), who),
               raceDef: i => raceDef(i),
+              peek: (where, x, y, r) => { const def = typeof where === "number" ? raceDef(where) : /^a\d+$/.test(where) ? actDef(+where.slice(1), 0) : gpDef(where); disposeWorld(); const w = world = buildWorld(def); r = r || 8;
+                const rows = []; for (let j = Math.min(H - 1, Math.round(y) + 6); j >= Math.max(0, Math.round(y) - 4); j--) { let s = ""; for (let i = Math.round(x) - r; i <= Math.round(x) + r; i++) s += tile(i, j); rows.push(String(j).padStart(2) + " " + s); }
+                const near = o => Math.abs((o.x != null ? o.x : o.x0) - x) < r && Math.abs((o.y != null ? o.y : o.y0) - y) < 6;
+                const out = { rows, hz: w.hazards.filter(near).map(z => [z.t || "hz", z.x0, z.x1, z.y0, z.y1]), en: w.enemies.filter(near).map(e => [e.key, e.x, e.y]), ents: w.ents.filter(near).map(e => [e.t, e.x, e.y]), sol: w.solids.filter(near).map(b => [b.t, b.x0, b.y0]) };
+                disposeWorld(); world = null; return out; },
+              botStats: (where, who, skill) => { const def = typeof where === "number" ? raceDef(where) : /^a\d+$/.test(where) ? actDef(+where.slice(1), 0) : gpDef(where); const r = simRun(def, who, 1000, skill); return { trace: r.trace, ok: r.ok, time: +r.time.toFixed(1), ideal: +r.st.ideal.toFixed(1), hurt: r.st.hurt, bump: r.st.bump, stumble: r.st.stumble, water: +r.st.water.toFixed(1), endX: Math.round(r.st.endX), dist: Math.round(r.st.dist), ev: r.st.ev }; },
               raceStart: o => raceStart(o), get race() { return RACE; }, actDef: (i, a) => actDef(i, a), storyStages: () => storyStages(),
               get tut() { return TUT; }, tutorialStart, trainingMenu, tutLessons: () => tutLessons().map(l => l.id),
               tutJump: id => { if (!TUT) return; TUT.i = LESSONS.findIndex(l => l.id === id) - 1; TUT.ok = null; tutNext(); },

@@ -133,8 +133,11 @@ over that (every spring with clear sky over it, so nothing it throws you into st
 and shortcuts: walls to go over by their steps or cracked rock to roll through and a tunnel
 straight on, ramps over gaps the low road goes round. Stage Racing (Free Exhibition) races a
 zone's Act 3 against a rival of your choosing at Easy, Normal or Hard; several chapters of the
-story are races too, and so is Metal Sonic's challenge. The rival's run is the robot's own,
-made out of sight just before the start and played back beside you.
+story are races too, and so is Metal Sonic's challenge. The rival is a runner on the course with
+you, as you are (the robot, below, at its hands): it takes the rings it runs through, lights the
+Star Posts it passes, breaks monitors and gets what's in them, is hit and loses its rings, and
+falls and starts again from its last Star Post. Easy holds its top speed back and it never
+dashes; Hard is flat out, its own dash and all.
 
 **Red Ring Circuit** is the grand prix, run the way Mario Kart 64 runs its own: pick a class
 (Breeze, Gale or Storm: how fast the rivals go and how keen they are on powers), your runner and a
@@ -164,10 +167,12 @@ Speed Shoes; a Bubble Shield that takes one hit; Invincibility (and anyone you t
 a Homing Bomb at the next runner ahead; an Eggman Monitor, a fake left behind you; a Thunder
 Shield that knocks down everyone close; and Chaos Control, which stops time for everyone else.
 The further back you are, the better the powers. A hit sends a runner spinning a moment (a
-shield takes it instead); rolling or attacking into a rival knocks them down too. The rivals run
-the robot's own runs of each course (made on the starting grid, with a bar to show it), each a
-little quicker or slower than the next, the pack kept near you, and they pick up and use powers
-of their own. The HUD shows your place, the whole field along the course on a strip, and the
+shield takes it instead, and a runner with rings drops them); rolling or attacking into a rival
+knocks them down too. The rivals are CPU runners on the course with you, as a race's rival is:
+each a little quicker or slower than the next (Breeze: about nine tenths of your top speed and
+no dash; Gale: a little under yours, dashing now and then; Storm: flat out), the pack kept near
+you, taking the rings, Red Rings and monitors they run through and lighting the Star Posts, and
+using powers of their own. The HUD shows your place, the whole field along the course on a strip, and the
 power box.
 
 **Story** is *The Red Star Rings*, told the way Sonic Battle tells its story: one plot, an
@@ -511,13 +516,16 @@ record comes along the first time, and so do the settings and the two players' k
 everything else (its runner framed in the open band between Start and the strip, so nothing on
 the title covers it), runs a demo: one of the cast at random plays a zone's first Act at random, by
 itself, to the goal post (the post spins), then another runner in another zone, round and round.
-A robot plays it honestly, keeping its speed: it looks further ahead the faster it goes and clears
-what's coming before it gets there -- jumps hurdles, crates, thorns and gaps, plans tall walls
-from their steps, rolls through cracked rock and badniks (those who can roll; Chaos dives
-instead), never wades into water it can jump or fly over, holds a glide over a gap, and uses no
-attack that would stop it. It is never hurt and plays quietly; a runner it can't get round a
-zone fairly isn't sent there, and a run that fails just ends and the next begins (a run takes
-about half a minute). The same robot makes the rivals' runs for every race. The stage it used is built
+A robot plays it honestly, keeping its speed as a player who knows the road would: it looks
+further ahead the faster it goes for walls, hurdles, monitors, thorns, badniks, the end of the
+road and water, and jumps each in good time for how tall it is, the jump planned before it's made
+(the shortest that clears it and comes down with room to jump the next); runs up slopes and onto
+what they lead to, plans tall walls from their steps, rolls through cracked rock (those who can
+roll), goes over a badnik with its spikes out or an armoured face rather than into it (Chaos dives
+under), never wades into water it can jump or fly over, holds a glide over a gap, Spin Dashes off
+the line and out of a stop, and uses no attack that would stop it. It plays quietly; a runner it
+can't get round a zone fairly isn't sent there, and a run that fails just ends and the next begins
+(a run takes about half a minute). The same robot runs every CPU in a race. The stage it used is built
 fresh before anyone plays it. Over it the Red Ring Circuit logo under its Sonic & Friends
 banner and the login (below). Along the bottom, on a strip of checkered soil under grass, up to
 four of the cast at a time come on at random, each to do one thing: walk across, run across,
@@ -567,9 +575,10 @@ other runners' name tags in races -- with Options' **Ping on player tags** (on a
 - **Exhibition race**: up to eight through a zone's Act; everyone runs their own copy, the
   others shown as ghosts with their names, the host counting down and calling the order home.
 - **Red Ring Circuit**: the grand prix for up to eight players, a cup and class the host picks,
-  CPUs in the places nobody takes (the same on every machine, their runs seeded alike). Everyone
-  runs their own copy of each course, the others as ghosts; powers that reach another player go
-  to them over the room; the host gathers the times and sends the one result, so the points and
+  CPUs in the places nobody takes: the host's game runs them and the others see them where it
+  says. Everyone runs their own copy of each course, the others as ghosts (a ghost, a player's or
+  a CPU's, takes the rings and Red Rings it runs through on your course too, and lights the Star
+  Posts); powers that reach another player go to them over the room (a hit on a CPU, to the host); the host gathers the times and sends the one result, so the points and
   the standings are everyone's. No retries online: the cup goes on whatever your place.
 - **Story co-op**: up to three through a chapter of an episode: the host is its hero (a
   spectating host's: the first player), the others fight beside them, or run the stage alongside;
@@ -610,8 +619,11 @@ browser, read receipts) and invites to rooms work from anywhere in the game.
 Battle's way: one battle a match, Survival with the lives set (one to three), three minutes,
 200 health. You and the CPUs (levels around the one picked, fighters nobody took) are spread so
 the players meet as late as they can; a winner moves on in the bracket as soon as their match
-is over; a match between two CPUs is settled at once (their levels and some luck) or watched.
-Going out or winning it all gives its XP and goes on your record.
+is over; a match between two CPUs is settled at once (their levels and some luck) or watched,
+with a spectator's camera (follow either fighter, Left and Right, or Z for the whole arena). Going
+out or winning it all gives its XP and goes on your record. Or **Spectate** it (You: Spectate, in
+the setup): a bracket of CPUs only, each match watched or settled, nothing counted. The bracket
+has its own music between matches; a match's stops when it ends.
 
 **Sonic Battle's effects** are its own, from QuadFactor's rip of the game's shared effects ("Miscellaneous
 Effects", The Spriters Resource; SEGA's sprites), cut by `tools/pack-effects.py`: the light
