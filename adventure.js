@@ -80,8 +80,8 @@
  *   Gamma     walks slowly; a double tap is Drive Mode, fast and steerable while held; Flight
  *             Mode in the air, sinking slowly; Devastator charges while C is held; Meltdown
  *             (Up + C) costs him a heart.
- *   Eggman    his Egg Mobile hovers off the ground; Egg Hover holds him up a while in the air,
- *             then he sinks slowly. The Death Egg Cannon, missiles, bombs.
+ *   Eggman    his Egg Mobile hovers off the ground; in the air its boosters fly him (tap to
+ *             climb, a while), then it glides down. The Death Egg Cannon, missiles, bombs.
  *   Metal     the fastest after Shadow; his jet in the air, a burst ahead and a hover; the
  *             Black Shield (Up + C) lets nothing through. Spin Dash.
  *   Mighty    Shell Launch, straight up, and a wall jump off any wall (Knuckles' Chaotix);
@@ -186,10 +186,10 @@
     /* the Egg Mobile is a hovercraft: it floats `lift` metres off the ground, bobbing, its
        shadow on the floor under it (his body is that much taller to things over him) */
     { id: "eggman", name: "Dr. Eggman", w: 0.92, h: 1.6, lift: 0.42, run: 12.5, accel: 17, airAccel: 13, jump: 12.4,
-      air: "hover", flyTime: 2.2, sink: 0, glides: true, flyK: 0.9, from: "Dr. Ivo \"Eggman\" Robotnik",
-      moves: "Egg Hover · Death Egg Cannon",
+      air: "fly", flyTime: 2.8, glides: true, flyK: 0.9, from: "Dr. Ivo \"Eggman\" Robotnik",
+      moves: "Egg Mobile Flight · Death Egg Cannon",
       grades: { Speed: "B", Jump: "B", Air: "A", Power: "A" },
-      text: "In his Egg Mobile. Space in the air holds him up a while, then he sinks slowly; Down lets go. Missiles, bombs and a cannon." },
+      text: "In his Egg Mobile. Space again in the air fires its boosters: tap to climb, a while, then it glides down; Down lets go. Missiles, bombs and a cannon." },
     { id: "metal", name: "Metal Sonic", w: 0.56, h: 1.04, run: 15.0, accel: 23, airAccel: 15, jump: 12.4,
       spinDash: true, air: "jet", dashK: 1.4, from: "Metal Sonic",
       moves: "Spin Dash · Jet",
@@ -538,6 +538,13 @@
   /* A card in the cabinet's menu: the runner's Sonic Battle portrait, the one their sheet draws
      with a white outline, at twice size with crisp pixels, standing on the card's floor. */
   const IMGS = {};
+  /* where each portrait's face is (its eyes and muzzle), in the portrait's own pixels */
+  const FACE = { sonic: [37, 27], tails: [30, 28], knuckles: [30, 28], amy: [31, 26], rouge: [26, 27], shadow: [30, 26], cream: [34, 29],
+    chaos: [17, 27], gamma: [32, 16], eggman: [41, 15], metal: [40, 31], mighty: [26, 21], silver: [40, 51], emerl: [28, 38] };
+  /* which way each bust looks: Sonic Battle's (and most here) turn to their left; TheKnucklesMainG4's
+     Metal Sonic, Mighty and Silver to their right. Two busts face to face: the left one looking right */
+  const LOOKS_RIGHT = { metal: 1, mighty: 1, silver: 1 };
+  const flipFor = (who, side) => (side === "l") !== !!LOOKS_RIGHT[who];   // (mirror it, on that side?)
   function paintCard(cv, who, frame, k) {
     const A = SHEETS[who]; if (!A) return;
     const img = IMGS[who] || (IMGS[who] = Object.assign(new Image(), { src: A.url }));
@@ -546,11 +553,13 @@
       const g = cv.getContext("2d"), f = (A.f[frame || "portrait"] || A.f.idle)[0];
       g.clearRect(0, 0, cv.width, cv.height); g.imageSmoothingEnabled = false;
       let k = k0; while (k > 1 && f[2] * k > cv.width) k--;      // a wide one (Emerl's) at a size that shows him
-      /* a portrait taller than the card (Eggman's, Silver's) shows its top: a bust, the face in */
-      /* (Emerl's is a bust under a tall crest: `faceY` drops the crop to his face) */
-      const fy = (!frame || frame === "portrait") && A.faceY ? A.faceY * k : 0;
-      const dy = f[3] * k > cv.height ? -Math.min(fy, f[3] * k - cv.height) : cv.height - f[3] * k;
-      g.drawImage(img, f[0], f[1], f[2], f[3], Math.round((cv.width - f[2] * k) / 2), dy, f[2] * k, f[3] * k);
+      /* a bust that fits stands on the card's floor; one bigger than the card (the small cards:
+         the bracket, the story list, the race) is cut round its face, so it's never all ears and quills */
+      const fc = (!frame || frame === "portrait") && FACE[who], W = f[2] * k, H = f[3] * k;
+      const dx = W <= cv.width || !fc ? Math.round((cv.width - W) / 2) : clamp(Math.round(cv.width / 2 - fc[0] * k), cv.width - W, 0);
+      const dy = H <= cv.height ? cv.height - H : fc ? clamp(Math.round(cv.height * 0.5 - fc[1] * k), cv.height - H, 0) : 0;
+      g.drawImage(img, f[0], f[1], f[2], f[3], dx, dy, W, H);
+      if (cv.dataset.dark) { g.globalCompositeOperation = "source-in"; g.fillStyle = "#0a1236"; g.fillRect(0, 0, cv.width, cv.height); g.globalCompositeOperation = "source-over"; }   // (not on the team yet: a silhouette)
     };
     if (img.complete && img.naturalWidth) go(); else img.addEventListener("load", go, { once: true });
   }
@@ -1288,6 +1297,175 @@
       block: [0x9aa0aa, 0x80868e], blocks: "hull", plank: 0x5a6068, planks: "grate", water: 0x3a7ad8, crack: 0x8a8e96, back: 0x1a1c24, indoors: 10,
       tufts: [], flowers: [], stars: true, hurdle: "crate", tree: "console",
       foes: { k: "slicer", r: "crawl", b: "mspinner", n: "eklagen", p: "grabber" }, far: "station", music: "rival_final", tint: 0xeef0fa },
+    // ---------------------------------------------------------------- the grand prix's twenty-four
+    /* Flicky Cup -- Checker Hills: the classic green hills, checkered soil, totem poles, the sea */
+    checker: {
+      sky: [0x3a8ef0, 0xc8ecff], fog: [0xcfeaf8, 60, 320], sun: [0xfff4dc, 0.95, [10, 32, 22]], hemi: [0xffffff, 0x8ab87a, 0.62],
+      top: [0x3cbc3c, 0x4ac848, 0x34aa34], drip: 0x2e9a2e, soil: [0xc0702a, 0x8a4a1a, 0xb0642a], deep: 0x6a3a14, checkSoil: true,
+      block: [0xd8a060, 0xb87a40], blocks: "stone", plank: 0xc8965a, planks: "wood", water: 0x2a9ae8, crack: 0xb08a5a, back: 0x8a5a2a,
+      tufts: [0x5ad24a, 0x6ade54], flowers: [0xff5a5a, 0xffd23a, 0xa86af0, 0xffffff], hurdle: "brush", tree: "totem",
+      foes: { k: "motobug", r: "rhinobot", b: "buzzbomber", n: "crabmeat" }, far: "checker" },
+    /* Coral Coast: white sand, coral rock, palms, the boardwalk over the tide pools */
+    coral: {
+      sky: [0x1e9ef2, 0xbaf2ff], fog: [0xc0eef8, 60, 320], sun: [0xfff6e0, 1.0, [12, 34, 20]], hemi: [0xffffff, 0xe8d8a8, 0.62],
+      top: [0xf2e2aa, 0xf6e8b8, 0xead6a0], drip: 0xe0cc90, soil: [0xe8d49a, 0xd8c088, 0xf0dcaa], deep: 0xb8a070,
+      block: [0xf2a0a0, 0xe08080], blocks: "stone", plank: 0xb08458, planks: "wood", water: 0x18c8d8, crack: 0xd8c49a, back: 0x8a7a58,
+      tufts: [0x6ac85a], flowers: [0xff7aa0, 0xffffff], hurdle: "stones", tree: "palm",
+      foes: { k: "crabmeat", r: "motobug", b: "buzzbomber", n: "chopper" }, far: "coral", balloon: [0xff5a5a, 0xffe060] },
+    /* Mushroom Grove: autumn woods, leaves on the ground, mushrooms taller than houses */
+    grove: {
+      sky: [0x6aa8e8, 0xf8dcb0], fog: [0xf0d8b0, 50, 260], sun: [0xffe8c0, 0.9, [10, 30, 22]], hemi: [0xfff0d8, 0xa87a4a, 0.62],
+      top: [0xd8902a, 0xe8a83a, 0xc8781e], drip: 0xb86a1a, soil: [0x7a5232, 0x6a442a, 0x8a5e3a], deep: 0x4a3020,
+      block: [0xa89a7a, 0x8a7c5e], blocks: "stone", plank: 0x8a5a32, planks: "wood", water: 0x3a9ad0, crack: 0x9a8a6a, back: 0x5a3a22,
+      tufts: [0xe8a83a, 0xc8702a], flowers: [0xff5a3a, 0xffd23a], hurdle: "brush", tree: "mushroom",
+      foes: { k: "snail", r: "motobug", b: "butterdroid", n: "buzzer" }, far: "grove" },
+    /* Lagoon Ruins: old columns half sunk in a clear lagoon, moss over everything */
+    lagoon: {
+      sky: [0x3a9ad8, 0xd8f2f0], fog: [0xc8eae6, 50, 280], sun: [0xfff6e0, 0.88, [10, 30, 22]], hemi: [0xffffff, 0x7aa88a, 0.65],
+      top: [0x5aa848, 0x66b452, 0x4e9a3e], drip: 0x3e8a34, soil: [0xb8b098, 0xa49c84, 0xc8c0a8], deep: 0x7a7462,
+      block: [0xc8c0a8, 0xa8a088], blocks: "mossy", plank: 0x7a5a3a, planks: "wood", water: 0x1ab0c0, crack: 0xa8a08a, back: 0x4a5a4a,
+      tufts: [0x5aaa48], flowers: [0xffffff, 0x9ad8ff], hurdle: "stones", tree: "column",
+      foes: { k: "chopper", r: "orbinaut", b: "jawz", n: "crabmeat" }, far: "lagoon" },
+    /* Carnival Cup -- Pinball Palace: blue felt, neon rails, bumpers everywhere, the lights going */
+    pinball: {
+      sky: [0x0a0420, 0x3a1060], fog: [0x24103a, 45, 220], sun: [0xf0d8ff, 0.65, [6, 30, 24]], hemi: [0xf0d0ff, 0x3a2050, 0.75],
+      top: [0x2a3ab8, 0x3448c8, 0x2232a8], drip: 0xf2d040, soil: [0x1a1a3a, 0x24244a, 0x14142e], deep: 0x0a0a1e,
+      block: [0x5a2a8a, 0x7a3aa8], blocks: "glass", neon: [0xffd23a, 0xff4ac8], plank: 0xe8c050, planks: "rail", water: 0x3a6ae8, crack: 0x8a8aaa, back: 0x1a1030,
+      tufts: [], flowers: [], stars: true, hurdle: "rope", tree: "lamp",
+      foes: { k: "pierrot", r: "mirror", b: "slot", n: "hanabii" }, far: "pinball", balloon: [0xff4ac8, 0x7ad8ff], tint: 0xe8e0ff },
+    /* Funfair Twilight: the fair at dusk, the wheel turning, the tents, the coaster's rails */
+    funfair: {
+      sky: [0x3a2a6a, 0xff9a7a], fog: [0xd88a7a, 50, 260], sun: [0xffb890, 0.85, [-16, 18, 20]], hemi: [0xffd8c8, 0x5a3a5a, 0.62],
+      top: [0x48a858, 0x54b464, 0x3e9a4e], drip: 0x3a8a48, soil: [0x8a5a6a, 0x7a4a5a, 0x9a6a7a], deep: 0x4a2a3a,
+      block: [0xf2e6d0, 0xd8303a], blocks: "stone", plank: 0xe8c050, planks: "rail", water: 0x3a8ad8, crack: 0xa88a8a, back: 0x3a2440,
+      tufts: [0x5ab868], flowers: [0xffd23a, 0xff5a8a], hurdle: "barrier", tree: "lamp",
+      foes: { k: "pierrot", r: "bubu", b: "balkiry", n: "hanabii" }, far: "funfair", balloon: [0xff5a5a, 0x5ac8ff], tint: 0xffe8e0 },
+    /* Sugar Rush Factory: icing on cake, a chocolate river, lollipops, gift boxes on the belts */
+    sweets: {
+      sky: [0xf8b8d8, 0xfff0f6], fog: [0xffe6f0, 50, 240], sun: [0xfff4f0, 0.85, [8, 30, 24]], hemi: [0xfff8fc, 0xe0a8c0, 0.75],
+      top: [0xfff6f8, 0xffe8f0, 0xfffafc], drip: 0xff9ac0, soil: [0xc87a4a, 0xa85e34, 0xd88a58], deep: 0x7a4428,
+      block: [0xf6c0d8, 0xe8a0c0], blocks: "stone", plank: 0xff7ab0, planks: "wood", water: 0x8a5232, crack: 0xe8c8a8, back: 0xc87aa0,
+      tufts: [0xff9ac0, 0x9ad8ff], flowers: [0xff4a7a, 0x7ad8ff, 0xffd23a], hurdle: "crate", tree: "lollipop",
+      foes: { k: "bubu", r: "gaogao", b: "butterdroid", n: "guards" }, far: "sweets", balloon: [0xff7ab0, 0x7ad8ff] },
+    /* Firework Pier: the boardwalk at night over the sea, lamps along it, the sky full of fireworks */
+    pier: {
+      sky: [0x060a24, 0x2a2a6a], fog: [0x141a40, 50, 260], sun: [0xd8e0ff, 0.62, [6, 30, 24]], hemi: [0xd8e0ff, 0x2a2a48, 0.72],
+      top: [0xa87a4a, 0xb88a58, 0x986a3e], drip: 0x6a4a2a, soil: [0x5a4a3a, 0x4a3e30, 0x6a5848], deep: 0x2a2420,
+      block: [0x8a6a4a, 0x6a4e34], blocks: "stone", plank: 0xa87a4a, planks: "wood", water: 0x1a4a8a, crack: 0x8a7a6a, back: 0x14182e,
+      tufts: [], flowers: [], stars: true, hurdle: "rope", tree: "lamp",
+      foes: { k: "kiki", r: "crabmeat", b: "balkiry", n: "hanabii" }, far: "pier", balloon: [0xff5a5a, 0xffd23a], tint: 0xe6e8ff },
+    /* Aurora Cup -- Powder Slopes: fresh snow down the mountain, pines, slalom gates, a chalet */
+    slopes: {
+      sky: [0x3a8ae0, 0xe6f2fc], fog: [0xe2eef8, 60, 320], sun: [0xfff8f0, 0.95, [10, 32, 22]], hemi: [0xffffff, 0xb8c8d8, 0.72],
+      top: [0xfafcff, 0xf0f6fc, 0xffffff], drip: 0xe6eef8, soil: [0x9aa8b8, 0x8a98a8, 0xaab8c8], deep: 0x6a7888,
+      block: [0xd8e8f4, 0xb8d0e4], blocks: "stone", plank: 0x8a5a32, planks: "wood", water: 0x4a9ad8, crack: 0xb8c8d8, back: 0x5a6a7a,
+      tufts: [0xffffff], flowers: [], snowfall: true, hurdle: "barrier", tree: "pine",
+      foes: { k: "pen", r: "yukimaru", b: "wamu", n: "leon" }, far: "slopes" },
+    /* Crystal Cavern: ice underground, crystals lit from inside */
+    crystal: {
+      sky: [0x0a1a2e, 0x1a4a6a], fog: [0x123048, 40, 200], sun: [0xc8f0ff, 0.65, [8, 30, 22]], hemi: [0xc8f0ff, 0x1a3a4a, 0.78],
+      top: [0xbfe2f2, 0xd0eef8, 0xaad8ec], drip: 0x7ad8ff, soil: [0x2a4a6a, 0x24405e, 0x325478], deep: 0x14283e,
+      block: [0x6ac8e8, 0x4aa8d0], blocks: "glass", neon: [0xbff4ff, 0x7ad8ff], plank: 0xbfe2f2, planks: "rail", water: 0x3ab8e8, crack: 0x8ab8d0, back: 0x0e1e30, indoors: 8,
+      tufts: [], flowers: [], hurdle: "cairn", tree: "crystal",
+      foes: { k: "pen", r: "orbinaut", b: "wamu", n: "spiny" }, far: "crystal", tint: 0xe6f4ff },
+    /* Iceberg Bay: the frozen bay, floes on dark water, icebergs out to the horizon */
+    floes: {
+      sky: [0x5a9ae0, 0xe8f4fc], fog: [0xd8eaf6, 55, 300], sun: [0xfff6ea, 0.85, [12, 30, 22]], hemi: [0xf4f8ff, 0x9ab4c8, 0.72],
+      top: [0xf4f8fc, 0xe6eef6, 0xffffff], drip: 0xcfe4f2, soil: [0x9ac8e0, 0x8ab8d4, 0xaad4ea], deep: 0x5a8aa8,
+      block: [0xc8e4f4, 0xa8d0e8], blocks: "stone", plank: 0x6a7a8a, planks: "wood", water: 0x1a7ab8, crack: 0xa8c8d8, back: 0x3a5a7a,
+      tufts: [0xffffff], flowers: [], snowfall: true, hurdle: "cairn", tree: "pine",
+      foes: { k: "pen", r: "chopper", b: "wamu", n: "yukimaru" }, far: "floes" },
+    /* Aurora Tundra: the tundra at night, the northern lights in ribbons over the snow */
+    tundra: {
+      sky: [0x040c1e, 0x1a3a5a], fog: [0x0e2236, 50, 260], sun: [0xc8f0e0, 0.6, [-8, 30, 20]], hemi: [0xc8e8ff, 0x2a3a4a, 0.72],
+      top: [0xe8f0f8, 0xdce8f4, 0xf0f6fc], drip: 0xc8d8e8, soil: [0x4a5462, 0x404a58, 0x56606e], deep: 0x2a3038,
+      block: [0x8aa0b4, 0x748a9e], blocks: "carved", plank: 0x6a5a4a, planks: "wood", water: 0x2a6aa8, crack: 0x8a98a8, back: 0x1a222c,
+      tufts: [0xffffff], flowers: [], snowfall: true, stars: true, hurdle: "cairn", tree: "pine",
+      foes: { k: "pen", r: "leon", b: "wamu", n: "yukimaru" }, far: "tundra", tint: 0xe0ecf8 },
+    /* Ember Cup -- Pyramid Dunes: golden dunes, an oasis's palms, the pyramids in the haze */
+    dunes: {
+      sky: [0x3a90e0, 0xfff0c8], fog: [0xf8e4b8, 60, 320], sun: [0xfff4d8, 1.05, [14, 34, 18]], hemi: [0xfff8e0, 0xd8b070, 0.6],
+      top: [0xf2d088, 0xf6d898, 0xe8c478], drip: 0xd8b468, soil: [0xe0b870, 0xd0a860, 0xe8c480], deep: 0xa8803e,
+      block: [0xe8c890, 0xc8a46a], blocks: "stone", plank: 0x8a6440, planks: "wood", water: 0x3aa8c8, crack: 0xd8b880, back: 0x8a6a3a,
+      tufts: [0xc8b050], flowers: [0xff6a5a], hurdle: "stones", tree: "palm",
+      foes: { k: "spiny", r: "rhinobot", b: "asteron", n: "motobug" }, far: "dunes" },
+    /* Dust Devil Town: a frontier town's dirt street, false fronts, the mesas, the wind spinning up */
+    town: {
+      sky: [0x4a8ad0, 0xf8d098], fog: [0xf0c890, 60, 300], sun: [0xffe8c0, 1.0, [14, 30, 20]], hemi: [0xfff0d8, 0xb8804a, 0.6],
+      top: [0xc89058, 0xd09c64, 0xb8804a], drip: 0xa87040, soil: [0xb06a3a, 0x9a5a30, 0xc07a46], deep: 0x6a3a1e,
+      block: [0x9a6a3a, 0x7a522a], blocks: "stone", plank: 0x8a5a32, planks: "wood", water: 0x4a8ab8, crack: 0xb08a5a, back: 0x5a3a20,
+      tufts: [0xb8a050], flowers: [], hurdle: "crate", tree: "cactus",
+      foes: { k: "rhinobot", r: "spiny", b: "condor", n: "motobug" }, far: "town" },
+    /* Magma Foundry: Eggman's foundry, steel and grating over molten metal, furnaces glowing */
+    foundry: {
+      sky: [0x1a0a06, 0x6a2a10], fog: [0x3a1a0e, 40, 200], sun: [0xffb070, 0.75, [8, 30, 22]], hemi: [0xffc8a0, 0x3a1a10, 0.72],
+      top: [0x5a5654, 0x64605e, 0x4e4a48], drip: 0xff8a2a, soil: [0x3a3634, 0x34302e, 0x423e3c], deep: 0x1e1a18,
+      block: [0x6a625e, 0x58504c], blocks: "steel", plank: 0x6a6058, planks: "grate", water: 0xff6a1a, crack: 0x8a7a70, back: 0x1a1210, indoors: 10,
+      tufts: [], flowers: [], hurdle: "crate", tree: "pipe",
+      foes: { k: "grounder", r: "crawl", b: "spinner", n: "rhinobot" }, far: "foundry", tint: 0xffe6d8 },
+    /* Volcano Rim: black rock with the fire in its cracks, embers falling, the cone smoking */
+    volcano: {
+      sky: [0x2a0a0a, 0xc04a2a], fog: [0x6a2a1a, 45, 240], sun: [0xffa070, 0.85, [-14, 24, 20]], hemi: [0xffc0a0, 0x3a1a14, 0.62],
+      top: [0x3a3234, 0x443a3c, 0x302a2c], drip: 0xff6a2a, soil: [0x5a3a34, 0x4a302a, 0x6a443c], deep: 0x2a1a16,
+      block: [0x4a3a38, 0x3a2e2c], blocks: "ruin", plank: 0x6a4a3a, planks: "girder", water: 0x3a6070, crack: 0x7a5a52, back: 0x1e1212,
+      tufts: [], flowers: [], snowfall: 0xffa050, hurdle: "stones", tree: "torch",
+      foes: { k: "rhinotank", r: "grounder", b: "spinner", n: "espinner" }, far: "volcano", tint: 0xffe0d0 },
+    /* Skyward Cup -- Cloud Temple: white stone over the clouds, gold rails, islands floating by */
+    temple: {
+      sky: [0x4a9af0, 0xf6fcff], fog: [0xeef6ff, 70, 340], sun: [0xfffaf0, 1.0, [10, 34, 22]], hemi: [0xffffff, 0xd8e4f0, 0.72],
+      top: [0x7ac85a, 0x86d466, 0x6ebc4e], drip: 0x5aa846, soil: [0xe8e0cc, 0xd8d0bc, 0xf0e8d6], deep: 0xb0a890,
+      block: [0xf4ecd8, 0xd8cca8], blocks: "marble", plank: 0xd8b050, planks: "rail", water: 0x4ab0e8, crack: 0xd8ccb0, back: 0x9a9080,
+      tufts: [0x7ac85a], flowers: [0xffffff, 0xffd23a], hurdle: "stones", tree: "column",
+      foes: { k: "gamigami", r: "rhinotank", b: "condor", n: "balkiry" }, far: "temple" },
+    /* Gale Highlands: windmills on green hills, the grass all blown one way */
+    windmills: {
+      sky: [0x4a90e0, 0xe0f0f8], fog: [0xd8eaf2, 60, 320], sun: [0xfff4e0, 0.92, [12, 32, 22]], hemi: [0xffffff, 0x8ab07a, 0.62],
+      top: [0x6ab84a, 0x76c456, 0x5eaa40], drip: 0x4e9a38, soil: [0x8a7a5a, 0x7a6a4a, 0x9a8a6a], deep: 0x5a4a32,
+      block: [0xb8b0a0, 0x9a9282], blocks: "stone", plank: 0x8a6a4a, planks: "wood", water: 0x3a90d0, crack: 0xa8a08a, back: 0x6a6a5a,
+      tufts: [0x7ac85a, 0x8ad468], flowers: [0xffd23a, 0xffffff, 0xa86af0], hurdle: "brush", tree: "windsock",
+      foes: { k: "kiki", r: "rhinotank", b: "stinger", n: "condor" }, far: "windmills" },
+    /* Storm Fleet: the decks of Eggman's airships in the thunderclouds, rain coming down */
+    fleet: {
+      sky: [0x1a2030, 0x4a5468], fog: [0x2a3040, 40, 220], sun: [0xd8e0f0, 0.6, [8, 30, 22]], hemi: [0xd8e0f0, 0x2a2e38, 0.72],
+      top: [0x7a828e, 0x848c98, 0x707884], drip: 0xf2c030, soil: [0x4a505a, 0x444a54, 0x525862], deep: 0x2a2e34,
+      block: [0x8a929c, 0x707882], blocks: "hull", plank: 0x5a6068, planks: "grate", water: 0x3a5a8a, crack: 0x8a8e96, back: 0x1a1e26,
+      tufts: [], flowers: [], snowfall: 0x9ab0d0, hurdle: "crate", tree: "flag",
+      foes: { k: "slicer", r: "crawl", b: "balkiry", n: "eklagen" }, far: "fleet", tint: 0xdfe4ee },
+    /* Jet Stream Spires: rock needles over a sea of cloud at sunrise, the jet stream in streaks */
+    spires: {
+      sky: [0x3a5ab0, 0xffc890], fog: [0xf0c8a0, 60, 320], sun: [0xffd8a8, 1.0, [16, 20, 22]], hemi: [0xfff0e0, 0xa88a7a, 0.62],
+      top: [0x8ac86a, 0x96d476, 0x7eba5e], drip: 0x6aa84e, soil: [0xb8a0a8, 0xa88e98, 0xc8b0b8], deep: 0x7a6070,
+      block: [0xc8b0b8, 0xa89098], blocks: "stone", plank: 0xe8c050, planks: "rail", water: 0x4a8ad8, crack: 0xb8a0a8, back: 0x6a5060,
+      tufts: [0x8ad468], flowers: [0xffffff, 0xff9ac0], hurdle: "stones", tree: "flag",
+      foes: { k: "kiki", r: "senbon", b: "condor", n: "balkiry" }, far: "spires" },
+    /* Emerald Cup -- Chemical Refinery: blue steel, yellow stripes, tanks and pipes, the pink stuff */
+    refinery: {
+      sky: [0x1a2a5a, 0x6a8ad8], fog: [0x3a4a7a, 50, 260], sun: [0xe8f0ff, 0.8, [10, 30, 22]], hemi: [0xe8f0ff, 0x3a3a5a, 0.7],
+      top: [0x4a7ad8, 0x5488e4, 0x406ec8], drip: 0xf2c030, soil: [0x3a4a7a, 0x34446e, 0x425486], deep: 0x1e2848,
+      block: [0x6a8ad8, 0x4a6ab8], blocks: "steel", plank: 0x8a92a8, planks: "grate", water: 0xe85ab8, crack: 0x8a92b0, back: 0x1a2040,
+      tufts: [], flowers: [], hurdle: "barrier", tree: "pipe",
+      foes: { k: "grabber", r: "spiny", b: "spinner", n: "grounder" }, far: "refinery", tint: 0xe8ecff },
+    /* Neon Metropolis: the city of tomorrow by day, white towers, tubes, the highways in the air */
+    metro: {
+      sky: [0x2a7ae8, 0xc8f0ff], fog: [0xc0e4f6, 60, 320], sun: [0xf8faff, 0.95, [12, 32, 22]], hemi: [0xffffff, 0x8a9ab8, 0.65],
+      top: [0x3a3e4a, 0x444854, 0x343844], drip: 0x7ad8ff, soil: [0xc8ccd8, 0xb8bcc8, 0xd8dce6], deep: 0x8a8e9a,
+      block: [0xe8ecf4, 0xc8ccd8], blocks: "glass", neon: [0x7ad8ff, 0xffffff], plank: 0xc8ccd8, planks: "rail", water: 0x3ab8e8, crack: 0xa8acb8, back: 0x5a6070,
+      tufts: [], flowers: [], lanes: true, hurdle: "barrier", tree: "streetlamp",
+      foes: { k: "aotento", r: "akatento", b: "condor", n: "klagen" }, far: "metro" },
+    /* Egg Fortress: his own fortress, plating and red girders, his face on every wall */
+    fortress: {
+      sky: [0x200a0a, 0x6a1e1e], fog: [0x3a1414, 40, 220], sun: [0xffd0c0, 0.7, [8, 30, 22]], hemi: [0xffd8d0, 0x3a1a1a, 0.72],
+      top: [0x5a5a64, 0x64646e, 0x50505a], drip: 0xe84a3a, soil: [0x3a3a44, 0x34343e, 0x42424c], deep: 0x1e1e26,
+      block: [0x6a6a74, 0x55555e], blocks: "hull", plank: 0x8a1e1e, planks: "girder", water: 0x3a5a8a, crack: 0x7a7a84, back: 0x1a1018,
+      tufts: [], flowers: [], hurdle: "crate", tree: "console",
+      foes: { k: "eklagen", r: "crawl", b: "mspinner", n: "slicer", p: "grabber" }, far: "fortress", tint: 0xf2e4e4 },
+    /* Starfall Orbit: a white track in orbit, the world turning below, stars falling past */
+    orbit: {
+      sky: [0x000006, 0x0a0a2a], fog: [0x08081e, 60, 340], sun: [0xf0f4ff, 0.8, [10, 32, 22]], hemi: [0xe0e8ff, 0x1a1a30, 0.72],
+      top: [0xc8ccd8, 0xd4d8e4, 0xbcc0cc], drip: 0x7ad8ff, soil: [0x3a3e52, 0x34384a, 0x42465c], deep: 0x1a1c2a,
+      block: [0x2a3060, 0x3a4080], blocks: "glass", neon: [0xffd23a, 0x7ad8ff], plank: 0xe8c050, planks: "rail", water: 0x3a5ad8, crack: 0x6a6a8a, back: 0x0a0a18,
+      tufts: [], flowers: [], stars: true, lanes: true, hurdle: "barrier", tree: "lamp",
+      foes: { k: "starnaut", r: "crawl", b: "nebula", n: "balkiry" }, far: "orbit", tint: 0xe8eaff },
   };
 
   // ---------------------------------------------------------------- reading a stage
@@ -1295,7 +1473,7 @@
      for a low road, a high one and the sky over both. H is the stage being run. */
   let H = 32;
   const SOLIDS = "#=XBImC{}";
-  const ENTS = "PGKEc*JHS>rbknphMVUOT^Qo";
+  const ENTS = "PGKEc*JHS>rbknphMVUOT^Qo@";
   function parse(def) {
     const chunks = def.chunks.map(raw => {
       const lines = raw.split("\n");
@@ -1499,6 +1677,7 @@
             } else {
               const band = (depth * 4 + (3 - sy)) % 7 < 3 ? 0 : 1;
               col = jit(rnd, depth >= 3 ? T.deep : T.soil[band + (rnd() < 0.12 ? 1 : 0)], 0.07);
+              if (T.checkSoil && depth < 3) col = jit(rnd, (((i * 4 + sx) >> 1) + ((ly + sy) >> 1)) & 1 ? T.soil[0] : T.soil[1], 0.03);   // the green hills' checkered soil
               if (rnd() < 0.015) col = 0x8a8a8e;                     // a stone
             }
             v.set(lx + sx, ly + sy, z, col);
@@ -1604,6 +1783,10 @@
     let g;
     switch (name) {
       case "ring": g = vox(v => ringVox(v, 0, 6, 5, 3.6, [0xf2b705, 0xfff3a0, 0xd89a00])); break;   // a gold ring, as every Sonic stage strews them
+      case "powerring": g = vox(v => {                 // the grand prix's Red Ring: red, a white glint, no star
+        ringVox(v, 0, 8, 7.5, 5.6, [0xe42630, 0xff8a8a, 0xa8141c]);
+        v.box(-1, 12, 1, 0, 13, 2, 0xffffff);
+      }); break;
       case "redring": g = vox(v => {                   // a Red Star Ring: a big red ring, a gold star in it
         ringVox(v, 0, 8, 7.5, 5.6, [0xe42630, 0xff8a8a, 0xa8141c]);
         starVox(v, 0, 8, 3.6, 0xffd21a);
@@ -1869,6 +2052,72 @@
         }
         return;
       }
+      case "totem": {                                  // a totem pole of the green hills: stacked faces, wings out at the top
+        const C = [0xd8402a, 0x3a7ae0, 0xf2c030, 0x3aa84a];
+        for (let k = 0; k < 5; k++) {
+          const y0 = k * 8, c = C[k % C.length];
+          v.box(-4, y0, -4, 3, y0 + 7, 3, c); v.box(-4, y0 + 7, -4, 3, y0 + 7, 3, mulC(c, 0.7));
+          v.box(-3, y0 + 4, 4, -2, y0 + 5, 4, 0xffffff); v.box(1, y0 + 4, 4, 2, y0 + 5, 4, 0xffffff);
+          v.set(-2, y0 + 4, 4, 0x1a1a1a); v.set(1, y0 + 4, 4, 0x1a1a1a); v.box(-2, y0 + 1, 4, 1, y0 + 2, 4, 0x2a1a1a);
+        }
+        for (const s of [-1, 1]) for (let k = 0; k < 9; k++) v.box(s * (4 + k), 34 + (k >> 1), -1, s * (4 + k), 37 + (k >> 1), 1, k % 3 ? 0xf2c030 : 0xd8402a);
+        return;
+      }
+      case "mushroom": {                               // a giant mushroom: a cream stalk, a red cap spotted white, the gills under it
+        for (let y = 0; y < 30; y++) { const r = y < 3 ? 5 : 3; for (let x = -r; x <= r; x++) for (let z = -r; z <= r; z++) if (Math.hypot(x, z) <= r) v.set(x, y, z, (x + y) % 5 ? 0xf2e6c8 : 0xe0d0aa); }
+        for (let y = 0; y < 10; y++) {
+          const r = 15 - Math.round(y * y * 0.14);
+          for (let x = -r; x <= r; x++) for (let z = -r; z <= r; z++) {
+            const d = Math.hypot(x, z); if (d > r || (d < r - 2 && y < 9 && y > 0)) continue;
+            v.set(x, 30 + y, z, y === 0 ? 0xe8d8b0 : ((x * 3 + z * 5 + y * 7) % 23 === 0 || (Math.abs(x) % 9 === 4 && Math.abs(z) % 7 === 3)) ? 0xffffff : 0xd8302a);
+          }
+        }
+        return;
+      }
+      case "pine": {                                   // a pine, snow on each tier
+        v.box(-1, 0, -1, 1, 8, 1, 0x6a4a2e);
+        for (let t = 0; t < 4; t++) {
+          const y0 = 6 + t * 9, r0 = 11 - t * 2;
+          for (let y = 0; y < 10; y++) { const r = Math.round(r0 * (1 - y / 10)); for (let x = -r; x <= r; x++) for (let z = -r; z <= r; z++) if (Math.abs(x) + Math.abs(z) <= r) v.set(x, y0 + y, z, y === 0 || (Math.abs(x) + Math.abs(z) >= r - 1 && y < 3) ? 0xf4f8fc : (x + z) % 3 ? 0x2a6a3a : 0x225a30); }
+        }
+        v.box(0, 46, 0, 0, 47, 0, 0xffffff);
+        return;
+      }
+      case "crystal": {                                // a cluster of ice crystals, three leaning out of the rock
+        v.box(-6, 0, -5, 5, 2, 4, 0x2a4a6a);
+        for (const [cx, lean, h, c] of [[0, 0, 40, 0x9ae6ff], [-5, -0.35, 26, 0x7ad0f4], [5, 0.3, 30, 0xbff2ff]]) {
+          for (let y = 0; y < h; y++) { const r = y > h - 6 ? Math.max(0, 2 - ((y - h + 6) >> 1)) : 2, x0 = cx + Math.round(lean * y);
+            for (let x = -r; x <= r; x++) for (let z = -r; z <= r; z++) v.set(x0 + x, 3 + y, z, x === r || z === r ? 0xffffff : c); }
+        }
+        return;
+      }
+      case "lollipop": {                               // a lollipop, taller than a runner, its swirl in two colours
+        v.box(-1, 0, -1, 0, 26, 0, 0xfaf6ee);
+        for (let x = -10; x <= 10; x++) for (let y = -10; y <= 10; y++) {
+          const d = Math.hypot(x, y); if (d > 10) continue;
+          const a = Math.atan2(y, x) + d * 0.55;
+          for (let z = -2; z <= 1; z++) v.set(x, 37 + y, z, d > 9.2 ? 0xffffff : Math.floor(a / PI * 2 + 8) % 2 ? 0xff5a9a : 0xfff0f6);
+        }
+        return;
+      }
+      case "pipe": {                                   // a pipe up out of the floor: a valve wheel, an elbow, a stripe
+        for (let y = 0; y < 34; y++) for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) if (Math.hypot(x, z) <= 3.3) v.set(x, y, z, y % 12 === 10 ? 0xf2c030 : (x + 2) % 4 ? 0x8a929c : 0x9aa2ac);
+        for (let x = 0; x < 12; x++) for (let y = -3; y <= 3; y++) for (let z = -3; z <= 3; z++) if (Math.hypot(y, z) <= 3.3) v.set(x, 34 + y, z, 0x8a929c);
+        for (let a = 0; a < 20; a++) { const t = a / 20 * PI * 2; v.set(Math.round(Math.cos(t) * 5), 18 + Math.round(Math.sin(t) * 5), 4, 0xd8302a); }
+        v.box(-1, 17, 4, 1, 19, 4, 0xd8302a);
+        return;
+      }
+      case "flag": {                                   // a pole and a pennant snapping in the wind
+        v.box(-2, 0, -2, 1, 1, 1, 0x8a8a92); v.box(-1, 2, -1, 0, 50, 0, 0xe8e8e2); v.box(-1, 51, -1, 0, 52, 0, 0xf2c030);
+        for (let x = 1; x < 20; x++) { const h = Math.round(8 * (1 - x / 22)), y0 = 48 - h + Math.round(Math.sin(x * 0.6) * 1.2); v.box(x, y0, 0, x, 48 + Math.round(Math.sin(x * 0.6) * 1.2), 0, x % 6 < 3 ? 0xd8302a : 0xf6f6f2); }
+        return;
+      }
+      case "torch": {                                  // a stone brazier on a post, fire in it
+        v.box(-4, 0, -4, 3, 2, 3, 0x3a302e); v.box(-2, 3, -2, 1, 22, 1, 0x4a3e3a);
+        v.box(-5, 23, -5, 4, 27, 4, 0x3a302e); v.box(-4, 27, -4, 3, 27, 3, 0xff6a1a);
+        for (let k = 0; k < 40; k++) { const x = Math.round((Math.random() - 0.5) * 7), z = Math.round((Math.random() - 0.5) * 7), y = 28 + Math.floor(Math.random() * (9 - Math.abs(x) - Math.abs(z) / 2)); v.set(x, y, z, y > 33 ? 0xffe060 : 0xff8a2a); }
+        return;
+      }
       default: {                                       // a palm bent by the sea wind: the trunk ringed and leaning, seven fronds and coconuts
         let lx = 0;
         for (let y = 0; y < 38; y++) { lx = Math.round(y * y / 150); v.box(lx - 1, y, -1, lx + 1, y, 1, y % 4 === 0 ? 0x7a5a3a : 0x9a7448); }
@@ -1885,7 +2134,7 @@
     }
   }
   /* Where a lamp's light hangs, in metres from its foot (twelve grains a metre), for its glow. */
-  const LAMP_AT = { lamp: [0, 38 / 12], streetlamp: [12 / 12, 56 / 12], lantern: [0, 22 / 12] };
+  const LAMP_AT = { lamp: [0, 38 / 12], streetlamp: [12 / 12, 56 / 12], lantern: [0, 22 / 12], torch: [0, 31 / 12] };
 
   // ---------------------------------------------------------------- far away
   /* What stands behind each stage, built coarse and set back so the perspective camera
@@ -2113,6 +2362,262 @@
         group.userData.anim.push(warnLights(group, W, topOf0, -39));
         break;
       }
+      // ---------------------------------------------------------------- the grand prix's places
+      case "checker": {
+        /* the classic: green hills with checkered soil rolling back to the sea, palms, a waterfall
+           down a cliff, totem poles, clouds */
+        plane(0x2a9ae8, -0.4, -150, 500);
+        plane(0x4ab03c, 0, -5, 150);
+        for (let x = -40; x < W + 60; x += 34 + rnd() * 30) checkerHill(group, x, -60 - rnd() * 50, 10 + rnd() * 14, 6 + rnd() * 10, rnd);
+        for (let x = -60; x < W + 80; x += 70 + rnd() * 50) checkerHill(group, x, -170 - rnd() * 30, 26 + rnd() * 18, 14 + rnd() * 12, rnd);
+        for (let x = 40; x < W; x += 160 + rnd() * 60) waterfall(group, x, -150, 18 + rnd() * 8);
+        for (let k = 0; k < Math.round(W / 16); k++) add(propGeo("tree", PALM), rnd() * (W + 40) - 20, 0, -18 - rnd() * 30, 1 + rnd() * 0.5);
+        trees(-12, Math.round(W / 60), 0);
+        clouds(1);
+        break;
+      }
+      case "coral": {
+        /* the beach: the sea right back to the sky, coral reefs showing through it, a boardwalk on
+           posts, sails, a lighthouse on the point, palms along the sand */
+        const sea = plane(0x18b8d8, -0.4, -6, 600);
+        plane(0xf2e2aa, -0.1, -5, 14);
+        for (let x = -20; x < W + 40; x += 18 + rnd() * 22) reef(group, x, -30 - rnd() * 70, rnd);
+        for (let x = 0; x < W; x += 140) boardwalk(group, x + rnd() * 30, -26, 40 + rnd() * 30);
+        for (let x = 60; x < W; x += 380) lighthouse(group, x, -0.4, -150);
+        band(4, -250, -240, 14, 7, 0.01, [0x4a9a5a, 0x5eaa4a], 141);
+        for (let k = 0; k < Math.round(W / 30); k++) add(propGeo("tree", PALM), rnd() * (W + 40) - 20, 0, -8 - rnd() * 6, 1 + rnd() * 0.4);
+        for (let k = 0; k < Math.round(W / 50); k++) { const s = sailBoat(); s.position.set(rnd() * (W + 80) - 40, -0.4, -80 - rnd() * 80); group.add(s); }
+        sea.material.color.setHex(0x18b8d8);
+        clouds(0.8);
+        break;
+      }
+      case "grove": {
+        /* autumn woods: mushrooms taller than trees, the trees in red and gold, the hills behind */
+        plane(0xc8782a, 0, -5, 400);
+        band(4, -220, -208, 34, 12, 0.012, [0x8a5a2a, 0xb87a2a], 151);
+        band(3, -130, -120, 18, 8, 0.02, [0x9a5a22, 0xd8902a], 152);
+        for (let x = -20; x < W + 40; x += 24 + rnd() * 26) giantMushroom(group, x, -40 - rnd() * 60, 14 + rnd() * 14, rnd);
+        for (let x = 0; x < W + 40; x += 8 + rnd() * 8) autumnTree(group, x, 0, -16 - rnd() * 14, 0.9 + rnd() * 0.6, rnd);
+        clouds(0.5);
+        break;
+      }
+      case "lagoon": {
+        /* the lagoon: still clear water back to the ruins, broken columns standing in it, arches,
+           the jungle hills behind, a waterfall or two */
+        plane(0x1ab0c0, -0.4, -5, 400);
+        band(3, -170, -160, 30, 12, 0.016, [0x3a6a3a, 0x4e9a44], 161);
+        const cliffAt = bandAt(3, 30, 12, 0.016, 161);
+        for (let x = 30; x < W; x += 90 + rnd() * 60) waterfall(group, x, -158, cliffAt(x + 2));
+        for (let x = -10; x < W + 40; x += 14 + rnd() * 20) ruinColumn(group, x, -22 - rnd() * 80, 6 + rnd() * 18, rnd, 0xc8c0a8);
+        for (let x = 40; x < W; x += 120 + rnd() * 50) ruinArch(group, x, -60 - rnd() * 30, 0xc8c0a8);
+        trees(-14, Math.round(W / 24), 0);
+        clouds(0.6);
+        break;
+      }
+      case "pinball": {
+        /* inside the machine: the playfield tilted up behind, lanes lit in neon, bumpers flashing,
+           flippers, the scoreboard over it all */
+        const base = topOf0;
+        plane(0x14142e, base - 0.02, -5, 80);
+        group.userData.anim.push(pinballBack(group, W, base, -60));
+        break;
+      }
+      case "funfair": {
+        /* the fair at dusk: the big wheel turning, striped tents, a coaster's rails up on posts, lights
+           strung everywhere, the sun going down */
+        plane(0x3a6a4a, 0, -5, 400);
+        disc(group, W * 0.5, 14, -300, 24, 0xffc080, 0xff8a5a);
+        band(4, -240, -230, 14, 6, 0.01, [0x3a2a4a, 0x4a3a5a], 171);
+        for (let x = 30; x < W; x += 260 + rnd() * 80) group.userData.anim.push(ferrisWheel(group, x, -110, 26 + rnd() * 6));
+        for (let x = -10; x < W + 40; x += 30 + rnd() * 30) tent(group, x, -40 - rnd() * 40, rnd);
+        coaster(group, W, -150, rnd);
+        for (let x = -10; x < W + 20; x += 24) fairyLights(group, x, 9 + rnd() * 3, -30);
+        break;
+      }
+      case "sweets": {
+        /* the factory of sweets: pink hills of icing back to cake mountains, giant lollipops,
+           cupcakes, candy canes, a chocolate river */
+        plane(0xffd8e8, 0, -5, 400);
+        plane(0x8a5232, 0.05, -60, 30);
+        band(4, -230, -218, 30, 12, 0.012, [0xc87a4a, 0xfff0f6], 181);
+        band(3, -140, -130, 16, 7, 0.02, [0xa85e34, 0xffc0d8], 182);
+        for (let x = -10; x < W + 40; x += 20 + rnd() * 26) candy(group, x, -24 - rnd() * 70, rnd);
+        clouds(0.7);
+        break;
+      }
+      case "pier": {
+        /* the pier at night: the sea, the boardwalk's lamps reaching out over it, a lit wheel at the
+           end, the town's lights, and the sky full of fireworks */
+        plane(0x0e2a5a, -0.4, -5, 500);
+        for (let x = 0; x < W; x += 110) boardwalk(group, x + rnd() * 20, -34, 60 + rnd() * 20);
+        for (let x = -10; x < W + 20; x += 22) fairyLights(group, x, 7 + rnd() * 2, -34);
+        skyline(group, W, -240, 0x1a2040, 0.5, 26, 1.2);
+        for (let x = 80; x < W; x += 340) group.userData.anim.push(ferrisWheel(group, x, -80, 20));
+        disc(group, W * 0.3, 70, -280, 10, 0xfff6e0, 0xd8c8ff);
+        group.userData.anim.push(fireworkShow(group, W, rnd));
+        break;
+      }
+      case "slopes": {
+        /* the mountain in the sun: snowfields, pines in their thousands, the peaks, a chalet or two,
+           the ski lift's cables */
+        plane(0xf4f8fc, 0, -5, 400);
+        mountains(group, W, -240, 3, 80, 0x7a8aa0, 7);
+        mountains(group, W, -140, 2, 40, 0x6a7890, 8);
+        for (let x = 20; x < W; x += 110 + rnd() * 60) chalet(group, x, -50 - rnd() * 30, rnd);
+        trees(-18, Math.round(W / 8), 0);
+        for (let k = 0; k < Math.round(W / 4); k++) add(propGeo("tree", PINE), rnd() * (W + 40) - 20, 0, -60 - rnd() * 60, 0.8 + rnd() * 0.5);
+        clouds(0.5);
+        break;
+      }
+      case "crystal": {
+        /* the cavern: rock walls back into the dark, crystals growing out of them lit from inside,
+           icicles hanging from the roof */
+        const base = topOf0;
+        plane(0x1a3048, base - 0.02, -5, 60);
+        group.userData.anim.push(crystalCave(group, W, base, -54, rnd));
+        hallCeiling(group, W, base + 30, -2, -60, 0x14283e, 0x22405a, 0x7ad8ff);
+        break;
+      }
+      case "floes": {
+        /* the frozen bay: dark water dotted with floes, icebergs out to the horizon, the snowy
+           shore's pines, the sun low and pale */
+        plane(0x1a6aa8, -0.4, -5, 500);
+        for (let k = 0; k < Math.round(W / 6); k++) floe(group, rnd() * (W + 80) - 40, -14 - rnd() * 90, rnd);
+        for (let x = -20; x < W + 60; x += 40 + rnd() * 50) iceberg(group, x, -110 - rnd() * 90, 8 + rnd() * 16, rnd);
+        mountains(group, W, -260, 3, 50, 0x8a9ab0, 9);
+        disc(group, W * 0.6, 30, -290, 12, 0xfff8f0, 0xe0f0ff);
+        clouds(0.5);
+        break;
+      }
+      case "tundra": {
+        /* the tundra at night: snow to the mountains, a few pines, a stone circle, and over it all
+           the aurora in green and violet ribbons, moving */
+        plane(0xd8e4f0, 0, -5, 400);
+        mountains(group, W, -230, 3, 60, 0x3a4658, 10);
+        mountains(group, W, -130, 2, 30, 0x2e3846, 11);
+        trees(-16, Math.round(W / 14), 0);
+        for (let x = 60; x < W; x += 200 + rnd() * 80) stoneCircle(group, x, -50 - rnd() * 20, rnd);
+        group.userData.anim.push(aurora(group, W));
+        break;
+      }
+      case "dunes": {
+        /* the desert: golden dunes in rows to the pyramids, an oasis's palms, the sun white-hot */
+        plane(0xf2d088, 0, -5, 400);
+        band(4, -250, -238, 20, 10, 0.009, [0xe0b468, 0xf2d088], 191);
+        band(3, -150, -140, 12, 7, 0.016, [0xd8a858, 0xf6d898], 192);
+        band(2, -80, -74, 6, 4, 0.03, [0xd0a050, 0xf2d088], 193);
+        for (let x = 40; x < W + 80; x += 170 + rnd() * 90) pyramid(group, x, -200 - rnd() * 40, 30 + rnd() * 20);
+        for (let x = 100; x < W; x += 260) { for (let k = 0; k < 5; k++) add(propGeo("tree", PALM), x + rnd() * 20, 0, -40 - rnd() * 10, 1); plane0(group, 0x3aa8c8, x + 10, -45, 26, 10); }
+        disc(group, W * 0.7, 80, -290, 12, 0xfffaf0, 0xffe8a0);
+        break;
+      }
+      case "town": {
+        /* the frontier town: the street's false fronts, a water tower, the mesas behind, dust devils
+           spinning across the flats */
+        plane(0xc89058, 0, -5, 400);
+        band(4, -240, -228, 40, 14, 0.008, [0xb8603a, 0xd88a5a], 201);
+        for (let x = 30; x < W; x += 90 + rnd() * 60) butte(group, x, -130 - rnd() * 20, 14 + Math.floor(rnd() * 10), rnd);
+        storefronts(group, W, -30, rnd);
+        for (let x = 140; x < W; x += 300) waterTower(group, x, -44);
+        group.userData.anim.push(dustDevils(group, W, rnd));
+        break;
+      }
+      case "foundry": {
+        /* the foundry: the far wall of furnaces glowing, crucibles tipping molten metal, chains,
+           a river of it along the floor behind */
+        const base = topOf0;
+        plane(0x2a2220, base - 0.02, -5, 70);
+        group.userData.anim.push(foundryBack(group, W, base, -64, rnd));
+        hallCeiling(group, W, base + 28, -2, -66, 0x1e1614, 0x3a302c, 0xff8a2a);
+        break;
+      }
+      case "volcano": {
+        /* the rim: black rock falling away to a lava lake, the cone smoking and spitting, the sky red */
+        plane(0x2a1a16, 0, -5, 120);
+        plane(0xff5a1a, -0.6, -125, 400);
+        group.userData.anim.push(volcano(group, W * 0.55, -260, 80));
+        band(3, -110, -100, 16, 10, 0.02, [0x2a2020, 0x4a2a22], 211);
+        group.userData.anim.push(fires(group, W, rnd));
+        break;
+      }
+      case "temple": {
+        /* above the clouds: the cloud sea below, islands floating with ruins on them, the temple's
+           towers far off, the sun */
+        const cl = plane(0xf4f8ff, -6, -5, 500); cl.material = new THREE.MeshBasicMaterial({ color: 0xf4f8ff });
+        cloudBank(group, W, rnd, Math.round(W / 12), -4);
+        for (let x = -20; x < W + 60; x += 50 + rnd() * 50) floatIsland(group, x, 4 + rnd() * 30, -60 - rnd() * 120, 6 + rnd() * 10, rnd);
+        for (let x = 80; x < W; x += 300) templeTower(group, x, -220);
+        clouds(1);
+        break;
+      }
+      case "windmills": {
+        /* the highlands: green hills one behind another, old windmills turning, the grass blown flat,
+           clouds going over fast */
+        plane(0x5aa840, 0, -5, 400);
+        band(4, -230, -218, 30, 12, 0.01, [0x4a8a3a, 0x6ab84a], 221);
+        band(3, -140, -130, 18, 8, 0.02, [0x5a9a40, 0x76c456], 222);
+        for (let x = 20; x < W; x += 70 + rnd() * 50) group.userData.anim.push(windmill(group, x, -60 - rnd() * 40));
+        for (let x = 0; x < W + 100; x += 90) group.userData.anim.push(turbine(group, x + rnd() * 30, -150 - rnd() * 10, 10 + rnd() * 4));
+        trees(-14, Math.round(W / 30), 0);
+        clouds(1.2);
+        break;
+      }
+      case "fleet": {
+        /* the storm: thunderclouds below and above, Eggman's airships around you in it, lightning
+           lighting them up */
+        const sea = plane(0x3a4458, -10, -5, 500); sea.material = new THREE.MeshBasicMaterial({ color: 0x3a4458 });
+        stormClouds(group, W, rnd);
+        for (let k = 0; k * 120 < W + 120; k++) group.userData.anim.push(airship(group, W, k, rnd));
+        group.userData.anim.push(lightning(group, W, rnd));
+        break;
+      }
+      case "spires": {
+        /* the spires at sunrise: needles of rock up out of a sea of cloud, the jet stream in streaks
+           of white across the sky */
+        const cl = plane(0xffe0c8, -6, -5, 500); cl.material = new THREE.MeshBasicMaterial({ color: 0xffd8c0 });
+        disc(group, W * 0.35, 18, -300, 22, 0xfff0c8, 0xffb070);
+        for (let x = -20; x < W + 60; x += 20 + rnd() * 30) spire(group, x, -50 - rnd() * 160, 20 + rnd() * 50, rnd);
+        group.userData.anim.push(jetStream(group, W, rnd));
+        break;
+      }
+      case "refinery": {
+        /* the refinery at night: tanks, towers, pipes everywhere, the pink stuff glowing in the vats */
+        plane(0x1e2848, 0, -5, 400);
+        skyline(group, W, -240, 0x2a3460, 0.4, 40, 1.4);
+        refinery(group, W, -60, rnd);
+        for (let x = 10; x < W; x += 70) fuelTank(group, x + rnd() * 20, -36);
+        break;
+      }
+      case "metro": {
+        /* the city of tomorrow: white towers with glass tops, tubes between them, the highways in the
+           air, flyers going over */
+        plane(0xd8dce6, 0, -5, 400);
+        skyline(group, W, -250, 0x9ab8d8, 0.0, 70, 1.6);
+        futureCity(group, W, -120, rnd);
+        overpass(group, W, -34);
+        group.userData.anim.push(traffic(group, W, -34));
+        group.userData.anim.push(flyers(group, W, rnd));
+        clouds(0.5);
+        break;
+      }
+      case "fortress": {
+        /* his fortress: walls and towers in his colours, his face on them, searchlights sweeping */
+        plane(0x2a2a32, 0, -5, 400);
+        fortressWall(group, W, -70, rnd);
+        for (let x = 40; x < W; x += 120) group.userData.anim.push(searchlight(group, x + rnd() * 40, -90, rnd));
+        disc(group, W * 0.6, 60, -280, 10, 0xffd8c8, 0xff6a5a);
+        break;
+      }
+      case "orbit": {
+        /* in orbit: the world below, a planet with its rings, the nebula, the track's far turns in
+           ribbons, and stars falling */
+        group.userData.anim.push(worldBelow(group, W));
+        nebula(group, W);
+        ringedPlanet(group, W * 0.7, 60, -300);
+        for (let x = -100; x < W + 200; x += 200) trackRibbon(group, x, -120 - rnd() * 60, rnd);
+        group.userData.anim.push(fallingStars(group, W, rnd));
+        break;
+      }
     }
     // a clear night: stars, far off, past the fog
     if (T.stars) {
@@ -2125,6 +2630,301 @@
   /* ---- the backdrops' pieces. Each is built in voxels at its own grain and set far enough
      back for the camera to give it parallax; `anim` ones hand back a function of the time. */
   const voxMesh = (v, g, x, y, z, mat) => { const m = new THREE.Mesh(meshVox(v, g), mat || materials().vox); m.position.set(x, y, z); return m; };
+  /* ---- the grand prix places' pieces */
+  const PALM = { id: "_palm", tree: "palm" }, PINE = { id: "_pine", tree: "pine" };
+  const glowSprite = (group, c, op, sx, sy, x, y, z) => { const s = new THREE.Sprite(glowMat(c, op)); s.scale.set(sx, sy, 1); s.position.set(x, y, z); group.add(s); return s; };
+  function plane0(group, color, x, z, w, d) {          // a patch of flat colour on the ground (an oasis's pool)
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshLambertMaterial({ color })); m.rotation.x = -PI / 2; m.position.set(x, 0.02, z); group.add(m);
+  }
+  function checkerHill(group, x, z, w, h, rnd) {       // a round green hill, its soil in brown checks, grass on top
+    const v = new Vox(), g = 1, R = Math.round(w / g), Hh = Math.round(h / g);
+    for (let X = -R; X <= R; X++) {
+      const top = Math.round(Hh * Math.sqrt(Math.max(0, 1 - (X / R) * (X / R))));
+      for (let y = 0; y <= top; y++) for (let Z = 0; Z < 3; Z++)
+        v.set(X, y, Z, y >= top - 1 ? (y === top ? 0x4ac848 : 0x34aa34) : (((X >> 1) + (y >> 1)) & 1 ? 0xc0702a : 0x8a4a1a));
+    }
+    group.add(voxMesh(v, g, x, 0, z));
+  }
+  function reef(group, x, z, rnd) {                    // coral showing through the shallows
+    const v = new Vox(), C = [0xff7a8a, 0xffa05a, 0xd85aa8, 0xf2e2aa];
+    for (let k = 0; k < 7; k++) { const cx = Math.floor(rnd() * 10), h = 1 + Math.floor(rnd() * 3), c = C[k % 4]; v.box(cx, 0, Math.floor(rnd() * 4), cx + 1, h, Math.floor(rnd() * 4) + 1, c); }
+    group.add(voxMesh(v, 1, x, -1.6, z));
+  }
+  function boardwalk(group, x, z, len) {               // a boardwalk out on posts
+    const v = new Vox();
+    for (let X = 0; X < len; X++) { v.box(X, 4, 0, X, 4, 5, X % 2 ? 0xb08458 : 0x9a7048); if (X % 6 === 0) for (const Z of [0, 5]) v.box(X, -3, Z, X, 3, Z, 0x6a4a2e); }
+    for (let X = 0; X < len; X += 3) v.box(X, 5, 0, X, 7, 0, 0xf2ece0);
+    group.add(voxMesh(v, 0.5, x, 0, z));
+  }
+  function sailBoat() { return new THREE.Mesh(vox(v => { v.box(-4, 0, -1, 4, 1, 1, 0xf6f6f2); v.box(-5, 1, -1, 5, 1, 1, 0xd8303a); for (let y = 2; y < 12; y++) v.box(0, y, 0, Math.round((12 - y) * 0.45), y, 0, 0xfaf8f0); v.box(0, 2, 0, 0, 13, 0, 0x8a6a4a); }, 0.5), materials().vox); }
+  function giantMushroom(group, x, z, h, rnd) {        // a mushroom taller than the trees
+    const v = new Vox(), cap = [0xd8302a, 0xe8782a, 0xc84a8a][Math.floor(rnd() * 3)], R = Math.round(h * 0.45);
+    for (let y = 0; y < h; y++) v.box(-1, y, -1, 1, y, 1, 0xf2e6c8);
+    for (let y = 0; y < 5; y++) { const r = R - y * y * 0.4; for (let X = -R; X <= R; X++) for (let Z = -R; Z <= R; Z++) { const d = Math.hypot(X, Z); if (d <= r && (y === 4 || d > r - 1.5 || y === 0)) v.set(X, h + y, Z, y === 0 ? 0xe8d8b0 : ((X * 7 + Z * 3) % 11 === 0 ? 0xffffff : cap)); } }
+    group.add(voxMesh(v, 0.8, x, 0, z));
+  }
+  function autumnTree(group, x, y, z, k, rnd) {        // a broad tree in red and gold
+    const v = new Vox(), r = 3 + Math.floor(rnd() * 2), C = [[0xd8502a, 0xe86a2a], [0xe8a83a, 0xf2c040], [0xb83a2a, 0xd8602a]][Math.floor(rnd() * 3)];
+    v.box(0, 0, 0, 0, 4, 0, 0x5a3a22);
+    for (let a = -r; a <= r; a++) for (let b = -r; b <= r; b++) for (let c = -r; c <= r; c++) if (Math.hypot(a, b * 1.15, c) <= r + 0.3) v.set(a, 5 + r + b, c, (a + b * 2 + c) % 4 === 0 ? C[0] : C[1]);
+    group.add(voxMesh(v, 0.5 * k, x, y, z));
+  }
+  function ruinColumn(group, x, z, h, rnd, col) {      // an old column standing in the water, broken off
+    const v = new Vox(), H2 = Math.round(h);
+    for (let y = 0; y < H2; y++) for (let X = -1; X <= 1; X++) for (let Z = -1; Z <= 1; Z++) if (!(y === H2 - 1 && rnd() < 0.4)) v.set(X, y, Z, (y % 6 === 0) ? mulC(col, 0.85) : (X + Z + y) % 5 ? col : 0x5aa848);
+    v.box(-2, 0, -2, 2, 0, 2, mulC(col, 0.8));
+    group.add(voxMesh(v, 1, x, -1, z));
+  }
+  function ruinArch(group, x, z, col) {                 // an arch still standing
+    const v = new Vox();
+    for (const X of [-6, 5]) v.box(X, 0, -1, X + 1, 12, 1, col);
+    for (let X = -6; X <= 6; X++) { const y = 12 + Math.round(Math.sqrt(Math.max(0, 36 - X * X)) * 0.5); v.box(X, 12, -1, X, y, 1, (X & 1) ? col : mulC(col, 0.9)); }
+    group.add(voxMesh(v, 1, x, -1, z));
+  }
+  function pinballBack(group, W, base, z) {            // the playfield tilted up: lanes, bumpers that flash, flippers, the backbox
+    const v = new Vox(), gl = new Vox(), lights = [];
+    for (let X = -20; X < W + 40; X++) for (let y = 0; y < 34; y++) v.set(X, y, 0, (X % 18 === 0 || y % 17 === 0) ? 0x3a2a7a : 0x1a1450);
+    for (let X = -20; X < W + 40; X += 18) for (let y = 3; y < 30; y += 2) gl.set(X, y, 1, y % 4 ? 0xff4ac8 : 0x7ad8ff);
+    group.add(voxMesh(v, 1, 0, base, z)); group.add(voxMesh(gl, 1, 0, base, z, materials().glow));
+    for (let x = 6; x < W; x += 18) for (const y of [8, 20]) {
+      const c = [0xffd23a, 0xff4ac8, 0x7ad8ff, 0x6af06a][(x + y) % 4];
+      const m = new THREE.Mesh(new THREE.CircleGeometry(2.4, 20), new THREE.MeshBasicMaterial({ color: c })); m.position.set(x + (y === 20 ? 9 : 0), base + y, z + 1.2); group.add(m);
+      const s = glowSprite(group, c, 0.6, 7, 7, x + (y === 20 ? 9 : 0), base + y, z + 1.4); lights.push({ s, p: x * 0.37 + y });
+    }
+    for (let x = 0; x < W; x += 72) {                    // the flippers, on their pins
+      for (const sd of [-1, 1]) { const f = new THREE.Mesh(new THREE.BoxGeometry(7, 1.2, 0.6), new THREE.MeshLambertMaterial({ color: 0xf6f6f2 })); f.position.set(x + sd * 6, base + 3, z + 1.5); f.rotation.z = sd * -0.4; group.add(f); lights.push({ f, sd }); }
+    }
+    return t => { for (const L of lights) { if (L.s) L.s.material.opacity = 0.25 + 0.6 * (Math.sin(t * 6 + L.p) > 0.3 ? 1 : 0); if (L.f) L.f.rotation.z = L.sd * (-0.4 + (Math.sin(t * 2.3) > 0.85 ? 0.7 : 0)); } };
+  }
+  function ferrisWheel(group, x, z, r) {               // the big wheel, its cars, turning; lit at night
+    const legs = new Vox(); for (let y = 0; y < r; y++) { legs.set(Math.round(-y * 0.45), y, 0, 0xd8d8e0); legs.set(Math.round(y * 0.45), y, 0, 0xd8d8e0); }
+    group.add(voxMesh(legs, 1, x, 0, z));
+    const wv = new Vox(), C = [0xff5a5a, 0xffd23a, 0x5ac8ff, 0x6af06a, 0xff8ac8];
+    for (let a = 0; a < 120; a++) { const t = a / 120 * PI * 2; wv.set(Math.round(Math.cos(t) * r), Math.round(Math.sin(t) * r), 0, 0xf6f6f2); }
+    for (let k = 0; k < 12; k++) { const t = k / 12 * PI * 2; for (let s = 0; s < r; s++) wv.set(Math.round(Math.cos(t) * s), Math.round(Math.sin(t) * s), 0, 0xe0e0e8); wv.box(Math.round(Math.cos(t) * r) - 1, Math.round(Math.sin(t) * r) - 2, -1, Math.round(Math.cos(t) * r) + 1, Math.round(Math.sin(t) * r), 1, C[k % 5]); }
+    const m = voxMesh(wv, 1, x, r, z + 0.5); group.add(m);
+    glowSprite(group, 0xfff0c8, 0.35, r * 2.6, r * 2.6, x, r, z + 1);
+    return t => { m.rotation.z = t * 0.12; };
+  }
+  function tent(group, x, z, rnd) {                    // a circus tent in stripes, a flag on top
+    const v = new Vox(), R = 7 + Math.floor(rnd() * 4), C = [[0xd8303a, 0xf6f2e8], [0x3a6ae0, 0xffd23a], [0x8a3ad8, 0xf6f2e8]][Math.floor(rnd() * 3)];
+    for (let y = 0; y < 12; y++) { const r = y < 5 ? R : Math.round(R * (12 - y) / 7); for (let X = -r; X <= r; X++) for (let Z = -r; Z <= r; Z++) { const d = Math.hypot(X, Z); if (d <= r && d > r - 1.4) v.set(X, y, Z, Math.floor((Math.atan2(Z, X) + PI) / (PI / 6)) % 2 ? C[0][0] : C[0][1]); } }
+    v.box(0, 12, 0, 0, 16, 0, 0x8a8a92); v.box(1, 14, 0, 4, 16, 0, C[1][0]);
+    group.add(voxMesh(v, 0.8, x, 0, z));
+  }
+  function coaster(group, W, z, rnd) {                 // a roller coaster's rails up on their posts, dipping and climbing
+    const v = new Vox();
+    for (let X = -40; X < W + 80; X++) { const y = Math.round(14 + Math.sin(X * 0.05) * 8 + Math.sin(X * 0.13) * 3); v.set(X, y, 0, 0xff5a5a); v.set(X, y, 2, 0xff5a5a); if (X % 8 === 0) for (let k = 0; k < y; k++) v.set(X, k, 1, 0xe8e8ee); }
+    group.add(voxMesh(v, 1, 0, 0, z));
+  }
+  function candy(group, x, z, rnd) {                   // a lollipop, a cupcake or a candy cane, all huge
+    const v = new Vox(), k = Math.floor(rnd() * 3);
+    if (k === 0) { v.box(0, 0, 0, 0, 14, 0, 0xfaf6ee); for (let a = -6; a <= 6; a++) for (let b = -6; b <= 6; b++) { const d = Math.hypot(a, b); if (d <= 6) v.set(a, 20 + b, 0, Math.floor((Math.atan2(b, a) + d * 0.6) * 1.3) % 2 ? 0xff5a9a : 0xfff0f6); } }
+    else if (k === 1) { for (let y = 0; y < 6; y++) { const r = 5 + (y >> 1); for (let a = -r; a <= r; a++) for (let b = -r; b <= r; b++) if (Math.hypot(a, b) <= r) v.set(a, y, b, a % 2 ? 0xe8a0c0 : 0xd888b0); }
+      for (let y = 0; y < 5; y++) { const r = 7 - y; for (let a = -r; a <= r; a++) for (let b = -r; b <= r; b++) if (Math.hypot(a, b) <= r) v.set(a, 6 + y, b, 0xfff6f8); } v.box(0, 11, 0, 0, 12, 0, 0xd8303a); }
+    else { for (let y = 0; y < 16; y++) v.set(0, y, 0, (y >> 1) % 2 ? 0xd8303a : 0xfff6f6); for (let a = 0; a < 8; a++) { const t = a / 8 * PI; v.set(Math.round(3 - Math.cos(t) * 3), 16 + Math.round(Math.sin(t) * 3), 0, a % 2 ? 0xd8303a : 0xfff6f6); } }
+    group.add(voxMesh(v, 0.9, x, 0, z));
+  }
+  function fireworkShow(group, W, rnd) {               // fireworks going up over the sea and bursting, again and again
+    const shells = [];
+    for (let k = 0; k < Math.max(4, Math.round(W / 120)); k++) {
+      const C = [0xff5a5a, 0xffd23a, 0x5ac8ff, 0x6af06a, 0xff8ac8][k % 5], parts = [];
+      for (let p = 0; p < 14; p++) { const s = new THREE.Sprite(glowMat(C, 0.9)); s.scale.set(2.2, 2.2, 1); group.add(s); parts.push(s); }
+      shells.push({ parts, x: rnd() * W, y: 40 + rnd() * 30, z: -150 - rnd() * 60, p: rnd() * 4, per: 3 + rnd() * 2 });
+    }
+    return t => { for (const f of shells) { const u = ((t + f.p) % f.per) / f.per, r = u * 22, op = u < 0.75 ? 0.95 : (1 - u) * 3.8;
+      f.parts.forEach((s, i) => { const a = i / f.parts.length * PI * 2; s.position.set(f.x + Math.cos(a) * r, f.y + Math.sin(a) * r - u * u * 8, f.z); s.material.opacity = op; }); } };
+  }
+  function chalet(group, x, z, rnd) {                  // a wooden chalet, snow thick on its roof, the windows lit
+    const v = new Vox();
+    v.box(-6, 0, -4, 6, 7, 4, 0x8a5a32); for (const X of [-4, 3]) v.box(X, 3, 5, X + 1, 5, 5, 0xffe8a0);
+    for (let y = 0; y < 6; y++) v.box(-8 + y, 8 + y, -5, 8 - y, 8 + y, 5, y === 5 ? 0xffffff : (y > 3 ? 0xf4f8fc : 0x6a3a22));
+    for (let y = 0; y < 6; y++) v.box(-8 + y, 9 + y, -5, 8 - y, 9 + y, 5, 0xf4f8fc);
+    group.add(voxMesh(v, 0.7, x, 0, z));
+  }
+  function crystalCave(group, W, base, z, rnd) {       // the cave's back wall and crystals out of it, glowing, slowly breathing
+    const v = new Vox(), gl = [];
+    for (let X = -20; X < W + 40; X++) { const h = 34 + Math.round(Math.sin(X * 0.2) * 3); for (let y = 0; y < h; y++) v.set(X, y, 0, (X * 7 + y * 3) % 11 ? 0x1e3854 : 0x284866); }
+    group.add(voxMesh(v, 1, 0, base, z));
+    for (let x = 0; x < W; x += 9 + rnd() * 10) {
+      const c = [0x9ae6ff, 0xbff2ff, 0x7ad0f4, 0xd8b0ff][Math.floor(rnd() * 4)], y = base + 2 + rnd() * 26, h = 3 + rnd() * 5;
+      const m = new THREE.Mesh(new THREE.ConeGeometry(0.9, h, 6), new THREE.MeshBasicMaterial({ color: c })); m.position.set(x, y, z + 2 + rnd() * 6); m.rotation.z = (rnd() - 0.5) * 1.2; group.add(m);
+      gl.push({ s: glowSprite(group, c, 0.5, h * 2, h * 2, x, y, z + 3), p: rnd() * 6 });
+    }
+    return t => { for (const g of gl) g.s.material.opacity = 0.32 + Math.sin(t * 1.4 + g.p) * 0.16; };
+  }
+  function floe(group, x, z, rnd) {                    // a floe of ice on the dark water
+    const v = new Vox(), w = 2 + Math.floor(rnd() * 5), d = 1 + Math.floor(rnd() * 3);
+    v.box(0, 0, 0, w, 0, d, 0xf4f8fc); v.box(0, -1, 0, w, -1, d, 0xb8d8ec);
+    group.add(voxMesh(v, 1, x, -0.3, z));
+  }
+  function iceberg(group, x, z, h, rnd) {              // an iceberg, white over blue
+    const v = new Vox(), R = Math.round(h * 0.7);
+    for (let y = 0; y < h; y++) { const r = Math.round(R * (1 - y / h) + 1); for (let X = -r; X <= r; X++) for (let Z = -2; Z <= 2; Z++) if (Math.abs(X) + rnd() * 2 <= r) v.set(X, y, Z, y < 2 ? 0x9ac8e0 : (X + y) % 6 ? 0xf4f8fc : 0xd8ecf8); }
+    group.add(voxMesh(v, 1.2, x, -0.4, z));
+  }
+  function stoneCircle(group, x, z, rnd) {             // standing stones in the snow
+    const v = new Vox();
+    for (let k = 0; k < 8; k++) { const a = k / 8 * PI * 2, X = Math.round(Math.cos(a) * 9), Z = Math.round(Math.sin(a) * 4); v.box(X, 0, Z, X + 1, 6 + (k % 3), Z, 0x5a6270); v.box(X, 7 + (k % 3), Z, X + 1, 7 + (k % 3), Z, 0xf4f8fc); }
+    group.add(voxMesh(v, 0.8, x, 0, z));
+  }
+  function aurora(group, W) {                          // the northern lights: ribbons of green and violet, rippling
+    const rib = [];
+    for (let k = 0; k < Math.round(W / 10) + 30; k++) {
+      const s = new THREE.Sprite(glowMat(k % 3 === 2 ? 0xa86af0 : 0x5af0a8, 0.4)); s.scale.set(26, 60, 1); group.add(s);
+      rib.push({ s, x: k * 12 - 150, p: k * 0.31 });
+    }
+    return t => { for (const r of rib) { r.s.position.set(r.x + Math.sin(t * 0.2 + r.p) * 6, 70 + Math.sin(t * 0.5 + r.p * 1.7) * 12, -260); r.s.material.opacity = 0.18 + 0.2 * (0.5 + 0.5 * Math.sin(t * 0.8 + r.p * 2.3)); } };
+  }
+  function pyramid(group, x, z, h) {                   // a pyramid in the haze, its steps
+    const v = new Vox(), n = Math.round(h / 2);
+    for (let y = 0; y < n; y++) v.box(-(n - y), y, -2, n - y, y, 2, y % 2 ? 0xe8c890 : 0xd8b478);
+    group.add(voxMesh(v, 2, x, 0, z));
+  }
+  function storefronts(group, W, z, rnd) {             // the street: false fronts, signs, a porch along them
+    let x = -20;
+    while (x < W + 40) {
+      const v = new Vox(), w = 8 + Math.floor(rnd() * 6), h = 10 + Math.floor(rnd() * 8), c = [0xb07a4a, 0x9a6a3a, 0xc89a6a, 0x8a5a3a][Math.floor(rnd() * 4)];
+      v.box(0, 0, 0, w, h, 4, c); v.box(0, h + 1, 3, w, h + 3, 4, mulC(c, 0.85));
+      for (let X = 1; X < w; X += 3) v.box(X, 4, 5, X + 1, 7, 5, 0x3a2a1a);
+      v.box(0, 8, 5, w, 8, 8, 0x6a4a2a); for (const X of [0, w]) v.box(X, 0, 8, X, 7, 8, 0x6a4a2a);
+      v.box(2, h - 2, 5, w - 2, h - 1, 5, 0xf2e2b8);
+      group.add(voxMesh(v, 0.8, x, 0, z));
+      x += (w + 1) * 0.8 + rnd() * 6;
+    }
+  }
+  function waterTower(group, x, z) {                   // a water tower on its legs
+    const v = new Vox();
+    for (const [X, Z] of [[-4, -4], [4, -4], [-4, 4], [4, 4]]) v.box(X, 0, Z, X, 14, Z, 0x6a4a2a);
+    for (let y = 15; y < 23; y++) for (let X = -5; X <= 5; X++) for (let Z = -5; Z <= 5; Z++) if (Math.hypot(X, Z) <= 5 && Math.hypot(X, Z) > 4) v.set(X, y, Z, y % 3 ? 0x9a6a3a : 0x5a3a20);
+    for (let y = 0; y < 3; y++) { const r = 5 - y * 2; v.box(-r, 23 + y, -r, r, 23 + y, r, 0x7a5a3a); }
+    group.add(voxMesh(v, 0.8, x, 0, z));
+  }
+  function dustDevils(group, W, rnd) {                 // dust devils spinning across the flats
+    const dv = [];
+    for (let k = 0; k < Math.max(3, Math.round(W / 220)); k++) {
+      const parts = []; for (let p = 0; p < 10; p++) { const s = new THREE.Sprite(glowMat(0xd8b080, 0.35)); s.scale.set(3 + p * 0.8, 3, 1); group.add(s); parts.push(s); }
+      dv.push({ parts, x0: rnd() * W, z: -60 - rnd() * 60, sp: 2 + rnd() * 3, p: rnd() * 10 });
+    }
+    return t => { for (const d of dv) { const x = (d.x0 + t * d.sp) % (W + 80) - 40; d.parts.forEach((s, i) => s.position.set(x + Math.sin(t * 5 + i + d.p) * (0.4 + i * 0.25), 0.8 + i * 1.6, d.z)); } };
+  }
+  function foundryBack(group, W, base, z, rnd) {       // the furnaces' wall, glowing; molten metal pouring; a river of it
+    const v = new Vox(), gl = new Vox(), glow = [];
+    for (let X = -20; X < W + 40; X++) for (let y = 0; y < 30; y++) v.set(X, y, 0, (X % 22 < 2 || y % 15 === 0) ? 0x2a2420 : 0x3e3632);
+    for (let x = 4; x < W; x += 22) { gl.box(x + 4, 4, 1, x + 14, 12, 1, 0xff7a1a); gl.box(x + 6, 6, 1, x + 12, 10, 1, 0xffd060); glow.push({ s: glowSprite(group, 0xff8a2a, 0.6, 22, 16, x + 9, base + 8, z + 2), p: x }); }
+    for (let x = 30; x < W; x += 88) { gl.box(x, 13, 3, x + 1, 29, 3, 0xffa030); }
+    group.add(voxMesh(v, 1, 0, base, z)); group.add(voxMesh(gl, 1, 0, base, z, materials().glow));
+    const river = new THREE.Mesh(new THREE.PlaneGeometry(W + 200, 8), new THREE.MeshBasicMaterial({ color: 0xff6a1a })); river.rotation.x = -PI / 2; river.position.set(W / 2, base - 0.01, z + 10); group.add(river);
+    return t => { for (const g of glow) g.s.material.opacity = 0.45 + Math.sin(t * 3 + g.p) * 0.12; };
+  }
+  function volcano(group, x, z, h) {                   // the volcano: a cone of black rock, lava down its sides, smoke going up
+    const v = new Vox(), gl = new Vox(), n = Math.round(h / 3);
+    for (let y = 0; y < n; y++) { const r = Math.round((n - y) * 1.8 + 3); for (let X = -r; X <= r; X++) v.box(X, y, -2, X, y, 2, (X * 3 + y * 7) % 13 ? 0x3a2a26 : 0x4a3430); }
+    for (let k = 0; k < 4; k++) { let X = Math.round((k - 1.5) * 4); for (let y = n; y > n * 0.3; y--) { X += (k % 2 ? 1 : -1) * ((y % 3) === 0 ? 1 : 0); gl.set(X, y, 3, 0xff6a1a); } }
+    gl.box(-4, n, -2, 4, n, 2, 0xffa030);
+    group.add(voxMesh(v, 3, x, 0, z)); group.add(voxMesh(gl, 3, x, 0, z, materials().glow));
+    glowSprite(group, 0xff5a1a, 0.7, 90, 50, x, n * 3 + 6, z + 4);
+    const smoke = []; for (let k = 0; k < 10; k++) { const s = new THREE.Sprite(glowMat(0x4a3a3a, 0.5)); group.add(s); smoke.push(s); }
+    return t => smoke.forEach((s, i) => { const u = ((t * 0.08 + i / 10) % 1); s.position.set(x + Math.sin(u * 5 + i) * 10, n * 3 + u * 90, z + 5); s.scale.set(20 + u * 60, 20 + u * 60, 1); s.material.opacity = 0.5 * (1 - u); });
+  }
+  function floatIsland(group, x, y, z, w, rnd) {       // an island floating, grass on top, rock hanging under, a column or two
+    const v = new Vox(), R = Math.round(w);
+    for (let X = -R; X <= R; X++) { const d = Math.round((R - Math.abs(X)) * 0.9) + 1; for (let k = 0; k < d; k++) for (let Z = -2; Z <= 2; Z++) v.set(X, -k, Z, k === 0 ? 0x7ac85a : (X + k) % 4 ? 0xd8d0bc : 0xb0a890); }
+    if (rnd() < 0.7) for (let c = 0; c < 2; c++) { const X = Math.round((rnd() - 0.5) * R); for (let k = 1; k < 5 + rnd() * 5; k++) v.set(X, k, 0, 0xf4ecd8); }
+    group.add(voxMesh(v, 1, x, y, z));
+  }
+  function templeTower(group, x, z) {                  // the temple's tower far off, gold on its top
+    const v = new Vox();
+    for (let y = 0; y < 50; y++) { const r = y < 40 ? 4 : 2; v.box(-r, y, -r, r, y, r, y % 8 === 0 ? 0xd8cca8 : 0xf4ecd8); }
+    v.box(-1, 50, -1, 1, 55, 1, 0xd8b050);
+    group.add(voxMesh(v, 1.4, x, -10, z));
+  }
+  function windmill(group, x, z) {                     // an old windmill, its sails turning
+    const v = new Vox();
+    for (let y = 0; y < 16; y++) { const r = 4 - Math.floor(y / 6); v.box(-r, y, -r, r, y, r, y > 13 ? 0x8a3a2a : 0xf2ece0); }
+    v.box(-1, 2, 5, 1, 5, 5, 0x6a4a2a);
+    group.add(voxMesh(v, 0.8, x, 0, z));
+    const s = new Vox(); for (let k = 0; k < 4; k++) { const a = k / 4 * PI * 2; for (let r = 1; r < 13; r++) { const X = Math.round(Math.cos(a) * r), Y = Math.round(Math.sin(a) * r); s.set(X, Y, 0, 0x8a6a4a); if (r > 3) s.set(X + Math.round(-Math.sin(a) * 2), Y + Math.round(Math.cos(a) * 2), 0, 0xf6f2e8); } }
+    const m = voxMesh(s, 0.8, x, 12, z + 4); group.add(m);
+    const ph = x * 0.21;
+    return t => { m.rotation.z = -t * 1.6 + ph; };
+  }
+  function stormClouds(group, W, rnd) {                 // thunderclouds, dark and heavy, above and below
+    glowMat(0, 0);                                         // (the soft disc's texture, made)
+    for (let k = 0; k < Math.round(W / 9); k++) {
+      const c = [0x2a3040, 0x3a4458, 0x232838][k % 3];
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: GLOW_TEX, color: c, transparent: true, opacity: 0.9, depthWrite: false, fog: false }));
+      const w = 50 + rnd() * 70; s.scale.set(w, w * 0.45, 1);
+      s.position.set(rnd() * (W + 200) - 100, k % 2 ? 50 + rnd() * 40 : -6 + rnd() * 10, -160 - rnd() * 100); group.add(s);
+    }
+  }
+  function airship(group, W, k, rnd) {                 // one of his airships, drifting through the storm, its props going
+    const v = new Vox();
+    for (let X = -22; X <= 22; X++) { const r = Math.round(6 * Math.sqrt(1 - (X / 23) * (X / 23))); for (let Y = -r; Y <= r; Y++) v.box(X, Y, -1, X, Y, 1, Math.abs(Y) === r ? 0x5a606a : (X % 8 === 0 ? 0xd8303a : 0x8a929c)); }
+    v.box(-10, -10, -2, 10, -7, 2, 0x4a505a); v.box(-3, -12, -2, 3, -11, 2, 0xf2c030);
+    const m = voxMesh(v, 1, 0, 0, 0); group.add(m);
+    const y = 12 + rnd() * 26, z = -70 - (k % 3) * 45 - rnd() * 30, sp = 1 + rnd() * 1.5, x0 = k * 120 + rnd() * 60;
+    return t => { m.position.set((x0 + t * sp) % (W + 200) - 60, y + Math.sin(t * 0.5 + k) * 3, z); };
+  }
+  function lightning(group, W, rnd) {                  // lightning, now and then, lighting the clouds
+    const s = new THREE.Sprite(glowMat(0xe8f0ff, 0)); s.scale.set(600, 300, 1); s.position.set(W / 2, 40, -200); group.add(s);
+    const bolt = new THREE.Mesh(vox(v => { let X = 0; for (let y = 40; y > 0; y--) { X += (y % 4 === 0) ? (y % 8 ? 1 : -2) : 0; v.set(X, y, 0, 0xffffff); } }, 1), new THREE.MeshBasicMaterial({ color: 0xffffff })); group.add(bolt);
+    let at = 0, next = 2;
+    return t => { if (t > next) { at = t; next = t + 2 + Math.random() * 5; bolt.position.set(Math.random() * W, 10, -160 - Math.random() * 60); }
+      const u = t - at, f = u < 0.25 ? (u < 0.06 || (u > 0.12 && u < 0.18) ? 1 : 0.2) : 0; s.material.opacity = f * 0.55; bolt.visible = f > 0.5; };
+  }
+  function spire(group, x, z, h, rnd) {                // a needle of rock up out of the clouds
+    const v = new Vox(), n = Math.round(h / 2);
+    for (let y = 0; y < n; y++) { const r = Math.max(1, Math.round(4 * (1 - y / n)) + 1); v.box(-r, y, -r, r, y, r, (y * 3) % 7 ? 0xb8a0a8 : 0x9a8090); }
+    v.box(-1, n, -1, 1, n, 1, 0x8ac86a);
+    group.add(voxMesh(v, 2, x, -12, z));
+  }
+  function jetStream(group, W, rnd) {                  // the jet stream: streaks of white going by fast
+    const st = [];
+    for (let k = 0; k < Math.round(W / 20); k++) { const s = new THREE.Sprite(glowMat(0xffffff, 0.35)); s.scale.set(30 + rnd() * 30, 0.8, 1); group.add(s); st.push({ s, x: rnd() * W, y: 30 + rnd() * 50, z: -120 - rnd() * 120, v: 40 + rnd() * 50 }); }
+    return t => { for (const q of st) q.s.position.set((q.x + t * q.v) % (W + 200) - 100, q.y, q.z); };
+  }
+  function refinery(group, W, z, rnd) {                // towers and tanks and pipes, the pink stuff glowing in its vats
+    let x = -20;
+    while (x < W + 40) {
+      const v = new Vox(), gl = new Vox(), h = 14 + Math.floor(rnd() * 20);
+      for (let y = 0; y < h; y++) for (let X = -3; X <= 3; X++) for (let Z = -3; Z <= 3; Z++) if (Math.hypot(X, Z) <= 3.2) v.set(X, y, Z, y % 6 === 0 ? 0xf2c030 : 0x5a6aa0);
+      for (let X = 4; X < 16; X++) v.box(X, h - 4, 0, X, h - 3, 1, 0x8a92a8);
+      gl.box(6, 0, -2, 14, 3, 2, 0xe85ab8);
+      group.add(voxMesh(v, 1, x, 0, z)); group.add(voxMesh(gl, 1, x, 0, z, materials().glow));
+      x += 26 + rnd() * 20;
+    }
+  }
+  function futureCity(group, W, z, rnd) {              // white towers with domes, glass bands lit, tubes between them
+    let x = -30;
+    while (x < W + 40) {
+      const v = new Vox(), gl = new Vox(), w = 3 + Math.floor(rnd() * 3), h = 20 + Math.floor(rnd() * 30);
+      for (let y = 0; y < h; y++) v.box(-w, y, -w, w, y, w, y % 7 === 6 ? 0x7ad8ff : 0xeef2f8);
+      for (let y = 0; y < 3; y++) { const r = w - y; v.box(-r, h + y, -r, r, h + y, r, 0xb8e8ff); }
+      for (let y = 6; y < h; y += 7) gl.box(-w, y, w + 1, w, y, w + 1, 0x9ae8ff);
+      group.add(voxMesh(v, 1, x, 0, z)); group.add(voxMesh(gl, 1, x, 0, z, materials().glow));
+      if (rnd() < 0.6) { const tb = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 16, 10), new THREE.MeshLambertMaterial({ color: 0xc8f0ff, transparent: true, opacity: 0.6 })); tb.rotation.z = PI / 2; tb.position.set(x + 9, h * 0.6, z); group.add(tb); }
+      x += w * 2 + 6 + rnd() * 10;
+    }
+  }
+  function flyers(group, W, rnd) {                     // little flyers going over the city
+    const fl = [];
+    for (let k = 0; k < Math.round(W / 60); k++) { const m = new THREE.Mesh(vox(v => { v.box(-2, 0, -1, 2, 1, 1, [0xff5a5a, 0xffd23a, 0x5ac8ff][k % 3]); v.box(-1, 2, -1, 1, 2, 1, 0xb8e8ff); }, 0.5), materials().vox); group.add(m); fl.push({ m, x: rnd() * W, y: 26 + rnd() * 30, z: -60 - rnd() * 100, v: (rnd() < 0.5 ? -1 : 1) * (8 + rnd() * 10) }); }
+    return t => { for (const f of fl) f.m.position.set(((f.x + t * f.v) % (W + 200) + W + 200) % (W + 200) - 100, f.y, f.z); };
+  }
+  function fortressWall(group, W, z, rnd) {            // the fortress: battlements and towers in his red and grey, his face on them
+    const v = new Vox();
+    for (let X = -30; X < W + 40; X++) { for (let y = 0; y < 24; y++) v.set(X, y, 0, (y % 8 === 0) ? 0x3a3a44 : 0x5a5a64); if (X % 4 < 2) v.box(X, 24, 0, X, 26, 0, 0x5a5a64); }
+    for (let x = 0; x < W; x += 60) { v.box(x - 5, 0, 1, x + 5, 38, 4, 0x6a6a74); v.box(x - 6, 38, 1, x + 6, 40, 4, 0xd8302a);
+      const ex = x, ey = 28; v.box(ex - 3, ey - 3, 5, ex + 3, ey + 3, 5, 0xffc890); v.box(ex - 3, ey + 2, 5, ex + 3, ey + 3, 5, 0xd8302a);
+      v.box(ex - 2, ey, 6, ex - 1, ey, 6, 0x1a1a1a); v.box(ex + 1, ey, 6, ex + 2, ey, 6, 0x1a1a1a); v.box(ex - 3, ey - 2, 6, ex + 3, ey - 2, 6, 0xd8762a); }
+    group.add(voxMesh(v, 1, 0, 0, z));
+  }
+  function fallingStars(group, W, rnd) {               // stars falling past, now and then
+    const st = [];
+    for (let k = 0; k < 12; k++) { const s = new THREE.Sprite(glowMat(0xfff6c8, 0.8)); s.scale.set(5, 1, 1); s.material.rotation = -0.5; group.add(s); st.push({ s, x: rnd() * W, p: rnd() * 6, per: 3 + rnd() * 4, z: -200 - rnd() * 80 }); }
+    return t => { for (const q of st) { const u = ((t + q.p) % q.per) / q.per; q.s.position.set(q.x + u * 60, 120 - u * 70, q.z); q.s.material.opacity = u < 0.6 ? 0.85 : (1 - u) * 2; } };
+  }
   function cloudBank(group, W, rnd, n, y0) {
     for (let k = 0; k < n; k++) {
       const v = new Vox(), r = mulberry32(k * 13 + 7), c = 3 + Math.floor(r() * 4);
@@ -2703,7 +3503,9 @@
   // ---------------------------------------------------------------- sound
   /* Little synthesised effects, at the game's own sfx volume. The music is Sound's. */
   let AC = null;
-  function sfxVol() { if (demo && mode === "title") return 0; try { const v = root.Settings && Settings.get("sfxVolume"); return v == null ? 0.7 : v; } catch (e) { return 0.7; } }
+  let demoQuiet = false;                              // (the demo's own steps: nobody hears its runner)
+  const demoOn = () => !!demo && (mode === "title" || mode === "main");
+  function sfxVol() { if (SIM || demoQuiet) return 0; try { const v = root.Settings && Settings.get("sfxVolume"); return v == null ? 0.7 : v; } catch (e) { return 0.7; } }
   function tone(f0, f1, dur, type, vol, delay) {
     try {
       AC = AC || new (root.AudioContext || root.webkitAudioContext)();
@@ -2831,6 +3633,7 @@
   }
   /** Play the track `key` (crossfading); a zone's theme picks up where it left off (`resume`). */
   function bgm(key, opts) {
+    if (SIM) return;
     opts = opts || {};
     if (!key || (key === BGM.key && !opts.restart)) return;
     if (!BGM.els.length) BGM.els = [new Audio(), new Audio()];
@@ -2847,7 +3650,7 @@
   }
   function bgmStop() { BGM.els.forEach(el => fadeEl(el, 0, 260, () => el.pause())); BGM.key = null; BGM.over = null; }
   function bgmVolume() { const el = BGM.els[BGM.cur]; if (el && !el.paused) el.volume = musicVol(); }
-  const zoneBgm = d => (ZONE_BGM[d.theme] || "splash-hill") + "-" + Math.min(2, d.actN || 1);
+  const zoneBgm = d => d.bgm || (ZONE_BGM[d.theme] || "splash-hill") + "-" + Math.min(2, d.actN || 1);
   const bossBgm = b => b.C.chase ? (b.hp <= b.C.hp / 2 ? "boss-chase-2" : "boss-chase-1") : b.gem > 0 ? "mini-boss" : BOSS_BGM[b.key] || "boss";
 
 
@@ -2913,6 +3716,7 @@
      on each fighter once; `hitDmg` and `hitKnock` how hard. */
   let battle = null, actor = null, hitTok = null, hitDmg = 8, hitKnock = 0.85;
   let demo = null;                                    // the title's demo run (see demoStart)
+  let SIM = false;                                    // (a run played out of sight, for a race's rival: no sound, no music, nothing counted)
   /* the tutorial running (see tutorialStart), and what the fight tells it */
   let TUT = null;
   const emit = (k, d) => { if (TUT && battle && battle.cfg.tutorial) tutHear(k, d); };
@@ -2955,7 +3759,7 @@
     group.add(skirts(S, T));
 
     const w = { def, T, S, W, group, far, pending, tiles: {}, ents: [], carrots: [], solids: [], plats: [], enemies: [], vents: [], bubbles: [],
-                shots: [], fx: [], traps: [], flashes: [], eshots: [], booms: [], drafts: [], hazards: [], checks: [], start: { x: 2, y: 5 }, goal: null, shoes: [], total: 0,
+                shots: [], fx: [], traps: [], flashes: [], eshots: [], booms: [], drafts: [], hazards: [], checks: [], start: { x: 2, y: 5 }, goal: null, shoes: [], powers: [], total: 0,
                 parts: null, t: 0 };
     const M = materials();
     // tiles that can go
@@ -2994,6 +3798,7 @@
           break;
         }
         case "E": w.arena = { x0: e.i, y }; break;          // Eggman's arena: its left edge (the boss, below)
+        case "@": w.powers.push({ x, y: y + 0.25, col: e.i, m: put(propGeo("powerring"), x, y + 0.25), back: 0 }); break;   // a Red Ring: a power
         case "H": w.shoes.push({ t: "shoe", n: shoeN, x, y: y + 0.2, m: put(propGeo("redring"), x, y + 0.2) }); shoeN++; break;   // a Red Star Ring
         case "S": {                                     // a spring, its coil squashed down at rest
           const m = new THREE.Group(), part = n => { const q = new THREE.Mesh(propGeo(n), M.vox); q.castShadow = q.receiveShadow = true; m.add(q); return q; };
@@ -3061,7 +3866,8 @@
       scene.add(w.snow);
     }
     shoeN = 0;
-    if (w.arena && rivalAt(def)) w.rival = newRival(w);                                        // a story chapter's: one of the cast waiting instead
+    const rs = w.arena && rivalSpec(def);
+    if (rs) w.rival = newRival(w, rs);                                                          // one of the cast waiting instead (a story chapter's; Silver's challenge)
     else if (w.arena && def.boss && def.last && BSH && BOSS[def.boss]) w.boss = newBoss(def.boss, w);   // Eggman, waiting in his arena
     return w;
   }
@@ -3185,6 +3991,7 @@
     e.cap.position.y = (3 + 8 * s) / 16;
   }
   function spawnCritter(x, y) {
+    if (!SIM && saveData && !(player && player.demo)) PROG().animals++;     // (toward Mighty)
     const bird = Math.random() < 0.5, m = new THREE.Mesh(propGeo(bird ? "bird" : "bunny"), materials().vox);
     m.position.set(x, y, 0.2); world.group.add(m);
     world.ents.push({ t: "critter", bird, x, y, vx: (Math.random() < 0.5 ? -1 : 1) * (bird ? 3.5 : 3), vy: bird ? 5 : 6, m, life: 2.6 });
@@ -3319,7 +4126,7 @@
   /* Hurt, the Sonic way: a shield takes the hit and goes; else the rings fly out; with no rings
      at all, the runner is down, and goes back to the last Star Post. */
   function hurt(p, fromX) {
-    if (p.inv > 0 || p.star > 0 || p.dead || p.demo) return;
+    if (p.inv > 0 || p.star > 0 || p.dead) return;
     p.inv = 1.6;
     p.vx = -sgn(fromX - p.x || p.face) * 7; p.vy = 8; p.ground = false;
     p.state = "hurt"; p.st = 0.45; p.curl = false; p.mv = null; p.sp = null;
@@ -3331,7 +4138,7 @@
   }
   function die(p, why) {
     if (p.dead) return;
-    if (p.demo) { p.demoFell = true; return; }           // (the title's demo: put back on the road instead)
+    if (p.demo) { p.demoFell = true; return; }           // (the robot's run -- the title's, a rival's: over)
     p.dead = 1.1; p.why = why; p.falls++;
     SFX.fall();
   }
@@ -3589,7 +4396,7 @@
         burst(p.x, p.y + 0.5, [0x9ad4ff, 0xffffff], 6, 3);
         break;
       }
-      case "fly":                                          // Tails' tails and Rouge's wings: tap to climb, till tired
+      case "fly":                                          // Tails' tails, Rouge's wings, the Egg Mobile's boosters: tap to climb, till tired
         if (p.inWater && srcOf(p, "air") !== "tails") return;
         if (p.state !== "fly") { if (p.flyLeft <= 0) return; p.state = "fly"; p.curl = false; p.jumping = false; }
         /* each stroke lifts, but not past the top of the stage: there is nothing to fly over */
@@ -3614,7 +4421,7 @@
         p.airUses = 1; p.vy = Math.max(p.vy, 8.5); p.jumping = true; p.curl = false; SFX.double();
         burst(p.x, p.y + 0.1, [0x9ad8ff, 0xffffff], 7, 2);
         break;
-      case "hover":                                        // Gamma's Flight Mode, Eggman's Egg Hover
+      case "hover":                                        // Gamma's Flight Mode
         if (p.state === "fly" || p.flyLeft <= 0 || p.inWater) return;
         p.state = "fly"; p.curl = false; p.jumping = false; p.vy = Math.max(p.vy, c.sink ? 0 : 1.5); SFX.flap();
         break;
@@ -4968,7 +5775,7 @@
     if (stopT > 0 && p.state === "hurt" && p.sinceHit < 0.02) { p.spr.position.x += (Math.random() - 0.5) * 0.14; p.spr.position.y += (Math.random() - 0.5) * 0.06; }
     /* KO'd: down a while, then flickering, then gone (till they come back in from above) */
     const koGone = p.ko && battle && (p.koT < 0.12 || (p.koT < 1.1 && Math.sin(world.t * 38) > 0));
-    p.spr.visible = (!GLIDE[mode] || (mode === "title" && !!demo) || (mode === "scene" && world.rival && world.rival.lock)) && !p.out && !koGone && !(p.hideT > 0) && !(p.inv > 0 && !p.dead && !p.ko && p.state !== "dash" && p.state !== "teleport" && !(p.sp && p.sp.shield) && Math.sin(world.t * 40) > 0.4);
+    p.spr.visible = !!(!GLIDE[mode] || (demoOn() && world.demo) || (mode === "scene" && world.rival && world.rival.lock)) && !p.out && !koGone && !(p.hideT > 0) && !(p.inv > 0 && !p.dead && !p.ko && p.state !== "dash" && p.state !== "teleport" && !(p.sp && p.sp.shield) && Math.sin(world.t * 40) > 0.4);
   }
   /* The dust behind a rev: Sonic Advance's spray, looping faster and swelling as the rev
      builds (each tap of Space kicks it up), at the runner's heels, trailing away from them. */
@@ -4976,7 +5783,7 @@
     const d = p.dust; if (!d) return;
     const winding = p.state === "special" && p.sp && p.sp.windup && p.ground;
     const on = p.state === "charge" || winding;
-    d.visible = on && !p.dead;
+    d.visible = !!(on && !p.dead);
     if (!on) { p.dustT = 0; return; }
     const rev = p.state === "charge" ? p.rev : Math.min(1, p.sp.t / p.sp.windup);
     p.revKick = Math.max(0, (p.revKick || 0) - dt * 5);
@@ -5091,7 +5898,7 @@
     const aspect = R.domElement.width / Math.max(1, R.domElement.height);
     /* a tall phone screen backs the camera off until twelve metres of the stage fit across */
     let D = clamp(12.5 / (2 * Math.tan(17 * PI / 180) * aspect), CAM_D, 42);
-    if (!battle && mode === "title" && demo) D = Math.max(D, Math.min(D * 2, 36));   // the title's demo: far off, behind the strip (an upright phone is far off already)
+    if (!battle && demoOn() && world.demo) D = Math.max(D, Math.min(D * 2, 36));   // the title's demo: far off, behind the strip (an upright phone is far off already)
     if (battle) D = battleView(aspect, dt);              // a battle frames everyone in it
     else {
       const halfW = Math.tan(17 * PI / 180) * D * aspect, halfH = Math.tan(17 * PI / 180) * D;
@@ -5101,7 +5908,7 @@
       if (w.boss && w.boss.lock) tx = bossCamX(w.boss, halfW);           // a boss's arena: the camera holds on it
       if (w.rival && w.rival.lock) tx = clamp((w.rival.x + p.x) / 2, w.rival.a0 + halfW - 1, w.rival.a1 - halfW + 1);   // a meeting: on the two of them
       let ty = clamp(p.y + 2.1, p.y < 3.5 ? 3.8 : 6.1, H - 3.2);             // lower when she is down in the water
-      if (mode === "title" && demo) ty = p.y + 0.6 - demoBand(dt) * halfH;   // the demo's runner: in the open, between the logo and the strip
+      if (demoOn() && world.demo) ty = p.y + 0.6 - (mode === "title" ? demoBand(dt) : -0.1) * halfH;   // the demo's runner: in the open, between the logo and the strip
       if (D > CAM_D) ty = Math.max(ty, halfH - 3);
       camX = lerp(camX, tx, 1 - Math.exp(-dt * 3.6));
       camY = lerp(camY, ty, 1 - Math.exp(-dt * (p.ground ? 4 : 1.8)));
@@ -5701,6 +6508,8 @@
     save(saveData);
     if (earned && root.Stable && Stable.grant) Stable.grant(earned, "adventure");
     if (NP.on && NP.race) { npFinished(time); return; }              // an online race: home, and wait for the others
+    if (GPR) { gpHome(time); return; }                               // the grand prix: home, and your place
+    if (RACE) { raceHome(time); return; }                            // a race against a rival: home first
     setTimeout(() => results({ time, best, grade, carrots: p.carrots, total: world.total, shoes: p.shoes, shoesAll: shoes, falls: p.falls, earned, par }), 1700);
   }
   function goalStep(p) { if (p.ground && Math.abs(p.vx) < 0.5) p.face = 1; }
@@ -5720,7 +6529,7 @@
      arrows or WASD move, and Up and Down pick the heavy or the special. A pad: A jumps, X,
      Y and B are light, heavy and special. */
   const KEYS = { ArrowLeft: "L", a: "L", A: "L", ArrowRight: "R", d: "R", D: "R", ArrowDown: "D", s: "D", S: "D", ArrowUp: "U", w: "U", W: "U",
-                 " ": "J", z: "Z", Z: "Z", x: "X", X: "X", c: "C", C: "C" };
+                 " ": "J", z: "Z", Z: "Z", x: "X", X: "X", c: "C", C: "C", v: "V", V: "V", Shift: "V" };   // (V or Shift: the grand prix's power)
   function onKey(e, down) {
     if (!host) return;
     const tg = e.target;
@@ -5867,21 +6676,24 @@
           if (battle) battleTick(h);
           else {
             readInput();
-            if (npHold() || rivalHold()) { const I = INPUT0; I.L = I.R = I.U = I.D = I.J = I.Z = I.X = I.C = 0; I.jp = I.zp = I.xp = I.cp = 0; I.dash = 0; }   // (an online race: nobody moves till Go)
-            step(h); worldStep(h); input.jp = input.zp = input.xp = input.cp = 0; input.dash = 0;
+            if (npHold() || rivalHold() || gpHold()) { const I = INPUT0; I.L = I.R = I.U = I.D = I.J = I.Z = I.X = I.C = 0; I.jp = I.zp = I.xp = I.cp = 0; I.dash = 0; }   // (an online race: nobody moves till Go)
+            if (!(gpFrozen() && GPR.freezeBy !== "you")) step(h);        // (Chaos Control: time stops for you)
+            worldStep(h); input.jp = input.zp = input.xp = input.cp = 0; input.dash = 0;
           }
           acc -= h; n++;
         }
         if (NP.on && NP.host && battle) npHostSend(dt);
       }
       if (!paused && NP.on && NP.race) npRaceTick(dt);
+      if (!paused && RACE) stepRace(dt);
+      if (!paused && GPR) gpTick(dt);
       if (!paused) {
         if (mode === "play" || mode === "goal") { if (battle) battleHud(); else { hud(); storyBeats(dt); } }
       }
     } else if (GLIDE[mode]) {
       /* the title and the menus: the camera goes along the stage on its own (the cast parades
          below the title); a story scene's talk goes on over it */
-      if (mode === "title" && demo) demoTick(dt);
+      if (demoOn() && world.demo) demoTick(dt);
       else { world.t += dt; titleGlide(dt); worldStep(dt * 0.6); }
       drawParade(dt);
       if (mode === "scene") sceneTick(dt);
@@ -6123,7 +6935,7 @@
       if (!f.spCards) { f.spCards = []; for (let k = 0; k < 8; k++) { const m = makeCard("items", "fx"); world.group.add(m); f.spCards.push(m); } }
       const lit = f.star > 0 && !f.dead, cy = f.y + f.hh * 0.5 + (f.c.lift || 0), R = 0.62 + f.c.w * 0.25;
       f.spCards.forEach((m, k) => {
-        m.visible = lit;
+        m.visible = !!lit;
         if (!lit) return;
         const ring = k % 2, lat = ring ? 0.5 : -0.5, a = world.t * (ring ? 5.2 : -4.4) + k * PI / 4, hr = R * Math.cos(lat);
         setFrame(m, "sparkle", (Math.floor(world.t * 20) + k * 2) % 6, 1, f.x + Math.cos(a) * hr, cy + R * Math.sin(lat) + Math.sin(a * 2) * 0.08,
@@ -6137,20 +6949,20 @@
     f.gT = guard ? (f.gOn ? (f.gT || 0) + dt : 0) : 0; f.gOn = guard;
     if (sb && !f.gCard) { f.gCard = makeCard("sbfx", "fx"); world.group.add(f.gCard); }
     if (f.gCard) {
-      f.gCard.visible = guard;
+      f.gCard.visible = !!guard;
       if (guard) {
         const L = framesOf("sbfx", "guard").length, i = Math.min(L - 1, Math.floor(f.gT / Math.max(0.2, f.guard0 || 0.5) * L));
         setFrame(f.gCard, "guard", i, f.face, f.x, f.y + f.hh * 0.5 + (f.c.lift || 0), true, 0.35, Math.max(1, f.hh * 0.95 + 0.1));
       }
     }
     const on = ((guard && !sb) || (f.shield && !ITEMS)) && up;
-    f.aura.visible = on;
+    f.aura.visible = !!on;
     if (on) { const k = 2.4 + Math.sin(world.t * 30) * 0.08; f.aura.scale.set(k, k, 1); f.aura.position.set(f.x, f.y + f.hh * 0.5 + (f.c.lift || 0), 0.35); }
     /* healing: the green ring, round them flat, rising from their feet up over them and again */
     const heal = f.healing && up;
     if (sb && !f.hCard) { f.hCard = makeCard("sbfx", "fx"); world.group.add(f.hCard); }
     if (f.hCard) {
-      f.hCard.visible = heal;
+      f.hCard.visible = !!heal;
       if (heal) {
         const r = (world.t * 1.25) % 1;
         setFrame(f.hCard, "heal", Math.floor(world.t * 16) % framesOf("sbfx", "heal").length, 1, f.x, f.y + 0.05 + r * f.hh * 0.85 + (f.c.lift || 0), true, 0.38, Math.max(1, f.c.w * 1.7));
@@ -6300,7 +7112,12 @@
     return (ARENA_PICS[i] = out);
   }
   /* the setups' arena picker: the picture over the arrows */
-  const arenaPick = i => `
+  const openArenas = () => stages().map((z, i) => i).filter(i => unlocked(i));
+  const arenaPick = i => i < 0 ? `
+    <div class="adv-arena">
+      <div class="adv-arena-pic in adv-arena-rand"><b>?</b></div>
+      ${arrows("arena", "Random")}
+    </div>` : `
     <div class="adv-arena">
       <div class="adv-arena-pic${ARENA_PICS[i] ? " in" : ""}"><canvas width="320" height="180" data-arena="${i}"></canvas></div>
       ${arrows("arena", esc(stages()[i].name))}
@@ -6317,10 +7134,12 @@
   function startBattle(cfg) {
     endBattle();
     disposeWorld();
-    world = buildWorld(arenaDef(cfg.arena));
+    const arenaI = cfg.arena == null || cfg.arena < 0 ? randomArena() : cfg.arena;           // (Random: a new one each fight)
+    world = buildWorld(arenaDef(arenaI));
     const W = world.W, xs = spawnXs(W);
     const fs = cfg.slots.map((s, i) => {
-      const who = s.who === "random" ? CAST[Math.floor(Math.random() * CAST.length)].id : s.who;   // Random: anyone, new each fight
+      const pool = s.ctl === "cpu" || s.ctl === "net" ? CAST : CAST.filter(c => hasFighter(c.id));
+      const who = s.who === "random" ? pool[Math.floor(Math.random() * pool.length)].id : s.who;   // Random: new each fight (a player's, from the team)
       const f = makePlayer(castOf(who), s.em), x = xs[i];
       return Object.assign(f, { x, y: floorAt(x), face: x < W / 2 ? 1 : -1, slot: i, ctl: s.ctl, lvl: s.lvl == null ? 1 : s.lvl, team: cfg.teams ? s.team : i,
         inp: newInput(), hits: new WeakSet(), hpMax: hpOf(f.c, cfg.hp), hp: hpOf(f.c, cfg.hp), score: 0, lives: cfg.rule === "stock" ? cfg.goal : 0, kos: 0, downs: 0, dealt: 0,
@@ -6329,7 +7148,7 @@
     });
     const humans = fs.filter(f => f.ctl !== "cpu");
     battle = { cfg, fs, live: false, over: false, intro: cfg.kind === "training" ? 0.6 : 1.7, clock: cfg.time || 0, duo: fs.some(f => f.ctl === "p2"),
-               teams: !!cfg.teams, lead: humans[0] || fs[0], t: 0, endT: 0 };
+               teams: !!cfg.teams, lead: humans[0] || fs[0], t: 0, endT: 0, arena: arenaI };
     player = battle.lead;
     for (const k in keys) keys[k] = 0;
     duoKeys.forEach(m => { for (const k in m) m[k] = 0; });
@@ -6877,13 +7696,17 @@
   }
   function mainMenu() {
     if (root.AdventureOnline && root.Auth && !Auth.user) { title(); return; }   // (log in first)
-    storyRun = null;
+    storyRun = null; RACE = null;
+    if (RETRO) { const g = RETRO; RETRO = null; retroCard(g, () => mainMenu()); return; }
+    checkUnlocks(); if (pendingFirst(mainMenu)) return;
     const ov = screenOn("main");
-    ensureStageWorld();
+    if (!(demo && world && world.demo)) demoStart();      // the title's demo, far off under its haze, goes on behind (the strip's cast stay on the title)
     const eps = EPS(), epc = epsCleared();
     const items = [
       ["story", "book", "Story", `The Red Star Rings, from every side: an episode for each of the ${eps.length}`,
         epc ? `${epc}/${eps.length}` : ""],
+      ["gp", "trophy", "Red Ring Circuit", "The grand prix: six cups of four courses, eight runners, and Red Rings with a power in each",
+        (() => { const t = (saveData.gp && saveData.gp.trophies) || {}; const n = Object.values(t).reduce((a, x) => a + Object.keys(x).length, 0); return n ? `${n}/18` : "New"; })()],
       ["exhibition", "flag", "Free Exhibition", "Any runner in any zone you've opened, Act 1 or Act 2 and its boss: for time, rings and Red Star Rings",
         `${stages().filter((st, i) => cleared(i)).length}/${stages().length}`],
       ["battle", "trophy", "Battle", "Up to four fighters with health, players or CPUs, in any runner's arena", ""],
@@ -6895,12 +7718,14 @@
       ["exit", "door", "Exit", "Back to the hall", ""],
     ].filter(it => it[0] !== "exit" || (opts0 && opts0.onExit));
     ov.innerHTML = `
+      <div class="adv-haze"></div>
       <div class="adv-main pop">
         <div class="ao-topbar"></div>
         <div class="adv-brand">
           <div class="adv-kicker">SONIC &amp; FRIENDS</div>
           <div class="adv-logo">RED RING CIRCUIT</div>
         </div>
+        <button class="adv-team" data-team data-k="team">${ico("person")}<b>Fighters ${fightersN()}/${CAST.length}</b>${chalsOpen().length ? `<em>${chalsOpen().length} challenger${chalsOpen().length > 1 ? "s" : ""} waiting</em>` : `<i>Who's on the team, and how to win over the rest</i>`}</button>
         <div class="adv-mm">
           ${items.map(([id, ic, t, sub, note], i) => `
             <button class="adv-mi" data-mm="${id}" data-k="mm-${id}" ${i === 0 ? "data-focus" : ""}>
@@ -6911,10 +7736,11 @@
         </div>
         <button hidden data-back id="advMMBack"></button>
       </div>`;
-    const go = { story: storyMenu, exhibition: () => { load3d(stageIdx); menu(); }, battle: () => battleSetup(true), training: () => trainingMenu(), options: () => optionsScreen(true), exit: () => exit(),
+    const go = { story: storyMenu, gp: () => gpMenu(), exhibition: () => { load3d(stageIdx); menu(); }, battle: () => battleSetup(true), training: () => trainingMenu(), options: () => optionsScreen(true), exit: () => exit(),
                  tourney: () => tourSetup(), online: () => { if (root.AdventureOnline) { AdventureOnline._from = "lobby"; AdventureOnline.lobby(); } } };
     if (root.AdventureOnline) { AdventureOnline._from = "menu"; AdventureOnline.topbar(ov.querySelector(".ao-topbar")); }
     ov.querySelectorAll("[data-mm]").forEach(b => b.onclick = () => go[b.dataset.mm]());
+    ov.querySelector("[data-team]").onclick = () => fighters();
     ov.querySelector("#advMMBack").onclick = () => title();
     autoFocus();
   }
@@ -6943,6 +7769,8 @@
     if (!b.v3) { b.hp = { 60: 200, 100: 300, 150: 400 }[b.hp] || 300; b.v3 = 1; }
     if (!b.v4) { b.hp = { 200: 150, 300: 200, 400: 250 }[b.hp] || 200; b.v4 = 1; }   // less again: three lives took longer than the three minutes   // three times the health now (a setup kept from before)               // Survival is the default now (a setup kept from before was on KOs by default)
     b.slots = d.slots.map((s, i) => Object.assign({}, s, (b.slots || [])[i] || {}));
+    b.slots.forEach(s => { if ((s.ctl === "p1" || s.ctl === "p2") && s.who !== "random" && !hasFighter(s.who)) s.who = castId; });
+    if (b.arena >= 0 && !unlocked(b.arena)) b.arena = 0;
     return b;
   }
   /* a row of choices, the picked one lit: Options' own segmented control */
@@ -6967,6 +7795,7 @@
             <b>Player 2</b> ${f(K[1], ["U", "L", "D", "R"])} to move &middot; ${f(K[1], ["J"])} jump &middot; ${f(K[1], ["Z", "X", "C"])} light, heavy, special`;
   }
   function battleSetup(first) {
+    if (first && pendingFirst(() => battleSetup(true))) return;
     const b = bset(), ov = screenOn("setup");
     if (first) ensureStageWorld();
     const n = b.slots.filter(s => s.ctl !== "off").length, duo = b.slots.some(s => s.ctl === "p2");
@@ -6979,7 +7808,7 @@
           <div class="adv-slots">${b.slots.map((s, i) => slotCard(s, i, b)).join("")}</div>
           <div class="adv-rules">
             ${row("Sides", "", seg("teams", [[0, "Everyone for themselves"], [1, "Red against Blue"]], b.teams ? 1 : 0))}
-            ${row("Arena", esc(stages()[b.arena].sub), arenaPick(b.arena))}
+            ${row("Arena", b.arena < 0 ? "A new one every fight, from the zones you've opened" : esc(stages()[b.arena].sub), arenaPick(b.arena))}
             ${row("Rule", b.rule === "stock" ? "Each fighter has lives; the last side standing wins." : "The first to so many KOs wins.", seg("rule", [["ko", "KO match"], ["stock", "Survival"]], b.rule))}
             ${row(b.rule === "stock" ? "Lives" : "KOs to win", "", seg("goal", [[1, "1"], [3, "3"], [5, "5"]], b.goal))}
             ${row("Time", "", seg("time", [[120, "2:00"], [180, "3:00"], [300, "5:00"], [0, "None"]], b.time))}
@@ -7006,13 +7835,15 @@
       const i = +el.dataset.ctl, s = b.slots[i];
       const order = i < 2 ? ["p1", "p2", "cpu"] : ["p1", "p2", "cpu", "off"];
       s.ctl = s.ctl === "off" ? "cpu" : cycle(order, s.ctl, 1);              // an empty slot: in comes a CPU
+      if ((s.ctl === "p1" || s.ctl === "p2") && s.who !== "random" && !hasFighter(s.who)) s.who = castId;   // (a player plays one of the team)
       if (s.ctl === "p1" || s.ctl === "p2") b.slots.forEach((o, k) => { if (k !== i && o.ctl === s.ctl) o.ctl = "cpu"; });   // one of each player
       redo();
     });
     ov.querySelectorAll("[data-arr]").forEach(el => el.onclick = () => {
       const key = el.dataset.arr, d = +el.dataset.d;
-      if (key === "arena") b.arena = (b.arena + d + stages().length) % stages().length;
-      else { const s = b.slots[+key.slice(3)]; s.who = cycle(CAST.map(c => c.id).concat(key.startsWith("who") ? ["random"] : []), s.who, d); }   // (and Random, after the last)
+      if (key === "arena") b.arena = cycle([-1].concat(openArenas()), b.arena, d);                 // (Random first, then the arenas of the zones open)
+      else { const s = b.slots[+key.slice(3)], team = s.ctl === "p1" || s.ctl === "p2";
+             s.who = cycle(CAST.map(c => c.id).filter(id => !team || hasFighter(id)).concat(["random"]), s.who, d); }   // (players: the team; and Random, after the last)
       redo();
     });
     ov.querySelectorAll("[data-seg]").forEach(el => el.onclick = () => {
@@ -7038,7 +7869,10 @@
 
   function tset() {
     const d = { you: castId, dummy: "knuckles", act: "stand", arena: 0 };
-    return (saveData.training = Object.assign(d, saveData.training || {}));
+    const t = saveData.training = Object.assign(d, saveData.training || {});
+    if (!hasFighter(t.you)) t.you = castId;
+    if (!unlocked(t.arena)) t.arena = 0;
+    return t;
   }
   function trainingSetup(first) {
     const t = tset(), ov = screenOn("setup");
@@ -7068,8 +7902,8 @@
     const redo = () => { save(saveData); trainingSetup(); };
     ov.querySelectorAll("[data-arr]").forEach(el => el.onclick = () => {
       const key = el.dataset.arr, d = +el.dataset.d;
-      if (key === "arena") t.arena = (t.arena + d + stages().length) % stages().length;
-      else t[key] = cycle(CAST.map(c => c.id), t[key], d);
+      if (key === "arena") t.arena = cycle(openArenas(), t.arena, d);
+      else t[key] = cycle(CAST.map(c => c.id).filter(id => key !== "you" || hasFighter(id)), t[key], d);
       redo();
     });
     ov.querySelectorAll("[data-seg]").forEach(el => el.onclick = () => { t.act = el.dataset.v; redo(); });
@@ -7389,7 +8223,7 @@
     glide: "a glide while held; glide into a wall to climb it", double: "a Double Jump", teleport: "Chaos Control, twice a jump",
     float: "Chaos Flight, a little more height", jet: "a burst of the jet ahead, and a hover", psy: "the Air Psycho Dash; then hold Space to float down",
     launch: "Shell Launch, straight up; against a wall, a wall jump" };
-  const airDesc = c => c.air === "hover" ? (c.id === "eggman" ? "Egg Hover: held up a while, then sinking slowly" : "Flight Mode: held up a while, sinking") : AIR_DESC[c.air] || "";
+  const airDesc = c => c.id === "eggman" ? "Egg Mobile Flight: tap to climb on its boosters, a while; then it glides down" : c.air === "hover" ? "Flight Mode: held up a while, sinking" : AIR_DESC[c.air] || "";
   function movesHtml(c) {
     const R = (k, t) => `<div class="adv-mv-r"><b>${k}</b><span>${t}</span></div>`;
     return `<div class="adv-mlist">
@@ -7465,7 +8299,9 @@
     const B = battle;
     if (B.cfg.net) return npBattleOver(B);
     if (B.cfg.tour) return tourBattleOver(B);
+    if (B.cfg.chal) return chalOver(B);
     if (B.cfg.kind === "story") return storyBattleOver(B);
+    { const me = B.fs.find(f => f.ctl === "p1"); if (me && B.winner === me.team && !B.counted) { B.counted = true; PROG().wins++; save(saveData); } checkUnlocks(); }
     mode = "results"; bgm("competition-results");
     host.querySelector(".adv-hud").classList.remove("on");
     /* (Emerl learns in his own story episode, not here) */
@@ -7619,6 +8455,250 @@
     else if (kbUsed && rebind) { const el = ov.querySelector(`[data-k="key-${rebind.slot}-${rebind.act}"]`); if (el) setFocus(el); }
   }
 
+  // ---------------------------------------------------------------- the team: who can be played
+  /* Every account starts with Sonic, Tails and Emerl, and their stories; the rest of the cast is won
+     over -- in a story chapter, a challenge, a race, Red Star Rings found, animals freed, or
+     Eggman's own tournament -- each with a scene of its own, and a card. Locked, they can still be
+     met as CPUs (and in the story); they are never picked. saveData: unlocked (who -> when), chal
+     (challenges open, who -> when), prog (battles won, animals freed, cups of 8 won). */
+  const START_CAST = ["sonic", "tails", "emerl"];
+  const PROG = () => (saveData.prog = saveData.prog || { wins: 0, animals: 0, cups: 0 });
+  const hasFighter = id => START_CAST.includes(id) || !!(saveData && saveData.unlocked && saveData.unlocked[id]);
+  const fightersN = () => CAST.filter(c => hasFighter(c.id)).length;
+  const chalsOpen = () => Object.keys((saveData && saveData.chal) || {}).filter(id => !hasFighter(id));
+  const chapterDone = (ep, title) => { const e = epOf(ep), i = e ? e.chapters.findIndex(c => c.title === title) : -1; return i >= 0 && epDone(ep) > i; };
+  const redRings = () => stages().reduce((n, z, i) => n + zoneShoes(i), 0);
+  const anyFinale = () => EPS().some(e => epDone(e.who) >= e.chapters.length);
+  const SAY = "";
+  const UNLOCK = {
+    amy: { how: "story", need: () => chapterDone("sonic", "Hammer Time"), hint: `Clear "Hammer Time" in Sonic's story.`,
+      join: [[SAY, "Rose Parlour. Amy has packed a bag: her hammer, her fortune cards, and a photo of Sonic."],
+             ["amy", "Sonic said I could come along! ...Well, he didn't say I couldn't."],
+             ["amy", "Look out, Eggman! Amy Rose is on the team!"]] },
+    knuckles: { how: "story", need: () => chapterDone("sonic", "Tricked Again"), hint: `Clear "Tricked Again" in Sonic's story.`,
+      join: [[SAY, "Guardian Peak. Knuckles stands over the empty shrines, fists clenched."],
+             ["knuckles", "Eggman tricked me for the last time. Nobody takes the rings from this mountain and gets away with it."],
+             ["knuckles", "Unlike Sonic, I don't chuckle. I'd rather flex. Let's go!"]] },
+    chaos: { how: "story", need: () => chapterDone("tails", "The Water's Guardian"), hint: `Clear "The Water's Guardian" in Tails' story.`,
+      join: [[SAY, "Moonwell Springs. The water stirs, and Chaos rises from the deepest pool, a Chao sitting on its shoulder."],
+             [SAY, "It looks up at the stars, where Eggman's station turns. Then it steps out of the water and onto the path."],
+             [SAY, "The guardian of the Chao will fight for them, wherever they need it."]] },
+    cream: { how: "story", need: () => chapterDone("emerl", "Cream"), hint: `Clear "Cream" in Emerl's story.`,
+      join: [["cream", "Cheese and I talked it over, and we'd like to help too! Mother says it's good manners to help your friends."],
+             [SAY, "Cheese spins in the air and chirps, very much in agreement."],
+             ["cream", "We'll do our very best! Won't we, Cheese?"]] },
+    gamma: { how: "story", need: () => chapterDone("amy", "A Kind Word"), hint: `Clear "A Kind Word" in Amy's story.`,
+      join: [["gamma", "New assignment confirmed: protect the girl. Stop the Star Engine."],
+             ["gamma", "Query: is this what the old unit felt, when it chose? ...Data insufficient. Proceeding anyway."]] },
+    shadow: { how: "fight", arena: "expressway", lvl: 2, need: () => chapterDone("sonic", "Prove It") && PROG().wins >= 10,
+      hint: `Clear "Prove It" in Sonic's story, then win 10 battles in Battle mode.`, count: () => `Battles won: ${Math.min(10, PROG().wins)}/10`,
+      what: "A one-on-one at Sundown Expressway, on Hard. Beat him, and he joins.",
+      call: [[SAY, "Sundown Expressway, at dusk. A black hedgehog with red stripes is waiting in the middle of the road."],
+             ["shadow", "Ten wins. I've been watching. You fight well... for someone who isn't the Ultimate Life Form."],
+             ["shadow", "Come to the expressway. Prove it."]],
+      join: [["shadow", "...Hmph. Not bad."],
+             ["shadow", "Don't misunderstand. I'm not doing this for you. Eggman's engine threatens everything I promised to protect. I'll fight."]] },
+    rouge: { how: "fight", arena: "club", lvl: 2, need: () => redRings() >= 15,
+      hint: "Find 15 Red Star Rings in the zones. Someone else is after them too.", count: () => `Red Star Rings: ${Math.min(15, redRings())}/15`,
+      what: "A one-on-one at Diamond Club, on Hard. Beat her, and she joins.",
+      call: [[SAY, "Diamond Club, after midnight. A bat in black lounges on the bar, turning a Red Star Ring between her fingers."],
+             ["rouge", "Fifteen Red Star Rings. You've been busy, sweetie. Busy doing MY job."],
+             ["rouge", "Here's the deal: beat me, and I stop competing with you. Lose, and those rings are mine."]],
+      join: [["rouge", "Oh, fine. You win. And a girl always knows when to switch to the winning side."],
+             ["rouge", "Besides, Eggman's engine is the biggest jewel in the world. I just want to see it. Up close."]] },
+    silver: { how: "zone", zone: "ruins", lvl: 2, need: () => chapterDone("sonic", "The Wrong Hedgehog"),
+      hint: `Clear "The Wrong Hedgehog" in Sonic's story, then reach the end of Cinder City Act 2 in Free Exhibition.`,
+      what: "He's waiting at the end of Cinder City Act 2, in Free Exhibition, where the boss would be.",
+      call: [[SAY, "A message, scorched into a broken wall in Cinder City: \"I still need to be sure. Meet me at the end of the old quarter.\""],
+             ["silver", "If the future really can change, I need to know the people who'll change it. I'll be waiting."]],
+      meet: [[SAY, "At the end of the old quarter, Silver drops out of the smoke, his hands glowing cyan."],
+             ["silver", "You came. Then show me: are you strong enough to change the future?"]],
+      join: [["silver", "You really are... okay. I believe you. I believe in you!"],
+             ["silver", "I'll stay in this time a little longer. If the future can change, I want to be there when it does."]] },
+    metal: { how: "race", zone: "stars", pace: 1.08, need: () => chapterDone("sonic", "The Real Thing"),
+      hint: `Clear "The Real Thing" in Sonic's story. Then he wants a rematch: a race.`,
+      what: "A race through Comet Circuit Act 3, at full speed. Reach the goal post first.",
+      call: [[SAY, "Comet Circuit. A silver-blue streak laps the racecourse, again and again, faster every time."],
+             ["metal", "(Metal Sonic stops at the starting line. It points at you. Then down the track.)"],
+             [SAY, "No fighting. No tricks. One run of Comet Circuit, the long way round, and the first to the goal post wins."]],
+      join: [["metal", "(It stands at the goal post a long time, very still. Then it turns, and falls in beside you.)"],
+             [SAY, "Second place felt, for the first time, like something it had never computed. Metal Sonic will run with you. For now."]] },
+    mighty: { how: "count", need: () => PROG().animals >= 300,
+      hint: "Free 300 animals from Eggman's badniks and capsules.", count: () => `Animals freed: ${Math.min(300, PROG().animals)}/300`,
+      join: [[SAY, "Redstone Canyon. A red and black armadillo sits on a rock, with Flickies, rabbits and squirrels all round him."],
+             ["mighty", "Three hundred little critters, set free from Eggman's machines. They told me all about you."],
+             ["mighty", "I don't like fighting. But I like seeing them free even more. Count me in!"]] },
+    eggman: { how: "cup", need: () => anyFinale(),
+      hint: "Clear the last chapter of any story. Then he'll hold a tournament of his own.",
+      what: "The Eggman Cup: a bracket of 8, with Eggman himself waiting in the final. Win it.",
+      call: [["eggman", "Hohoho! So you beat me at my own engine. Well, I've had enough of losing on YOUR terms!"],
+             ["eggman", "Welcome to the first annual EGGMAN CUP! Eight fighters, one bracket, and the greatest genius in the world waiting in the final!"],
+             ["eggman", "Win it, and I'll... graciously allow you to... play as ME. Lose, and you'll never hear the end of it!"]],
+      join: [["eggman", "No way! I can't believe this! In my OWN tournament!"],
+             ["eggman", "...Very well. A genius knows when an alliance is to his advantage. The Eggman Empire is open for business. On YOUR side. Temporarily!"]] },
+  };
+  let PENDING = [], RETRO = null;
+  /** What is newly won (a story or a count: on the team) or newly open to win (a challenge), queued
+      to be shown -- unless `quiet` (a save from before the team was won over: one card for it all). */
+  function checkUnlocks(quiet) {
+    if (!saveData) return [];
+    const U0 = saveData.unlocked = saveData.unlocked || {}, C0 = saveData.chal = saveData.chal || {}, got = [];
+    for (const id in UNLOCK) {
+      if (hasFighter(id) || PENDING.some(n => n.id === id)) continue;
+      const u = UNLOCK[id];
+      if (!u.need()) continue;
+      if (u.how === "story" || u.how === "count") { U0[id] = Date.now(); got.push({ id, kind: "join" }); }
+      else if (!C0[id]) { C0[id] = Date.now(); got.push({ id, kind: "chal" }); }
+    }
+    if (got.length) { save(saveData); if (!quiet) PENDING.push(...got); }
+    return got;
+  }
+  function grantFighter(id) {
+    (saveData.unlocked = saveData.unlocked || {})[id] = Date.now();
+    if (saveData.chal) delete saveData.chal[id];
+    save(saveData);
+  }
+  /* A save made before the team had to be won over: what its story already cleared is won now, and
+     any challenge it has earned is open; one card says so, at the main menu. */
+  function teamCatchUp() {
+    if (!saveData) return;
+    if (!hasFighter(castId)) { castId = "sonic"; saveData.cast = castId; }
+    if (saveData.teamV) return;
+    saveData.teamV = 1;
+    const got = checkUnlocks(true);
+    save(saveData);
+    if (got.length) RETRO = got;
+  }
+  /* the unlocks waiting to be shown: each one's scene, then its card; then `then` */
+  function showPending(then) {
+    const n = PENDING.shift(); if (!n) { then(); return; }
+    const u = UNLOCK[n.id];
+    if (!world || battle) ensureStageWorld();
+    playScene(n.kind === "join" ? u.join : u.call, () => unlockCard(n, () => showPending(then)));
+  }
+  const pendingFirst = then => { if (PENDING.length) { showPending(then); return true; } return false; };
+  function unlockCard(n, next) {
+    const c = castOf(n.id), u = UNLOCK[n.id], ep = epOf(n.id), join = n.kind === "join";
+    const ov = screenOn("story");
+    ov.innerHTML = `
+      <div class="panel adv-small pop adv-ulk">
+        <div class="adv-ulk-band">${join ? "New fighter" : "A new challenger"}</div>
+        <canvas width="176" height="144" data-face="${n.id}"></canvas>
+        <b class="adv-ulk-name">${join ? `${esc(c.name)} joins the team!` : `${esc(c.name)} ${u.how === "race" ? "wants a race" : u.how === "cup" ? "is holding a tournament" : "wants a fight"}!`}</b>
+        <p class="adv-note">${join ? `${esc(poss(c.name))} story, <b>${esc(ep ? ep.title : "")}</b>, is open in Story, and ${esc(c.name)} can be picked in every mode. ${fightersN()} of ${CAST.length} on the team.`
+          : `${esc(u.what)} It waits under Fighters, on the main menu.`}</p>
+        <div class="adv-btns">
+          ${join ? `<button class="btn" data-ok data-focus data-enter>${ico("check")}Let's go!</button>`
+            : `<button class="btn" data-go data-focus data-enter>${ico("flag")}Take it on now</button><button class="btn ghost" data-ok data-back>Later</button>`}
+        </div>
+      </div>`;
+    ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 2));
+    ov.querySelector("[data-ok]").onclick = () => next();
+    if (ov.querySelector("[data-go]")) ov.querySelector("[data-go]").onclick = () => { PENDING = []; takeChallenge(n.id); };
+    SFX.check && SFX.check();
+    setTimeout(autoFocus, 0);
+  }
+  /* one card for a save from before: who is on the team already, and who is waiting */
+  function retroCard(got, next) {
+    const ov = screenOn("story"), joined = got.filter(g => g.kind === "join"), chal = got.filter(g => g.kind === "chal");
+    ov.innerHTML = `
+      <div class="panel adv-small pop adv-ulk">
+        <div class="adv-ulk-band">The team</div>
+        <p class="adv-note">Fighters are won over now: everyone starts with Sonic, Tails and Emerl. From your story so far:</p>
+        <div class="adv-ulk-row">${joined.map(g => `<span><canvas width="88" height="72" data-face="${g.id}"></canvas><b>${esc(castOf(g.id).name)}</b></span>`).join("")}</div>
+        ${joined.length ? `<p class="adv-note">${joined.length === 1 ? "joins" : "join"} the team.</p>` : ""}
+        ${chal.length ? `<p class="adv-note">Waiting for you under Fighters: ${chal.map(g => esc(castOf(g.id).name)).join(", ")}.</p>` : ""}
+        <div class="adv-btns"><button class="btn" data-ok data-focus data-enter>${ico("check")}Let's go!</button></div>
+      </div>`;
+    ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 1));
+    ov.querySelector("[data-ok]").onclick = () => next();
+    setTimeout(autoFocus, 0);
+  }
+
+  /* ---- the challenges: a fight, a fight at a zone's end, a race, a tournament */
+  function takeChallenge(id) {
+    const u = UNLOCK[id];
+    if (!u || hasFighter(id)) { fighters(); return; }
+    if (u.how === "fight") playScene(u.call.slice(-1), () => chalFight(id));
+    else if (u.how === "zone") {
+      const zi = stageAt(u.zone);
+      if (!actOpen(zi, 1)) { note(`Get to ${stages()[zi].name} Act 2 in Free Exhibition first.`); fighters(); return; }
+      storyRun = null; RACE = null; stageIdx = zi; actIdx = 1; demo = null; play();
+    } else if (u.how === "race") {
+      const def = raceDef(stageAt(u.zone));
+      loadDef(def);
+      playScene(u.call.slice(-1), () => raceStart({ def, who: id, pace: u.pace, winLabel: "Fighters", backLabel: "Main menu", onBack: () => mainMenu(),
+        onWin: () => { grantFighter(id); PENDING.push({ id, kind: "join" }); showPending(() => fighters()); } }));
+    } else if (u.how === "cup") {
+      playScene(u.call.slice(-1), () => {
+        TOUR = tourMake({ size: 8, lvl: 1, goal: 2, arena: -1, online: false, cup: "eggman", humans: [{ name: root.Auth && Auth.user ? Auth.name : "You", who: castId, me: true }] });
+        tourBracket();
+      });
+    }
+  }
+  function chalFight(id) {
+    const u = UNLOCK[id];
+    startBattle({ kind: "battle", chal: id, slots: [{ who: castId, ctl: "p1", team: 0 }, { who: id, ctl: "cpu", lvl: u.lvl, team: 1 }],
+                  teams: true, arena: stageAt(u.arena || u.zone), rule: "stock", goal: 2, time: 180, hp: 200 });
+  }
+  function chalOver(B) {
+    const id = B.cfg.chal, won = B.winner === B.fs[0].team;
+    if (won) { grantFighter(id); endBattle(); PENDING.push({ id, kind: "join" }); showPending(() => fighters()); return; }
+    mode = "results";
+    host.querySelector(".adv-hud").classList.remove("on");
+    const ov = host.querySelector(".adv-ov");
+    ov.innerHTML = `
+      <div class="panel adv-small pop">
+        <div class="panel-hd">${ico("info")}${esc(castOf(id).name)} wins this time</div>
+        <p class="adv-note">The challenge stays open under Fighters. Down guards, and held still heals; the move list is in Training.</p>
+        <div class="adv-btns">
+          <button class="btn" id="advTry" data-focus>${ico("flag")}Try again</button>
+          <button class="btn ghost" id="advSt" data-back>${ico("person")}Fighters</button>
+        </div>
+      </div>`;
+    ov.querySelector("#advTry").onclick = () => startBattle(B.cfg);
+    ov.querySelector("#advSt").onclick = () => fighters();
+    setTimeout(autoFocus, 0);
+  }
+  const note = msg => { if (root.AdventureOnline && AdventureOnline.toast) AdventureOnline.toast(msg); };
+
+  /* The Fighters screen: the team, and how to win over the rest (the challenges open, to take on) */
+  function fighters() {
+    if (pendingFirst(fighters)) return;
+    const ov = screenOn("story");
+    ensureStageWorld();
+    const open = chalsOpen();
+    ov.innerHTML = `
+      <div class="adv-menu pop">
+        <div class="panel adv-panel">
+          <div class="panel-hd">${ico("person")}Fighters: ${fightersN()} of ${CAST.length}</div>
+          <p class="adv-note">Everyone starts with Sonic, Tails and Emerl. The rest of the cast is won over: in the story, in challenges, and out in the zones.</p>
+          <div class="setrow"><div class="setlab"><b>Your fighter</b><i>For the challenges, Free Exhibition and the Tournament.</i></div><div class="adv-pick"><button class="adv-arr" data-pk="-1">${ico("back")}</button><canvas width="44" height="40" data-face="${castId}"></canvas><b>${esc(castOf(castId).name)}</b><button class="adv-arr" data-pk="1">${ico("next")}</button></div></div>
+          <div class="adv-roster">
+            ${CAST.map(c => { const has = hasFighter(c.id), u = UNLOCK[c.id] || {}, ch = !has && open.includes(c.id);
+              return `
+              <div class="adv-rst ${has ? "" : "locked"} ${ch ? "chal" : ""}">
+                <canvas width="88" height="72" data-face="${c.id}" ${has ? "" : 'data-dark="1"'}></canvas>
+                <div class="adv-rst-tx"><b>${has ? esc(c.name) : "???"}</b><i>${has ? "On the team" : esc(ch ? u.what : u.hint)}</i>${!has && u.count ? `<em>${esc(u.count())}</em>` : ""}</div>
+                ${ch ? `<button class="btn" data-chal="${c.id}" data-k="chal-${c.id}">${ico("flag")}${u.how === "race" ? "Race" : u.how === "cup" ? "Enter" : u.how === "zone" ? "Go there" : "Fight"}</button>` : ""}
+              </div>`; }).join("")}
+          </div>
+          <div class="adv-go"><button class="btn ghost" data-back data-focus data-k="back">${ico("back")}Main menu</button></div>
+        </div>
+      </div>`;
+    ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 1));
+    ov.querySelectorAll("[data-chal]").forEach(b => b.onclick = () => takeChallenge(b.dataset.chal));
+    ov.querySelectorAll("[data-pk]").forEach(b => b.onclick = () => { castId = cycleTeam(castId, +b.dataset.pk); saveData.cast = castId; save(saveData); fighters(); });
+    ov.querySelector("[data-back]").onclick = () => mainMenu();
+    autoFocus();
+  }
+  /* the next fighter on the team, either way round */
+  function cycleTeam(id, d) {
+    const ids = CAST.map(c => c.id).filter(hasFighter);
+    const i = ids.indexOf(id);
+    return ids[((i < 0 ? 0 : i + d) % ids.length + ids.length) % ids.length];
+  }
+
   // ---------------------------------------------------------------- story
   /* The story: The Red Star Rings, told as an episode for each of the cast, the way Sonic
      Battle tells its story (adventure-story.js and its two parts). An episode is chapters, each a
@@ -7637,6 +8717,7 @@
   function chapterLine(ch) {
     const who = castOf(ch.who).name;
     if (ch.kind === "run") { const d = storyDef(ch); return `${who}: ${d.name}${d.actN ? " Act " + d.actN : ""}`; }
+    if (ch.kind === "race") return `${who}: ${stages()[stageAt(ch.zone)].name} Act 3, a race against ${castOf(ch.rival).name}`;
     if (ch.kind === "zone") {
       const z = stages()[stageAt(ch.zone)], with_ = (ch.allies || []).map(a => castOf(a).name);
       return `${who}: ${z.name}, Acts 1 and 2, then ${ch.foes ? ch.foes.map(f => castOf(f.who).name).join(" & ") + (with_.length ? " (with " + with_.join(" & ") + ")" : "")
@@ -7647,12 +8728,13 @@
   }
   /** The story's first screen: whose episode. (With `who`, or from a chapter, that episode's chapters.) */
   function storyMenu(who) {
+    if (pendingFirst(() => storyMenu(who))) return;
     if (who === undefined && storyRun) who = storyRun.who;
     storyRun = null;
     if (who && epOf(who)) return storyEpisode(who);
     const ov = screenOn("story");
     ensureStageWorld();
-    const list = EPS(), last = (saveData.story && saveData.story.last) || (list[0] && list[0].who);
+    const list = EPS(), last0 = (saveData.story && saveData.story.last) || (list[0] && list[0].who), last = hasFighter(last0) ? last0 : "sonic";
     ov.innerHTML = `
       <div class="adv-menu pop">
         <div class="panel adv-panel">
@@ -7660,10 +8742,10 @@
           <p class="adv-note">One story, told from every side. Whose episode?</p>
           <div class="adv-stages adv-chs">
             ${list.map(ep => { const n = ep.chapters.length, d = Math.min(epDone(ep.who), n); return `
-              <button class="adv-st ${ep.who === last ? "on" : ""}" data-ep="${ep.who}" data-k="ep-${ep.who}" ${ep.who === last ? "data-focus" : ""}>
-                <canvas class="adv-st-who" width="36" height="38" data-face="${ep.who}"></canvas>
-                <span class="adv-st-tx"><b>${esc(castOf(ep.who).name)}: ${esc(ep.title)}</b><i>${esc(ep.blurb)}</i></span>
-                <span class="adv-chk">${d >= n ? `${ico("check")}Cleared` : d ? `${d}/${n}` : `${n} chapters`}</span>
+              <button class="adv-st ${ep.who === last ? "on" : ""} ${hasFighter(ep.who) ? "" : "locked"}" data-ep="${ep.who}" data-k="ep-${ep.who}" ${ep.who === last ? "data-focus" : ""} ${hasFighter(ep.who) ? "" : "disabled"}>
+                <canvas class="adv-st-who" width="36" height="38" data-face="${ep.who}" ${hasFighter(ep.who) ? "" : 'data-dark="1"'}></canvas>
+                <span class="adv-st-tx"><b>${hasFighter(ep.who) ? `${esc(castOf(ep.who).name)}: ${esc(ep.title)}` : "???"}</b><i>${esc(hasFighter(ep.who) ? ep.blurb : (UNLOCK[ep.who] || {}).hint || "")}</i></span>
+                <span class="adv-chk">${!hasFighter(ep.who) ? `${ico("lock")}Locked` : d >= n ? `${ico("check")}Cleared` : d ? `${d}/${n}` : `${n} chapters`}</span>
               </button>`; }).join("")}
           </div>
           <div class="adv-go">
@@ -7672,13 +8754,14 @@
         </div>
       </div>`;
     ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "idle", 1));
-    ov.querySelectorAll("[data-ep]").forEach(b => b.onclick = () => storyEpisode(b.dataset.ep));
+    ov.querySelectorAll("[data-ep]").forEach(b => b.onclick = () => { if (hasFighter(b.dataset.ep)) storyEpisode(b.dataset.ep); });
     ov.querySelector("#advSBack").onclick = () => mainMenu();
     autoFocus();
     const on = ov.querySelector(".adv-st.on"); if (on) on.scrollIntoView({ block: "nearest" });
   }
   /** One runner's episode: its chapters. */
   function storyEpisode(who) {
+    if (!hasFighter(who)) { storyMenu(null); return; }
     storyRun = null;
     const ep = epOf(who); if (!ep) return storyMenu(null);
     saveData.story = saveData.story || {}; saveData.story.last = who; save(saveData);
@@ -7694,9 +8777,9 @@
             ${list.map((ch, i) => { const open = i <= done; return `
               <button class="adv-st ${i === next ? "on" : ""} ${open ? "" : "locked"}" data-ch="${i}" data-k="ch-${i}" ${open ? "" : "disabled"}>
                 <span class="adv-n">${i + 1}</span>
-                <canvas class="adv-st-who" width="36" height="38" data-face="${ch.foes ? ch.foes[0].who : ch.who}"></canvas>
+                <canvas class="adv-st-who" width="36" height="38" data-face="${ch.rival || (ch.foes ? ch.foes[0].who : ch.who)}"></canvas>
                 <span class="adv-st-tx"><b>${esc(ch.title)}</b><i>${esc(chapterLine(ch))}</i></span>
-                <span class="adv-chk">${!open ? `${ico("lock")}Locked` : i < done ? `${ico("check")}Cleared` : ch.kind === "battle" ? "Battle" : ch.kind === "zone" ? "Zone" : "Stage"}</span>
+                <span class="adv-chk">${!open ? `${ico("lock")}Locked` : i < done ? `${ico("check")}Cleared` : ch.kind === "battle" ? "Battle" : ch.kind === "zone" ? "Zone" : ch.kind === "race" ? "Race" : "Stage"}</span>
               </button>`; }).join("")}
           </div>
           <div class="adv-go">
@@ -7719,6 +8802,7 @@
     endBattle();
     storyRun = { who, ep, i, ch };
     if (ch.kind === "zone") { playZone(ch); return; }
+    if (ch.kind === "race") { playRaceChapter(ch); return; }
     if (ch.kind === "run") { storyRun.def = storyDef(ch); loadDef(storyRun.def); glideX = 12; camX = 15; }
     else { disposeWorld(); world = buildWorld(arenaDef(stageAt(ch.arena))); player = makePlayer(castOf(ch.who)); glideX = world.W / 2; snapCamera(); }
     music();
@@ -7762,16 +8846,31 @@
     if (from >= 1) { zoneAct(1); music(); playScene(ch.mid, () => play()); return; }             // back at Act 2
     zoneAct(0); music(); playScene(ch.before, () => play());
   }
+  /* A race chapter (`kind: "race"`): the zone's Act 3, the racecourse, against `rival` -- their run
+     the robot's, played straight; first to the post wins, and the story goes on */
+  function playRaceChapter(ch) {
+    const R = storyRun, def = raceDef(stageAt(ch.zone));
+    R.def = def; loadDef(def); glideX = 12; camX = 15; music();
+    playScene(ch.before, () => raceStart({ def, who: ch.rival, pace: ch.pace || 1.25, winLabel: "Go on with the story", backLabel: "Story",
+      onWin: () => { storyRun = R; storyAfter(); }, onBack: () => storyMenu() }));
+  }
   /* Act 1 cleared: the talk between, and on into Act 2 */
   function zoneNext() {
     storyAt(1);
     zoneAct(1); music();
     playScene(storyRun.ch.mid, () => play());
   }
-  const rivalAt = def => !!(storyRun && rivalOf(storyRun.ch) && def && def.last && def.zone && def.zone.id === storyRun.ch.zone);
-  function newRival(w) {
+  function rivalSpec(def) {
+    if (!def || !def.last || !def.zone) return null;
+    if (storyRun && rivalOf(storyRun.ch) && def.zone.id === storyRun.ch.zone) { const ch = storyRun.ch; return { who: rivalOf(ch), hero: ch.who, meet: ch.meet, story: true, fight: () => storyFight(ch) }; }
+    const u = UNLOCK.silver;                                   // Silver's challenge: at the end of Cinder City Act 2, in Free Exhibition
+    if (!storyRun && !NP.on && !RACE && def.zone.id === u.zone && saveData && saveData.chal && saveData.chal.silver && !hasFighter("silver"))
+      return { who: "silver", hero: runnerId(), meet: u.meet, fight: () => chalFight("silver") };
+    return null;
+  }
+  function newRival(w, spec) {
     const x0 = w.arena.x0, a0 = x0 + 11, a1 = a0 + BOSS_W;
-    return { who: rivalOf(storyRun.ch), C: { chase: false }, x0, a0, a1, camX: (a0 + a1) / 2, gy: w.arena.y, state: "wait", t: 0, lock: false,
+    return { who: spec.who, spec, C: { chase: false }, x0, a0, a1, camX: (a0 + a1) / 2, gy: w.arena.y, state: "wait", t: 0, lock: false,
              x: a1 - 4, y: w.arena.y + 10, vy: 0, landed: false, card: null };
   }
   /* (while they drop in, nobody moves) */
@@ -7785,7 +8884,8 @@
       r.state = "in"; r.t = 0; r.lock = true; r.landed = false;
       r.x = clamp(p.x + 5, r.a0 + 4, r.a1 - 3); r.y = r.gy + 10; r.vy = 0;
       r.card = makeCard(r.who); world.group.add(r.card);
-      storyAt(2); SFX.bossIn(); hudToast(castOf(r.who).name);
+      if (r.spec.story) storyAt(2);
+      SFX.bossIn(); hudToast(castOf(r.who).name);
       return;
     }
     if (r.lock) { const L = r.a0 + 0.5, Rx = r.a1 - 0.5; if (p.x < L) { p.x = L; if (p.vx < 0) p.vx = 0; } if (p.x > Rx) { p.x = Rx; if (p.vx > 0) p.vx = 0; } }
@@ -7808,17 +8908,16 @@
     const r = world.rival, p = player;
     p.face = r.x > p.x ? 1 : -1; p.vx = 0; p.state = "run";
     glideX = r.camX - 3; camX = r.camX;
-    playScene(storyRun.ch.meet, () => rivalVs());
+    playScene(r.spec.meet, () => rivalVs(r), p.x < r.x ? { l: p.c.id, r: r.who } : { l: r.who, r: p.c.id });
   }
-  function rivalVs() {
-    const R = storyRun, ch = R.ch;
-    showVs(ch, () => { if (storyRun === R && mode === "scene") storyFight(ch); });
+  function rivalVs(r) {
+    showVs({ who: r.spec.hero, foes: [{ who: r.who }] }, () => { if (world && world.rival === r && mode === "scene") r.spec.fight(); });
   }
   /* the VS card: the hero and the one they meet, a moment, then on (`then`) */
   function showVs(ch, then) {
     const ov = screenOn("scene");
     ov.innerHTML = `<div class="adv-vs"><canvas width="176" height="144" data-face="${ch.who}"></canvas><b>VS</b><canvas width="176" height="144" data-face="${ch.foes[0].who}"></canvas></div>`;
-    ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 2));
+    ov.querySelectorAll("[data-face]").forEach((cv, i) => { paintCard(cv, cv.dataset.face, "portrait", 2); cv.classList.toggle("flip", flipFor(cv.dataset.face, i ? "r" : "l")); });
     SFX.dash();
     setTimeout(then, 1150);
   }
@@ -7885,6 +8984,7 @@
     eps[R.who] = Math.max(eps[R.who] || 0, i + 1); saveData.story.last = R.who;
     if (saveData.story.at && saveData.story.at.who === R.who && saveData.story.at.i === i) saveData.story.at = null;
     save(saveData);
+    if (!R.ulk) { R.ulk = true; checkUnlocks(); if (pendingFirst(() => chapterClear())) return; }
     const n = ep.chapters.length, next = i + 1 < n ? i + 1 : -1, nch = next >= 0 ? chOf(ep, next) : null, all = epsCleared();
     const ov = screenOn("story");
     const skills = !R.got ? "" : R.got.length ? R.got.map(g => `
@@ -7915,8 +9015,54 @@
      left, the next on the right; a third takes the place of whoever spoke longest ago), their
      name, and their words typed out at the dialogue speed Options sets. Z, Enter or a tap goes
      on (all of a line at once, then the next); X skips the rest. Narration has no portrait. */
-  const lineOf = x => Array.isArray(x) ? { who: x[0], text: x[1] } : x;
-  function playScene(lines, done) {
+  const lineOf = x => Array.isArray(x) ? { who: x[0], text: x[1], act: x[2] || null } : x;
+  /* What the speaker's bust does as they say it -- a line can name it (a third item: "hop",
+     "laugh", "shake", "shock", "tilt", "slump", "nod", "lean", "flee", "think"); if not, the
+     words say: a laugh, a shout, a gasp, a question, a sigh, an exit. A bust that flees runs
+     off its side of the screen, jittering, and comes back in when its runner speaks again. */
+  const G_ACTS = ["hop", "laugh", "shake", "shock", "tilt", "slump", "nod", "lean", "flee", "think", "enter", "flinch"];
+  const G_FLEE = /\b(time to (go|leave|run|scram)|retreat|i'?ll be back|you haven'?t seen the last|until next time|so long|i'?ll get you|you'?ll regret|i'?m (out of|outta) here|run for it|see you later|later, (hedgehog|losers?|fools?)|fall back)\b/i;
+  const G_GONE = /\b(spins|zooms|wobbles|flies|races|runs|speeds|blasts|darts|dashes|shoots|roars|rockets|scurries|hurries|bolts) (away|off)\b|\bis gone\b|\bgets away\b|\bescapes\b|\bflees\b|\bvanishes\b/i;
+  function actOf(L) {
+    const t = (L.text || "").trim();
+    if (G_FLEE.test(t)) return "flee";
+    if (/\b(ha(ha)+|ho ?ho(ho)*|heh(eh)*|hee ?hee|tee ?hee)\b|\bhah!/i.test(t)) return "laugh";
+    if (/^(what|huh|wha|eh|whoa|woah|no way|impossible|eek|gah)\b|\?!|!\?/i.test(t)) return "shock";
+    if (/\b(grr+|argh+|blast( it)?|curses?|how dare|you'?ll pay|enough|stop right there|get back here|you traitor|why,? you|outrageous)\b|\bhmph!/i.test(t)) return "shake";
+    if (/^\.\.\.|\b(sigh|sorry|i'?m afraid|lost|failed|alone|too late|i miss)\b/i.test(t)) return "slump";
+    if (/^\(/.test(t)) return "think";                       // (a robot that doesn't speak: what it does instead)
+    if (/^(yes|yeah|right|okay|ok|got it|understood|sure|agreed|of course|affirmative|confirmed|deal)\b/i.test(t)) return "nod";
+    if (/!/.test(t) && /\b(yay|hooray|awesome|great|alright|all right|let'?s go|woo+|thank(s| you)|we did it|you did it|wonderful|amazing)\b/i.test(t)) return "hop";
+    if (/\?$/.test(t)) return "tilt";
+    if (/!$/.test(t)) return "lean";
+    return null;
+  }
+  /* a bust's names in the narration: its runner's, and what they go about in */
+  const G_ALIAS = { eggman: ["Egg Mobile"], tails: ["the fox"], gamma: ["Gamma"], metal: ["Metal Sonic"] };
+  function namedIn(text, who) {
+    const c = castOf(who), nm = ((c && c.name) || who).replace(/^Dr\. /, "");
+    if (who === "sonic") return /(?<!Metal )\bSonic\b/.test(text);
+    return [nm].concat(G_ALIAS[who] || []).some(n => text.includes(n));
+  }
+  /* the busts stand behind the talk box, their cut-off edge always under it: the box's top
+     (with the whole line in it) is where they stand, sunk a way below it */
+  function seatBusts(T, text) {
+    const wrap = T.ov.querySelector(".adv-talk"), box = T.ov.querySelector(".adv-tk-box"), tx = T.ov.querySelector(".adv-tk-text");
+    if (!wrap || !box || !tx) return;
+    const keep = tx.textContent; tx.textContent = text || "";
+    const top = wrap.getBoundingClientRect().bottom - box.getBoundingClientRect().top;
+    tx.textContent = keep;
+    if (top > 0) wrap.style.setProperty("--tkb", Math.round(top) + "px");
+  }
+  function gesture(T, side, act) {
+    const cv = T.ov.querySelector(".adv-tk-face." + side); if (!cv) return;
+    for (const a of G_ACTS) cv.classList.remove("g-" + a);
+    if (!act) return;
+    void cv.offsetWidth;                                 // (from the start again)
+    cv.classList.add("g-" + act);
+    T.gone[side] = act === "flee";
+  }
+  function playScene(lines, done, seat) {
     lines = (lines || []).map(lineOf);
     if (!lines.length) { done(); return; }
     const ov = screenOn("scene");
@@ -7931,7 +9077,7 @@
         </div>
         <button class="btn ghost adv-tk-skip" data-k="skip">Skip</button>
       </div>`;
-    talk = { lines, i: -1, done, shown: 0, t: 0, sides: { l: null, r: null }, last: "r", ov };
+    talk = { lines, i: -1, done, shown: 0, t: 0, sides: { l: null, r: null }, seat: seat || null, gone: { l: false, r: false }, last: "r", ov };
     ov.querySelector(".adv-talk").onclick = e => { if (e.target.closest(".adv-tk-skip")) sceneSkip(); else sceneNext(); };
     sceneNext();
   }
@@ -7947,17 +9093,36 @@
     if (n.who) {
       let side = T.sides.l === n.who ? "l" : T.sides.r === n.who ? "r" : null;
       if (!side) {
-        side = T.sides.l == null ? "l" : T.sides.r == null ? "r" : T.last === "l" ? "r" : "l";
+        /* (a meeting in the world seats each where they stand: `seat` {l, r}) */
+        const st = T.seat && (T.seat.l === n.who ? "l" : T.seat.r === n.who ? "r" : null);
+        side = st || (T.sides.l == null && !(T.seat && T.seat.l) ? "l" : T.sides.r == null && !(T.seat && T.seat.r) ? "r" : T.sides.l == null ? "l" : T.sides.r == null ? "r" : T.last === "l" ? "r" : "l");
         T.sides[side] = n.who;
         const cv = T.ov.querySelector(".adv-tk-face." + side); paintCard(cv, n.who); cv.classList.add("in");
+        cv.classList.toggle("flip", flipFor(n.who, side));
+        T.gone[side] = true;                             // (in from its side of the screen)
       }
       T.last = side;
+      /* the bust's gesture: in again first, if it had gone (then the gesture); a shout or a gasp
+         makes the other one flinch */
+      const act = n.act || actOf(n), other = side === "l" ? "r" : "l";
+      if (T.gone[side]) {
+        gesture(T, side, "enter"); T.gone[side] = false;
+        if (act && act !== "lean") setTimeout(() => { if (talk === T && T.lines[T.i] === n) gesture(T, side, act); }, 380);
+      } else gesture(T, side, act);
+      if ((act === "shake" || act === "shock") && T.sides[other] && !T.gone[other]) gesture(T, other, "flinch");
+      /* the runner standing in the world turns to whoever is talking to them (a meeting already
+         has the two of them face to face, where they stand) */
+      if (player && world && !(world.rival && world.rival.lock) && n.who !== (player.c && player.c.id)) T.face = player.face = side === "l" ? -1 : 1;
     }
+    seatBusts(T, n.text);
+    /* narration: someone on screen making off (the Egg Mobile spinning away, Sonic gone) */
+    if (!n.who && G_GONE.test(n.text)) for (const sd of ["l", "r"]) if (T.sides[sd] && !T.gone[sd] && namedIn(n.text, T.sides[sd])) gesture(T, sd, "flee");
     if (!textMs()) T.shown = n.text.length;
     paintTalk();
   }
   function sceneTick(dt) {
     const T = talk; if (!T) return;
+    if (T.face && player) player.face = T.face;           // (held there, through the talk)
     const L = T.lines[T.i]; if (!L || T.shown >= L.text.length) return;
     T.t += dt * 1000;
     const n = Math.min(L.text.length, Math.floor(T.t / Math.max(1, textMs())));
@@ -7997,6 +9162,13 @@
     return ACT_DEFS[id] || (ACT_DEFS[id] = Object.assign({}, z, z.acts[a], { id, zone: z, actN: a + 1, last: a === z.acts.length - 1, acts: null }));
   }
   const nActs = i => (stages()[i] && stages()[i].acts ? stages()[i].acts.length : 1);
+  /* a zone's Act 3: its racecourse -- much longer, few badniks, its hazards, roads up high and
+     shortcuts -- raced against a rival (Stage Racing, the story's races, Metal Sonic's challenge) */
+  function raceDef(i) {
+    const z = stages()[i]; if (!z || !z.race) return null;
+    const id = z.id + "-3";
+    return ACT_DEFS[id] || (ACT_DEFS[id] = Object.assign({}, z, z.race, { id, zone: z, actN: 3, last: false, race: true, acts: null }));
+  }
   /* an Act cleared -- or its whole zone, in a record from before the zones had Acts */
   const actCleared = (i, a) => { const z = stages()[i]; return !!((saveData.stages[z.id + "-" + (a + 1)] || {}).clear || (saveData.stages[z.id] || {}).clear || (z.was && (saveData.stages[z.was] || {}).clear)); };
   const actOpen = (i, a) => unlocked(i) && (a === 0 || actCleared(i, a - 1) || actCleared(i, a));
@@ -8007,7 +9179,7 @@
 
   /* the stage up now: a story chapter's own, or the Act picked on the stage select */
   const storyStages = () => (root.AdventureStages && AdventureStages.STORY) || [];
-  const curDef = () => (NP.on && NP.def) || (storyRun && storyRun.def) || actDef(stageIdx, actIdx);
+  const curDef = () => (NP.on && NP.def) || (GPR && GPR.def) || (RACE && RACE.def) || (storyRun && storyRun.def) || actDef(stageIdx, actIdx);
   function load3d(i, a) { stageIdx = i; if (a != null) actIdx = a; actIdx = clamp(actIdx, 0, nActs(i) - 1); loadDef(actDef(i, actIdx)); }
   function loadDef(def) {
     disposeWorld();
@@ -8029,7 +9201,7 @@
     endBattle(); storyRun = null; talk = null;
     if (mode !== "title" && mode !== "main" && world) { glideX = Math.max(12, world.start.x); camX = glideX + 3; }
     mode = "title"; paused = false; music();
-    demoStart();
+    if (!(demo && world && world.demo)) demoStart();
     const ov = host.querySelector(".adv-ov");
     host.querySelector(".adv-hud").classList.remove("on");
     host.classList.remove("playing");
@@ -8059,16 +9231,17 @@
      Nothing hurts it and it is quiet; fallen, it is put back on the road ahead; stuck a while,
      it skips on; at the goal post the post spins, and after a moment, the next. */
   function demoStart() {
-    const zones = stages().map((z, i) => i), ids = CAST.map(c => c.id);
+    const zones = stages().map((z, i) => i).filter(i => cleanRunners(stages()[i].id + "-1").length);
     const pick = (list, not) => { const l = list.length > 1 ? list.filter(v => v !== not) : list; return l[Math.floor(Math.random() * l.length)]; };
-    const i = pick(zones, demo && demo.i), id = pick(ids, demo && demo.id);
+    const i = pick(zones.length ? zones : stages().map((z, k) => k), demo && demo.i);
+    const ok = cleanRunners(stages()[i].id + "-1"), id = pick(ok.length ? ok : CAST.map(c => c.id), demo && demo.id);
     disposeWorld();
     world = buildWorld(actDef(i, 0)); world.demo = true; world.played = true;
     player = makePlayer(castOf(id)); player.demo = true;
     snapCamera();
     const box = host.querySelector(".adv-3d");
     if (box && R.domElement.parentNode !== box) box.appendChild(R.domElement);
-    demo = { i, id, t: 0, acc: 0, best: player.x, still: 0, hold: 0, jt: 0, airUsed: false, done: 0, safe: { x: player.x, y: player.y }, inp: newInput() };
+    demo = Object.assign(newBot(player), { i, id, acc: 0 });
   }
   /* where on the screen the demo's runner goes (-1 the bottom, 1 the top): the middle of the open
      band under the logo and Start, over the heads of the strip's cast -- measured off the page now
@@ -8088,64 +9261,960 @@
     return D.band;
   }
   /* back on the road, `dist` metres or more on from x: the nearest standing place to the height it was at */
-  function demoWarp(p, x, dist) {
-    for (let dx = dist; dx < dist + 16; dx++) {
-      const i = Math.floor(x + dx); if (i < 2 || i >= world.W - 2) break;
-      let best = null;
-      for (let j = 1; j < H - 3; j++) {
-        const under = tile(i, j - 1), at = tile(i, j), over = tile(i, j + 1);
-        if ((solid(under) || under === "-") && !solid(at) && !solid(over) && at !== "~" && over !== "~" && (best == null || Math.abs(j - p.y) < Math.abs(best - p.y))) best = j;
-      }
-      if (best != null) {
-        p.x = i + 0.5; p.y = best + 0.02; p.vx = p.c.run * 0.4; p.vy = 0; p.ground = false; p.on = null; p.state = "run"; p.curl = false;
-        p.dead = 0; p.demoFell = false; p.mv = null; p.sp = null;
-        burst(p.x, p.y + 0.6, [0xffffff, 0x9ad4ff], 10, 4);
-        if (demo) demo.warps = (demo.warps || 0) + 1;
-        return true;
-      }
+  /* The robot: the title demo's runner, and (out of sight) a racing rival's. It holds right; jumps
+     walls, gaps, badniks and a slow-down; uses the air action for a wall or a drop (Knuckles
+     climbs). Played straight: no help, nothing skipped -- it breathes as a runner does and is hit
+     as one is. Stuck at something, it backs off for a run at it (three tries); a fall, a hit it
+     can't take, or no way past, and its run is over: "fail". */
+  const newBot = p => ({ t: 0, best: p.x, still: 0, hold: 0, jt: 0, zt: 0, back: 0, tries: 0, airUsed: false, done: 0, goal: null, gt: 0, tried: [], dashT: 0, inp: newInput() });
+  /* stuck: a way up -- a ledge or a plank higher than it is, within a jump (its own, and its air
+     action's), back the way it came or just ahead, with room over it to jump (not up into a roof) */
+  /* how many rows up a runner really gets: its jump (about three), and what its air action adds
+     (flight a good deal, a double jump some, a hover or a glide hardly any) */
+  const jumpRows = c => (c.jump * c.jump) / (2 * GRAV * 0.7) + ({ fly: 2.6, ballet: 1.2, double: 1.2, hop: 1 }[c.air] || 0.3);
+  function stepUp(p, tried) {
+    const c = p.c, reach = jumpRows(c), x0 = Math.floor(p.x), y0 = Math.floor(p.y + 0.01);
+    const open = (i, j) => { const t = tile(i, j); return !solid(t) || t === "-"; };
+    let best = null, bs = 1e9;
+    for (let i = x0 - 24; i <= x0 + 4; i++) for (let j = y0 + 1; j <= y0 + Math.ceil(reach); j++) {
+      const under = tile(i, j - 1);
+      if (!(solid(under) || under === "-") || !open(i, j) || !open(i, j + 1) || tile(i, j) === "~") continue;
+      if (tried.some(a => Math.abs(a.x - (i + 0.5)) < 1.5 && a.y === j)) continue;
+      const side = i + 0.5 < p.x ? 1 : -1;                                  // (the side it jumps from)
+      let room = true;
+      for (let k = y0 + 1; k <= j + 1 && room; k++) for (const dx of [0, side, 2 * side]) if (!open(i + dx, k)) { room = false; break; }
+      if (!room) continue;
+      const score = Math.abs(i + 0.5 - p.x) - (j - y0) * 0.6;
+      if (score < bs) { bs = score; best = { x: i + 0.5, y: j }; }
     }
-    return false;
+    return best;
   }
   function demoBot(D, p, w, h) {
     const I = D.inp, c = p.c;
     I.R = 1; I.L = 0; I.U = 0; I.D = 0; I.Z = I.X = I.C = 0;
-    p.air = AIR;                                           // (never short of breath)
-    D.t += h; D.jt -= h; D.hold -= h;
+    D.t += h; D.jt -= h; D.hold -= h; D.back -= h; D.zt -= h; D.dashT -= h;
+    if (p.demoFell || p.dead || p.y < 0.3) return "fail";
     if (p.x > D.best + 0.4) { D.best = p.x; D.still = 0; } else D.still += h;
-    if (p.ground) { D.safe = { x: p.x, y: p.y }; D.airUsed = false; }
-    if (p.demoFell || p.dead || p.y < 0.3) { demoWarp(p, D.safe.x, 2) || demoWarp(p, p.x, 2); D.still = 0; return; }
-    if (D.still > 2.4) { demoWarp(p, p.x, 5); D.still = 0; D.best = p.x; return; }
-    if (D.t > 75 && w.goal) { demoWarp(p, w.goal.x - 9, 0); D.t = 0; return; }
-    const at = (dx, dy) => { const t = tile(Math.floor(p.x + dx), Math.floor(p.y + dy)); return solid(t); };
-    const front = c.w / 2 + 0.45;
-    const wall = at(front, 0.6) || at(front, 1.3);
-    const floorAt = dx => { const i = Math.floor(p.x + dx); for (let j = Math.floor(p.y + 0.5); j >= Math.max(1, Math.floor(p.y) - 9); j--) { const t = tile(i, j - 1); if (solid(t) || t === "-") return true; } return false; };
-    const gap = p.ground && !floorAt(1.4) && !floorAt(2.4);
-    const foe = w.enemies.some(e => e.alive && !e.hidden && e.x - p.x > 0.2 && e.x - p.x < 2.8 && e.y + e.h > p.y - 0.6 && e.y < p.y + 2.2);
+    if (p.ground) D.airUsed = false;
+    if (D.t > 220) return "fail";
+    if (D.back > 0) { I.R = 0; I.L = 1; I.J = 0; return; }            // backing off, for a run at it
+    if (D.goal) {                                                      // on the way up to a ledge
+      const g = D.goal, dx = g.x - p.x;
+      D.gt += h;
+      if (p.ground && p.y >= g.y - 0.3 && Math.abs(dx) < 1.6) { D.goal = null; D.best = p.x; D.still = 0; D.tries = 0; }
+      else if (D.gt > 4.5) { D.tried.push(g); D.goal = null; D.still = 0; }                      // (it gave that one a fair go)
+      else {
+        I.R = dx > 0.35 ? 1 : 0; I.L = dx < -0.35 ? 1 : 0;
+        if (p.ground && Math.abs(dx) < 2.4 && D.jt <= 0) { I.jp = 1; D.hold = 0.5; D.jt = 0.4; }
+        else if (!p.ground && !D.airUsed && p.vy < 1 && p.y < g.y + 0.2 && D.jt <= 0) { I.jp = 1; D.airUsed = true; D.hold = 0.7; D.jt = 0.25; }
+        else if (p.state === "fly" && p.y < g.y + 0.5 && D.jt <= 0) { I.jp = 1; D.jt = 0.22; }
+        I.J = D.hold > 0 || I.jp ? 1 : 0;
+        return;
+      }
+    }
+    if (D.still > 1.6) {
+      if (++D.tries > 5) return "fail";
+      D.still = 0; D.jt = 0;
+      const g = stepUp(p, D.tried);
+      if (g) { D.goal = g; D.gt = 0; } else D.back = 0.45 * Math.min(3, D.tries);             // a way up; else a run at it, further back each time
+      return;
+    }
+    /* keeping its speed: it looks further ahead the faster it goes, and deals with what's coming
+       before it gets there, never with a move that stops it (no standing attacks). On the ground,
+       those who roll (Down while running: all but Rouge, Chaos, Gamma and Eggman) roll through
+       cracked rock, crates, hurdles and badniks; the rest jump them (the ball breaks what it
+       touches). It jumps thorns, walls and gaps; water is a gap too (stones, a jump, its flight,
+       its glide, a double jump: never wading in if it can help it). A wall of cracked rock it
+       can't roll through it treats as a wall: up and over by its ledges. */
+    const v = Math.max(0, p.vx), half = c.w / 2, look = half + 0.6 + v * 0.17;
+    const T = (dx, dy) => tile(Math.floor(p.x + dx), Math.floor(p.y + dy));
+    const at = (dx, dy) => solid(T(dx, dy));
+    const brk = t => t === "X" || t === "B";
+    const floorAt = dx => { const i = Math.floor(p.x + dx); for (let j = Math.floor(p.y + 0.5); j >= Math.max(1, Math.floor(p.y) - 9); j--) { const t = tile(i, j - 1); if (t === "~") return false; if (solid(t) || t === "-") return true; } return false; };
+    let wall = false, low = false, rockWall = false, rockAt = 99, spikes = false;
+    for (let dx = half + 0.1; dx <= look; dx += 0.3) {
+      const t1 = T(dx, 0.5), t2 = T(dx, 1.3), t3 = T(dx, 2.3);
+      if (brk(t1) || t1 === "h") { if (brk(t2) && (brk(t3) || solid(t3))) { rockWall = true; rockAt = Math.min(rockAt, dx); } else low = true; }
+      else if (solid(t1) || solid(t2)) wall = true;
+      if (T(dx, 0.1) === "^" || T(dx + 0.9, 0.1) === "^") spikes = true;
+    }
+    const near = Math.min(look, 1.6), wet = T(near, -0.5) === "~" || T(look, -0.5) === "~";
+    const gap = p.ground && ((!floorAt(near) && !floorAt(near + 1)) || (!floorAt(look) && !floorAt(look + 1)) || wet);
+    const foe = w.enemies.some(e => e.alive && !e.hidden && e.x - p.x > 0.2 && e.x - p.x < look + 1.2 && e.y + e.h > p.y - 0.6 && e.y < p.y + 2.2);
     const slow = p.ground && Math.abs(p.vx) < 1.5 && D.t > 0.6;
+    const roof = at(0, 2.3) || at(0.7, 2.3);                     // (a low roof: a jump would only hit it)
     if (p.state === "climb") { I.U = 1; return; }          // Knuckles, on a wall: up and over
-    if (p.ground && D.jt <= 0 && (wall || gap || foe || slow)) { I.jp = 1; D.hold = 0.42; D.jt = 0.3; }
-    else if (!p.ground && !D.airUsed && p.vy < 1.5 && (wall || !floorAt(0.8)) && D.jt <= 0) { I.jp = 1; D.airUsed = true; D.hold = 0.6; D.jt = 0.25; }
-    else if (p.state === "fly" && (wall || !floorAt(1)) && D.jt <= 0) { I.jp = 1; D.jt = 0.22; }     // flying: a beat at a time
+    const rolls = c.spinDash && v > 4;
+    if (p.ground && (rockWall || low || foe) && rolls && !gap && !spikes) { I.D = 1; I.J = 0; return; }   // roll through it: speed kept, it breaks
+    if (rockWall && !rolls) wall = true;                                                             // (no roll: it's a wall, up and over)
+    /* a wall taller than it can jump: up it by its steps, starting now (not once it's stuck) */
+    if (wall && p.ground && !D.goal) {
+      let hgt = 0; const fx = half + 0.6;
+      for (let k = 0; k < 9 && (at(fx, 0.5 + k) || brk(T(fx, 0.5 + k))); k++) hgt = k + 1;
+      if (hgt > jumpRows(c) - 0.4) { const g = stepUp(p, D.tried); if (g) { D.goal = g; D.gt = 0; return; } }
+    }
+    /* Chaos: a Chaos Dive under badniks and across thorns -- nothing touches him, and it's quicker */
+    if (p.ground && c.dashInv && !rolls && (foe || spikes) && !gap && !wall && !low && D.dashT <= 0) { I.dash = 1; D.dashT = 1.1; return; }
+    if (p.ground && D.jt <= 0 && (wall || gap || foe || slow || low || spikes) && !(roof && !wall && !gap && !spikes)) { I.jp = 1; D.hold = gap ? 0.6 : 0.42; D.jt = 0.3; }
+    else if (!p.ground && !D.airUsed && p.vy < 1.5 && (wall || !floorAt(0.8) || !floorAt(1.8)) && D.jt <= 0) { I.jp = 1; D.airUsed = true; D.hold = 0.6; D.jt = 0.25; }
+    else if (p.state === "fly" && (wall || !floorAt(1) || !floorAt(2.2)) && D.jt <= 0) { I.jp = 1; D.jt = 0.22; }     // flying: a beat at a time, over the water too
+    if (p.state === "glide" && (!floorAt(0.8) || !floorAt(2))) D.hold = Math.max(D.hold, 0.1);                       // gliding: on over it
     I.J = D.hold > 0 || I.jp ? 1 : 0;
   }
   function demoTick(dt) {
     const D = demo, p = player, w = world, h = 1 / 120;
     D.acc += Math.min(dt, 0.1);
-    const keep = input; input = D.inp;
+    const keep = input; input = D.inp; demoQuiet = true;
     let n = 0;
     while (D.acc >= h && n < 14) {
       D.acc -= h; n++;
       if (D.done) {                                         // at the post: braking, the post spinning, then the next
         D.done += h; D.inp.R = 0; D.inp.J = 0;
-        if (D.done > 3.4) { input = keep; demoStart(); return; }
-      } else demoBot(D, p, w, h);
+        if (D.done > 3.4) { input = keep; demoQuiet = false; demoStart(); return; }
+      } else if (demoBot(D, p, w, h) === "fail") { input = keep; demoQuiet = false; demoStart(); return; }   // (it didn't make it: on to another)
       step(h); worldStep(h);
       input.jp = input.zp = input.xp = input.cp = 0; input.dash = 0;
       if (!D.done && w.goal && p.x >= w.goal.x) { D.done = h; w.goal.spin = 2.6; w.goal.fire = 2.5; w.goal.fireT = 0; }
     }
-    input = keep;
+    input = keep; demoQuiet = false;
   }
+  /* A run played out of sight, at the robot's hands: through `def` as `who`, a fixed step at a time,
+     with no sound, no music and nothing counted; the sprite's place and frame kept thirty times a
+     second, for a rival to run it again in a race. The world there was goes (build the next).
+     { ok, time, track: [[t, x, y, frame, i, face]] } */
+  function simRun(def, who, seed) {
+    const keep = { input, mode, demo, rnd: Math.random }, h = 1 / 120, res = { ok: false, time: 0, track: [] };
+    if (seed != null) Math.random = mulberry32(seed);      // (a seeded run: the same on every machine)
+    disposeWorld();
+    SIM = true; demo = null;
+    try {
+      world = buildWorld(def); world.sim = true;
+      const p = player = makePlayer(castOf(who)); p.demo = true;
+      const D = newBot(p);
+      input = D.inp; mode = "sim";
+      let rec = 0;
+      while (world.t < 230) {
+        if (demoBot(D, p, world, h) === "fail") break;
+        step(h); worldStep(h);
+        input.jp = input.zp = input.xp = input.cp = 0; input.dash = 0;
+        if (world.t >= rec) { rec += 1 / 30; drawRunner(p, 1 / 30); const f = p._rf || ["idle", 0, 1]; res.track.push([+world.t.toFixed(3), +p.spr.position.x.toFixed(3), +p.spr.position.y.toFixed(3), f[0], f[1], f[2]]); }
+        if (world.goal && p.x >= world.goal.x) { res.ok = true; break; }
+      }
+      res.time = world.t;
+    } catch (e) { console.error(e); }
+    finally { disposeWorld(); world = null; player = null; input = keep.input; mode = keep.mode; demo = keep.demo; SIM = false; Math.random = keep.rnd; }
+    return res;
+  }
+  /* Who the robot gets through each Act 1 (and the story's race stages) fairly: measured with
+     simRun, every runner on every one (_debug.cleanTable() measures them again). */
+  const CLEAN = {
+    "seabreeze-1": "tails amy rouge shadow cream chaos gamma eggman metal mighty emerl", "seabreeze-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "airstrip-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "airstrip-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal emerl silver",
+    "parlour-1": "sonic tails knuckles amy rouge shadow cream gamma eggman metal emerl silver", "parlour-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "peak-1": "tails knuckles amy shadow", "peak-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "club-1": "sonic tails knuckles amy rouge shadow cream eggman metal emerl", "club-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "expressway-1": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver", "expressway-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "museum-1": "sonic tails amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "museum-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "springs-1": "tails knuckles amy rouge shadow cream chaos gamma eggman mighty emerl", "springs-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "canyon-1": "sonic tails rouge shadow cream gamma eggman metal mighty", "canyon-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "ruins-1": "knuckles shadow", "ruins-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "depot-1": "sonic tails knuckles amy rouge cream gamma eggman metal mighty", "depot-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "stars-1": "sonic tails rouge shadow cream eggman metal mighty", "stars-3": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver",
+    "station-1": "sonic tails knuckles amy rouge shadow cream gamma eggman metal mighty emerl silver", "station-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+  };
+  const cleanRunners = id => (CLEAN[id] || "").split(" ").filter(Boolean);
+  /* the same for the grand prix's courses: who gets round each fairly (a cup's rivals are drawn
+     from those who get round all four) */
+  const GP_CLEAN = {};                                // (measured 2026-11-18 with _debug.gpSim: everyone gets round all twenty-four)
+  for (const k of "checker coral grove lagoon pinball funfair sweets pier slopes crystal floes tundra dunes town foundry volcano temple windmills fleet spires refinery metro fortress orbit".split(" ")) GP_CLEAN["gp-" + k] = "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver";
+
+  /* A RACE: you against a rival's run through an Act 1 (or a story stage) to the goal post -- the
+     rival's run is the robot's, made out of sight just before (simRun) and played back beside you,
+     at the pace asked for (1 its own; more, slower). First to the post wins. Free Exhibition's
+     Stage Racing, the story's race chapters and Metal Sonic's challenge are all one of these. */
+  let RACE = null;
+  const PACE = { easy: 1.3, normal: 1.12, hard: 1.0 };
+  function raceStart(o) {
+    RACE = null;
+    let run = null;
+    for (let k = 0; k < 3 && !(run && run.ok); k++) run = simRun(o.def, o.who);     // (its own run; a second go if the first one stumbled)
+    if (!run || !run.ok) { loadDef(o.def); hudToast(castOf(o.who).name + " couldn't make it through here"); if (o.cant) o.cant(); return false; }
+    const k = o.pace || 1;
+    RACE = Object.assign({}, o, { track: run.track, simT: run.time, T: run.time * k, k: 1 / k, over: false, card: null, at: 0 });
+    loadDef(o.def);
+    play();
+    RACE.card = makeCard(o.who); world.group.add(RACE.card);
+    const hudEl = host.querySelector(".adv-hud");
+    const tag = document.createElement("div"); tag.className = "adv-race"; tag.innerHTML = `<canvas width="88" height="72"></canvas><div><b>${esc(castOf(o.who).name)}</b><span></span></div>`;
+    hudEl.append(tag); paintCard(tag.querySelector("canvas"), o.who);
+    caption("Race " + castOf(o.who).name + " to the goal post!");
+    return true;
+  }
+  /* the rival, where its run had it at this moment of the race; its lead, on the HUD */
+  function stepRace(dt) {
+    const R = RACE; if (!R || !world || mode !== "play") return;
+    const u = world.t * R.k, tr = R.track;
+    while (R.at + 1 < tr.length && tr[R.at + 1][0] <= u) R.at++;
+    const a = tr[R.at], b = tr[Math.min(tr.length - 1, R.at + 1)], f = b[0] > a[0] ? clamp((u - a[0]) / (b[0] - a[0]), 0, 1) : 0;
+    setFrame(R.card, a[3], a[4], a[5], 0, 0);
+    R.card.position.set(a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, 0.05);
+    const el = host.querySelector(".adv-race span");
+    if (el) { const d = Math.round(R.card.position.x - player.x); el.textContent = Math.abs(d) < 2 ? "neck and neck" : d > 0 ? d + " m ahead" : -d + " m behind"; }
+    if (!R.over && u >= R.simT) { R.over = true; R.won = false; mode = "goal"; SFX.goal(); setTimeout(() => raceEnd(), 1400); }
+  }
+  /* home first (finish() comes here): the race is won */
+  function raceHome(time) { const R = RACE; if (!R || R.over) return; R.over = true; R.won = true; R.time = time; setTimeout(() => raceEnd(), 1700); }
+  function raceEnd() {
+    const R = RACE; if (!R || !host) return;
+    mode = "results";
+    host.querySelector(".adv-hud").classList.remove("on");
+    const ov = host.querySelector(".adv-ov"), rn = castOf(R.who).name;
+    ov.innerHTML = `
+      <div class="panel adv-small adv-res pop">
+        <div class="panel-hd gold">${ico("flag")}${R.won ? "You win the race!" : esc(rn) + " wins the race"}</div>
+        <div class="adv-board">
+          <div class="adv-row"><span>You</span><b class="num">${R.won ? fmt(R.time) : "--:--.-"}</b></div>
+          <div class="adv-row"><span>${esc(rn)}</span><b class="num">${fmt(R.T)}</b></div>
+        </div>
+        <div class="adv-btns">
+          ${R.won && R.onWin ? `<button class="btn" id="advRW" data-focus>${ico("next")}${esc(R.winLabel || "Go on")}</button>` : ""}
+          <button class="btn ${R.won && R.onWin ? "ghost" : ""}" id="advRA" ${R.won && R.onWin ? "" : "data-focus"}>${ico("flag")}${R.won ? "Race again" : "Try again"}</button>
+          <button class="btn ghost" id="advRB" data-back>${ico("back")}${esc(R.backLabel || "Back")}</button>
+        </div>
+      </div>`;
+    const again = Object.assign({}, R);
+    if (ov.querySelector("#advRW")) ov.querySelector("#advRW").onclick = () => { RACE = null; R.onWin(); };
+    ov.querySelector("#advRA").onclick = () => raceStart(again);
+    ov.querySelector("#advRB").onclick = () => { RACE = null; (R.onBack || mainMenu)(); };
+    setTimeout(autoFocus, 0);
+  }
+
+  // ---------------------------------------------------------------- the grand prix: Red Ring Circuit
+  /* RED RING CIRCUIT, the grand prix: a cup is four courses (adventure-gp.js), raced eight at a time
+     -- you and seven of the cast -- and points for each: 9, 6, 3 and 1 for the first four, nothing
+     after. Finish fifth or worse and the race has to be run again. After the fourth, the three with
+     the most points stand on the podium, and a trophy is yours if you're one of them.
+     The seven rivals run the robot's own run of each course (simRun, made on the grid before the
+     start), at the class's pace, each a little quicker or slower than the next; held back or let
+     on a bit by how far from you they are; stopped by what hits them, sped on by what they pick up.
+     Red Rings stand across every road at the power points: run into one and the box spins up a
+     power, used with its own button (V or Shift; a pad's left shoulder; Power on a touch screen).
+       Speed Shoes, a bubble Shield (one hit), Invincibility (and anyone touched goes down), a
+       Homing Bomb (at the next runner ahead), an Eggman Monitor (left behind: a fake), a Thunder
+       Shield (everyone close goes down), and Chaos Control (time stops for everyone else).
+     The further back you are, the better the powers. Classes: Breeze, Gale and Storm (the rivals'
+     pace, and how keen they are on powers). Cups open one after another (a trophy in the one
+     before, any class), and Storm once you've won a gold at Gale. */
+  const GPD = () => root.AdventureGP || { CUPS: [], COURSES: [] };
+  const GP_CLS = { breeze: { name: "Breeze", pace: 1.24, keen: 0.55 }, gale: { name: "Gale", pace: 1.12, keen: 0.8 }, storm: { name: "Storm", pace: 1.02, keen: 1 } };
+  const GP_PTS = [9, 6, 3, 1, 0, 0, 0, 0];
+  const GP_CUP_NAMES = ["Flicky Cup", "Carnival Cup", "Aurora Cup", "Ember Cup", "Skyward Cup", "Emerald Cup"];
+  const POWERS = {
+    shoes: { name: "Speed Shoes", say: "Speed Shoes!" },
+    shield: { name: "Bubble Shield", say: "Shield up" },
+    star: { name: "Invincibility", say: "Invincible!" },
+    bomb: { name: "Homing Bomb", say: "Homing Bomb away" },
+    monitor: { name: "Eggman Monitor", say: "A fake monitor, left behind" },
+    thunder: { name: "Thunder Shield", say: "Thunder!" },
+    chaos: { name: "Chaos Control", say: "Chaos Control!" },
+  };
+  /* what a Red Ring gives, by place: the leaders a defence, the back of the pack the big ones */
+  const POWER_ODDS = [
+    { monitor: 40, shield: 34, bomb: 16, shoes: 10 },
+    { bomb: 30, shoes: 26, monitor: 18, shield: 16, thunder: 10 },
+    { bomb: 28, shoes: 28, thunder: 16, shield: 14, monitor: 8, star: 6 },
+    { shoes: 30, bomb: 24, thunder: 20, star: 12, shield: 8, chaos: 6 },
+    { shoes: 30, star: 22, thunder: 20, bomb: 16, chaos: 12 },
+    { shoes: 28, star: 26, thunder: 18, chaos: 16, bomb: 12 },
+    { star: 32, shoes: 26, chaos: 22, thunder: 20 },
+    { star: 36, chaos: 28, shoes: 24, thunder: 12 },
+  ];
+  function rollPower(place, rnd) {
+    const o = POWER_ODDS[clamp(place, 0, 7)], tot = Object.values(o).reduce((a, b) => a + b, 0);
+    let r = (rnd || Math.random)() * tot;
+    for (const k in o) { r -= o[k]; if (r <= 0) return k; }
+    return "shoes";
+  }
+  let GP = null, GPR = null;                          // the cup being run; the race being run
+  const GP_TRACKS = {};                               // the rivals' runs, made once a session
+  const gpCourse = id => GPD().COURSES.find(c => c.id === id);
+  const GP_DEFS = {};
+  function gpDef(id) {
+    const c = gpCourse(id); if (!c) return null;
+    return GP_DEFS[id] || (GP_DEFS[id] = Object.assign({}, c, { actN: 3, race: true, gp: true, last: false }));
+  }
+  const gpSave = () => (saveData.gp = saveData.gp || { trophies: {} });
+  const gpCupOpen = (i, online) => online || i === 0 || Object.keys((gpSave().trophies[GPD().CUPS[i - 1].id]) || {}).length > 0;
+  const gpClsOpen = (cls, online) => online || cls !== "storm" || Object.values(gpSave().trophies).some(t => t.gale === 1);
+  /* load the courses when they're first wanted (a megabyte of them; the rest of the cabinet doesn't need it) */
+  function needGP(then) {
+    if (root.AdventureGP) { then(); return; }
+    const s = document.createElement("script");
+    s.src = "adventure-gp.js" + (root.V ? "?v=" + root.V : "");       // (index.html's stamp)
+    s.onload = () => then(); s.onerror = () => note("The grand prix's courses didn't load: check the connection.");
+    document.head.append(s);
+  }
+
+  /* A course's picture for the cup select, as Mario Kart 64 shows each cup's four: the course
+     built to one side, a stretch of it near the start, seen from the run's own camera, kept */
+  const GP_PICS = {};
+  function coursePic(id, at) {
+    if (GP_PICS[id]) return GP_PICS[id];
+    if (!R) return null;
+    const keep = { scene, camera, sun, hemi, H };
+    let out = null, rt = null;
+    try {
+      const w = buildWorld(gpDef(id));
+      const cx = at || 120, i0 = Math.max(0, Math.floor((cx - 40) / 16) * 16);
+      for (let i = i0; i < Math.min(w.W, cx + 48); i += 16) for (const m of buildChunk(w.S, w.T, i, Math.min(w.W, i + 16))) w.group.add(m);
+      for (const f of w.far.userData.anim) f(3);
+      let gy = 4; for (let j = H - 1; j >= 0; j--) if (solid(w.S.grid[j][Math.floor(cx)])) { gy = j + 1; break; }
+      const PW = 480, PH = 300;
+      camera.aspect = PW / PH; camera.updateProjectionMatrix();
+      camera.position.set(cx, gy + 5.5, 19); camera.lookAt(cx, gy + 3, 0);
+      sun.position.set(cx + w.T.sun[2][0], w.T.sun[2][1], w.T.sun[2][2]); sun.target.position.set(cx, gy, 0);
+      rt = new THREE.WebGLRenderTarget(PW, PH);
+      rt.texture.encoding = R.outputEncoding;
+      R.setRenderTarget(rt); R.render(scene, camera);
+      const px = new Uint8Array(PW * PH * 4);
+      R.readRenderTargetPixels(rt, 0, 0, PW, PH, px);
+      const big = document.createElement("canvas"); big.width = PW; big.height = PH;
+      const img = big.getContext("2d").createImageData(PW, PH), row = PW * 4;
+      for (let y = 0; y < PH; y++) img.data.set(px.subarray((PH - 1 - y) * row, (PH - y) * row), y * row);
+      big.getContext("2d").putImageData(img, 0, 0);
+      out = document.createElement("canvas"); out.width = PW / 2; out.height = PH / 2;
+      const g = out.getContext("2d"); g.imageSmoothingQuality = "high"; g.drawImage(big, 0, 0, PW / 2, PH / 2);
+      scene.traverse(o => { if (o.geometry && !o.userData.keep && !Object.values(PROPS).includes(o.geometry)) o.geometry.dispose(); });
+      if (scene.background && scene.background.dispose) scene.background.dispose();
+    } catch (e) { console.error(e); out = null; }
+    finally {
+      if (R) R.setRenderTarget(null);
+      if (rt) rt.dispose();
+      ({ scene, camera, sun, hemi, H } = keep);
+    }
+    return (GP_PICS[id] = out);
+  }
+
+  /* ---- the cup select: the class, your runner, the six cups; the highlighted cup's four courses
+     in pictures, with their names; your trophies on each cup */
+  let gpCupI = 0;
+  function gpMenu() {
+    needGP(() => gpMenuDraw());
+  }
+  function gpMenuDraw() {
+    if (pendingFirst(gpMenu)) return;
+    const S = gpSave(), set = S.set = Object.assign({ cls: "breeze", cup: 0 }, S.set || {});
+    if (!gpClsOpen(set.cls)) set.cls = "breeze";
+    gpCupI = clamp(set.cup | 0, 0, GPD().CUPS.length - 1); if (!gpCupOpen(gpCupI)) gpCupI = 0;
+    if (!hasFighter(castId)) castId = "sonic";
+    const ov = screenOn("setup");
+    ensureStageWorld();
+    const cups = GPD().CUPS;
+    const tro = c => ["breeze", "gale", "storm"].map(k => { const p = (S.trophies[c.id] || {})[k]; return `<i class="gp-tro ${p ? "p" + p : ""}" title="${GP_CLS[k].name}: ${p ? ["", "gold", "silver", "bronze"][p] : "none yet"}">${ico("trophy")}</i>`; }).join("");
+    ov.innerHTML = `
+      <div class="adv-menu pop gp-menu">
+        <div class="panel adv-panel">
+          <div class="panel-hd">${ico("trophy")}Red Ring Circuit: the grand prix</div>
+          <div class="gp-top">
+            <div class="setrow"><div class="setlab"><b>Class</b><i>How fast the rivals go.</i></div><div class="seg adv-seg">${Object.keys(GP_CLS).map(k => `<button data-cls="${k}" data-k="cls-${k}" class="${set.cls === k ? "sel" : ""}" ${gpClsOpen(k) ? "" : "disabled"}>${gpClsOpen(k) ? "" : ico("lock")}${GP_CLS[k].name}</button>`).join("")}</div></div>
+            <div class="setrow"><div class="setlab"><b>You</b><i>Seven of the rest race you.</i></div><div class="adv-pick"><button class="adv-arr" data-pk="-1" data-k="pk-prev">${ico("back")}</button><canvas width="44" height="40" data-face="${castId}"></canvas><b>${esc(castOf(castId).name)}</b><button class="adv-arr" data-pk="1" data-k="pk-next">${ico("next")}</button></div></div>
+          </div>
+          <div class="gp-sel">
+            <div class="gp-cups">${cups.map((c, i) => `
+              <button class="gp-cup ${i === gpCupI ? "on" : ""} ${gpCupOpen(i) ? "" : "locked"}" data-cup="${i}" data-k="cup-${c.id}" ${i === gpCupI ? "data-focus" : ""}>
+                <b>${gpCupOpen(i) ? "" : ico("lock")}${esc(c.name)}</b><span class="gp-tros">${tro(c)}</span>
+              </button>`).join("")}</div>
+            <div class="gp-prev"></div>
+          </div>
+          <div class="adv-go">
+            <button class="btn ghost" data-back data-k="back">${ico("back")}Main menu</button>
+            <button class="btn" id="gpGo" data-enter data-k="go">${ico("flag")}Start the cup</button>
+          </div>
+        </div>
+      </div>`;
+    ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 1));
+    const paintPrev = () => {
+      const c = cups[gpCupI], el = ov.querySelector(".gp-prev"); if (!el) return;
+      el.innerHTML = `<div class="gp-prev-hd"><b>${esc(c.name)}</b><i>${esc(c.sub)}</i></div>
+        <div class="gp-pics">${c.courses.map((id, k) => { const d = gpCourse(id); return `<div class="gp-pic"><canvas width="240" height="150" data-pic="${id}"></canvas><span><em>${k + 1}</em>${esc(d ? d.name : id)}</span></div>`; }).join("")}</div>
+        ${gpCupOpen(gpCupI) ? "" : `<p class="adv-note">${ico("lock")}Win a trophy in the ${esc(cups[gpCupI - 1].name)} (any class) to open it.</p>`}`;
+      /* the pictures, one a frame, so the menu stays quick */
+      const cvs = [...el.querySelectorAll("[data-pic]")];
+      const one = k => { if (k >= cvs.length || !cvs[k].isConnected) return; const pic = coursePic(cvs[k].dataset.pic); if (pic) cvs[k].getContext("2d").drawImage(pic, 0, 0, 240, 150); setTimeout(() => one(k + 1), 30); };
+      setTimeout(() => one(0), 30);
+    };
+    paintPrev();
+    ov.querySelectorAll("[data-cup]").forEach(b => b.onclick = () => {
+      gpCupI = +b.dataset.cup; set.cup = gpCupI; save(saveData);
+      ov.querySelectorAll("[data-cup]").forEach(x => x.classList.toggle("on", x === b)); paintPrev();
+    });
+    ov.querySelectorAll("[data-cls]").forEach(b => b.onclick = () => { set.cls = b.dataset.cls; save(saveData); ov.querySelectorAll("[data-cls]").forEach(x => x.classList.toggle("sel", x === b)); });
+    ov.querySelectorAll("[data-pk]").forEach(b => b.onclick = () => { castId = cycleTeam(castId, +b.dataset.pk); saveData.cast = castId; save(saveData); gpMenuDraw(); });
+    ov.querySelector("[data-back]").onclick = () => mainMenu();
+    ov.querySelector("#gpGo").onclick = () => {
+      if (!gpCupOpen(gpCupI)) { note(`Win a trophy in the ${cups[gpCupI - 1].name} first.`); return; }
+      gpBegin({ cup: gpCupI, cls: set.cls, who: castId });
+    };
+    autoFocus();
+  }
+
+  /* ---- a cup: who races, the points */
+  function gpBegin(o) {
+    const cup = GPD().CUPS[o.cup], me = o.who;
+    const clean = id => cup.courses.every(cid => (GP_CLEAN[cid] || "").split(" ").includes(id));
+    let pool = CAST.map(c => c.id).filter(id => id !== me);
+    const good = pool.filter(clean), rest = pool.filter(id => !good.includes(id));
+    U.shuffle(good); U.shuffle(rest);
+    const cpus = good.concat(rest).slice(0, 7);
+    GP = { cup: o.cup, cupId: cup.id, cls: o.cls, k: GP_CLS[o.cls], race: 0, online: !!o.online,
+           runners: [{ id: "you", who: me, me: true, name: "You" }].concat(cpus.map((who, i) => ({ id: "cpu" + i, who, name: castOf(who).name, skill: 0.97 + Math.random() * 0.07 }))),
+           pts: {}, done: [], retries: 0 };
+    GP.runners.forEach(r => { GP.pts[r.id] = 0; });
+    gpGrid();
+  }
+  /* the starting grid: the course, who's on it, and their runs made while you look */
+  function gpGrid() {
+    const G = GP, cup = GPD().CUPS[G.cup], cid = cup.courses[G.race], def = gpDef(cid);
+    const ov = screenOn("setup");
+    ov.innerHTML = `
+      <div class="panel adv-small pop gp-grid">
+        <div class="panel-hd">${ico("flag")}${esc(cup.name)} · Race ${G.race + 1} of 4</div>
+        <div class="gp-grid-c"><canvas width="240" height="150" class="gp-gpic"></canvas><div><b>${esc(def.name)}</b><i>${esc(def.sub)}</i><em>${esc(G.k.name)}</em></div></div>
+        <div class="gp-line">${G.runners.map(r => `<span class="${r.me ? "me" : ""}"><canvas width="36" height="38" data-face="${r.who}"></canvas><b>${esc(r.me ? castOf(r.who).name : r.name)}</b></span>`).join("")}</div>
+        <div class="gp-load"><i style="width:0%"></i></div>
+        <p class="adv-note gp-load-t">The runners take their marks…</p>
+      </div>`;
+    ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 1));
+    const pic = coursePic(cid); if (pic) ov.querySelector(".gp-gpic").getContext("2d").drawImage(pic, 0, 0, 240, 150);
+    const cpus = G.runners.filter(r => !r.me && !r.human);
+    G.ready = new Set(); G.goSent = false; G.goEarly = false;
+    let k = 0;
+    const bar = ov.querySelector(".gp-load i");
+    const next = () => {
+      if (GP !== G) return;
+      if (k >= cpus.length) {
+        setTimeout(() => {
+          if (GP !== G) return;
+          gpGo(def);
+          if (G.online) { if (NP.host) gpNetReady(NP.me); else Online.toHost({ t: "np.gok" }); }
+        }, 350);
+        return;
+      }
+      const r = cpus[k], key = cid + ":" + r.who;
+      if (!GP_TRACKS[key]) {
+        let run = null;
+        for (let n = 0; n < 2 && !(run && run.ok); n++) run = simRun(def, r.who, 1000 + n * 7919 + G.race * 31);
+        GP_TRACKS[key] = run && run.ok ? run : { ok: false };
+      }
+      k++; bar.style.width = Math.round(k / cpus.length * 100) + "%";
+      setTimeout(next, 16);
+    };
+    setTimeout(next, 120);
+  }
+  /* the race: the course built, the rivals on their marks, the count */
+  function gpGo(def) {
+    const G = GP, cid = def.id;
+    const ok = G.runners.filter(r => !r.me && !r.human).map(r => GP_TRACKS[cid + ":" + r.who]).find(t => t && t.ok);
+    GPR = { def, cid, t0: 0, count: G.online && !G.goEarly ? Infinity : 4.2, said: 5, hfin: {}, seen: {}, gT: 0, tid: 0, go: false, over: false, fin: [], rivals: [], rows: [], freeze: 0, freezeBy: null,
+            power: null, spin: 0, roll: 0, bombs: [], traps: [], shieldS: null, rnd: mulberry32(7 + G.race * 101), myFin: null, lastV: 0, endT: 0 };
+    loadDef(def);
+    play();
+    world.played = true;
+    const W = world;
+    /* the rivals: their runs (a borrowed one if theirs fell through), their cards */
+    for (const r of G.runners) {
+      if (r.me || r.human) continue;
+      let tr = GP_TRACKS[cid + ":" + r.who]; const own = tr && tr.ok;
+      if (!own) tr = ok;
+      if (!tr) continue;
+      const card = makeCard(r.who); W.group.add(card);
+      const bub = new THREE.Sprite(glowMat(0x6ac8ff, 0.55)); bub.scale.set(2.6, 2.6, 1); bub.visible = false; W.group.add(bub);
+      GPR.rivals.push({ r, who: r.who, track: tr.track, simT: tr.time, own, u: 0, at: 0, x: W.start.x, y: W.start.y, card, bub,
+                        rate: 1 / (G.k.pace * (r.skill || 1)), stun: 0, boost: 0, star: 0, shield: false, pow: null, powT: 0, fin: null, lastX: W.start.x, bumpCd: 0 });
+    }
+    /* the Red Rings' rows: the rings by their column */
+    const rows = {};
+    for (const e of W.powers) { (rows[e.col] = rows[e.col] || []).push(e); }
+    GPR.rows = Object.keys(rows).map(Number).sort((a, b) => a - b).map(c => ({ x: c + 0.5, rings: rows[c] }));
+    /* the HUD: your place, the field along the course, the power box */
+    const hudEl = host.querySelector(".adv-hud");
+    const box = document.createElement("div"); box.className = "gp-hud";
+    box.innerHTML = `
+      <div class="gp-place"><b class="num">8</b><i>th</i></div>
+      <div class="gp-strip"><div class="gp-strip-in">${G.runners.map((r, i) => `<span data-gs="${i}" class="${r.me ? "me" : ""}"><canvas width="22" height="22" data-face="${r.who}"></canvas></span>`).join("")}<em class="gp-goal"></em></div></div>
+      <div class="gp-pow"><canvas width="48" height="48"></canvas><i>${TOUCH ? "" : "V"}</i></div>`;
+    hudEl.append(box);
+    box.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 1));
+    if (TOUCH) { const wrap = document.createElement("div"); wrap.className = "gp-pwrap"; wrap.innerHTML = `<button class="gp-pbtn" data-t="V">Power</button>`; (hudEl.querySelector(".adv-pad") || hudEl).append(wrap); wirePad(wrap); }
+    paintPower(null);
+    caption(G.online && GPR.count === Infinity ? "Waiting for the others…" : def.name, true);
+    world.t = 0;
+  }
+  const gpHold = () => !!(GPR && !GPR.over && GPR.count > 0.4);
+  const gpFrozen = () => !!(GPR && GPR.freeze > 0);
+  /* a power's picture, in the box (drawn here: crisp, the cabinet's own) */
+  function paintPower(k, spin) {
+    const cv = host && host.querySelector(".gp-pow canvas"); if (!cv) return;
+    const g = cv.getContext("2d"); g.clearRect(0, 0, 48, 48);
+    if (!k) return;
+    g.save(); g.translate(24, 24);
+    const px = (c, x, y, w, h) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+    switch (k) {
+      case "shoes": px("#1a1a2a", -15, -2, 30, 14); px("#e8303a", -13, -1, 26, 9); px("#ffffff", -13, 6, 26, 3); px("#ffffff", -4, -1, 3, 6); px("#f2c030", 8, -1, 4, 3); break;
+      case "shield": g.fillStyle = "rgba(106,200,255,.45)"; g.beginPath(); g.arc(0, 0, 17, 0, PI * 2); g.fill(); g.strokeStyle = "#e6f8ff"; g.lineWidth = 3; g.stroke(); px("#ffffff", -9, -11, 5, 4); break;
+      case "star": { g.fillStyle = "#ffd23a"; g.strokeStyle = "#7a4a00"; g.lineWidth = 3; g.beginPath(); for (let i = 0; i < 10; i++) { const a = i / 10 * PI * 2 - PI / 2, r = i % 2 ? 7 : 17; g.lineTo(Math.cos(a) * r, Math.sin(a) * r); } g.closePath(); g.stroke(); g.fill(); break; }
+      case "bomb": g.fillStyle = "#1a1a2a"; g.beginPath(); g.arc(-2, 4, 13, 0, PI * 2); g.fill(); px("#5a5a6a", -8, -4, 5, 5); px("#8a6a4a", 6, -14, 3, 8); px("#ffd23a", 7, -18, 5, 5); px("#e8303a", 4, 0, 6, 6); break;
+      case "monitor": px("#1a1a2a", -15, -15, 30, 30); px("#c8ccd8", -13, -13, 26, 26); px("#2a3a6a", -10, -10, 20, 16); px("#ffc890", -6, -8, 12, 10); px("#d8762a", -7, -2, 14, 3); px("#1a1a1a", -4, -6, 2, 2); px("#1a1a1a", 2, -6, 2, 2); break;
+      case "thunder": g.fillStyle = "rgba(255,230,90,.35)"; g.beginPath(); g.arc(0, 0, 17, 0, PI * 2); g.fill(); g.fillStyle = "#ffd23a"; g.strokeStyle = "#7a4a00"; g.lineWidth = 2; g.beginPath(); g.moveTo(3, -17); g.lineTo(-9, 2); g.lineTo(-1, 2); g.lineTo(-4, 17); g.lineTo(9, -3); g.lineTo(1, -3); g.closePath(); g.fill(); g.stroke(); break;
+      case "chaos": g.fillStyle = "#3ad88a"; g.strokeStyle = "#0a4a2a"; g.lineWidth = 3; g.beginPath(); g.moveTo(-14, -4); g.lineTo(-7, -14); g.lineTo(7, -14); g.lineTo(14, -4); g.lineTo(0, 16); g.closePath(); g.stroke(); g.fill(); px("#c8ffe8", -6, -11, 6, 4); break;
+    }
+    g.restore();
+    if (spin) { g.fillStyle = "rgba(255,255,255,.18)"; g.fillRect(0, 0, 48, 48); }
+  }
+  /* the race, a frame of it (from the loop, in play) */
+  function gpTick(dt) {
+    const Rr = GPR, G = GP, w = world, p = player; if (!Rr || !w || !p) return;
+    if (Rr.count > 0) {                                    // the count: 3, 2, 1, Go (online: once the host says)
+      if (Rr.count === Infinity) { gpDraw(dt); return; }
+      Rr.count -= dt;
+      const n = Math.ceil(Rr.count - 0.4);
+      if (n !== Rr.said && n <= 3) { Rr.said = n; if (n > 0) { caption(String(n), true); SFX.blip ? SFX.blip() : SFX.pop(); } else { caption("Go!"); SFX.dash(); w.t = 0; Rr.go = true; } }
+      gpDraw(dt); return;
+    }
+    if (mode !== "play" && mode !== "goal") return;
+    const t = w.t, goalX = w.goal ? w.goal.x : w.W - 20;
+    Rr.freeze = Math.max(0, Rr.freeze - dt);
+    host.classList.toggle("gp-frozen", Rr.freeze > 0 && Rr.freezeBy !== "you");
+    /* the rivals: along their runs */
+    for (const v of Rr.rivals) {
+      v.bumpCd = Math.max(0, v.bumpCd - dt);
+      if (v.fin != null) continue;
+      v.stun = Math.max(0, v.stun - dt); v.boost = Math.max(0, v.boost - dt); v.star = Math.max(0, v.star - dt);
+      let rate = v.rate;
+      if (!G.online && Rr.myFin == null) { const d = v.x - p.x; rate *= d > 40 ? 0.93 : d > 20 ? 0.97 : d < -40 ? 1.08 : d < -20 ? 1.04 : 1; }   // (the pack stays near you)
+      if (v.boost > 0) rate *= 1.45; if (v.star > 0) rate *= 1.22;
+      if (v.stun > 0 || (Rr.freeze > 0 && Rr.freezeBy !== v.r.id)) rate = 0;
+      v.u += dt * rate;
+      if (v.u >= v.simT) { v.fin = t; Rr.fin.push({ id: v.r.id, t }); }
+      gpSample(v);
+      /* a Red Ring row passed: a power, if its hands are free */
+      for (const row of Rr.rows) if (v.lastX < row.x && v.x >= row.x && !v.pow && Rr.rnd() < 0.55 + 0.45 * G.k.keen) {
+        const ring = row.rings.reduce((a, b) => Math.abs(b.y - v.y) < Math.abs(a.y - v.y) ? b : a, row.rings[0]);
+        if (ring && Math.abs(ring.y - v.y) < 3.5 && !ring.back) { ring.back = 4; ring.m.visible = false; }
+        v.pow = rollPower(gpPlace(v.r.id), Rr.rnd); v.powT = 0;
+      }
+      v.lastX = v.x;
+      if (v.pow) { v.powT += dt; gpCpuUse(v); }
+    }
+    /* your Red Rings: run into one and the box spins */
+    for (const e of w.powers) {
+      if (e.back > 0) { e.back -= dt; if (e.back <= 0) { e.back = 0; e.m.visible = true; } continue; }
+      if (Math.abs(p.x - e.x) < 0.75 && p.y < e.y + 0.8 && p.y + p.hh > e.y - 0.3 && !p.dead) {
+        e.back = 4; e.m.visible = false; SFX.ring(); burst(e.x, e.y + 0.4, [0xe42630, 0xffffff, 0xffd21a], 10, 4);
+        if (!Rr.power && !Rr.roll) { Rr.roll = 1.1; Rr.rollK = rollPower(gpPlace("you"), Math.random); }
+      }
+    }
+    if (Rr.roll > 0) {                                     // the box, spinning through them, then stopping on one
+      Rr.roll -= dt;
+      const ks = Object.keys(POWERS);
+      if (Rr.roll > 0) paintPower(ks[Math.floor(t * 14) % ks.length], true);
+      else { Rr.roll = 0; Rr.power = Rr.rollK; paintPower(Rr.power); SFX.set(); }
+    }
+    /* the power button */
+    const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(g => g && g.connected) : [];
+    const gp0 = pads[0], padV = gp0 && ((gp0.buttons[4] && gp0.buttons[4].pressed) || (gp0.buttons[6] && gp0.buttons[6].pressed));
+    const V = !!(keys.V || touch.V || padV);
+    if (V && !Rr.lastV && Rr.power && !p.dead && Rr.myFin == null && Rr.freeze <= 0) { const k = Rr.power; Rr.power = null; paintPower(null); gpUse("you", k); }
+    Rr.lastV = V;
+    /* you and the rivals, touching: invincible, or rolling into them, they go down */
+    for (const v of Rr.rivals) {
+      if (v.fin != null || v.bumpCd > 0) continue;
+      if (Math.abs(v.x - p.x) < 0.9 && Math.abs(v.y - p.y) < 1.6) {
+        if (p.star > 0 && v.star <= 0) { gpHit(v.r.id, "you"); v.bumpCd = 1.5; }
+        else if (v.star > 0 && p.star <= 0) { gpHit("you", v.r.id); v.bumpCd = 1.5; }
+        else if ((p.curl || p.state === "attack" || p.state === "special") && v.stun <= 0) { gpHit(v.r.id, "you", 0.8); v.bumpCd = 1.5; }
+      }
+    }
+    gpStepShots(dt);
+    if (G.online) {                                        // online: where you are, to the others; the other players, touched
+      Rr.gT += dt;
+      if (Rr.gT >= 0.1) { Rr.gT = 0; const d = { t: "np.g", x: r3(p.x), y: r3(p.y), rf: p._rf || ["idle", 0, 1], fin: Rr.myFin != null ? 1 : 0 }; if (NP.host) Online.toAll(Object.assign({ id: NP.me }, d), true); else Online.toHost(d); }
+      for (const r of G.runners) if (r.human && !r.me) {
+        const g = NP.ghosts.get(r.netId); if (!g) continue;
+        if (g.fin && Rr.seen[r.netId] == null) Rr.seen[r.netId] = t;
+        if (p.star > 0 && !(Rr.cd && Rr.cd[r.netId] > t) && Math.abs(g.x - p.x) < 0.9 && Math.abs(g.y - p.y) < 1.6) { (Rr.cd = Rr.cd || {})[r.netId] = t + 1.5; gpSend({ k: "hit", to: r.netId }); }
+      }
+    }
+    if (Rr.spin > 0) { Rr.spin -= dt; p.face = Math.floor(Rr.spin * 12) % 2 ? 1 : -1; }
+    /* the bubble round you */
+    if (!Rr.shieldS) { Rr.shieldS = new THREE.Sprite(glowMat(0x6ac8ff, 0.55)); Rr.shieldS.scale.set(2.8, 2.8, 1); w.group.add(Rr.shieldS); }
+    Rr.shieldS.visible = !!Rr.myShield; Rr.shieldS.position.set(p.x, p.y + p.hh / 2, 0.3);
+    gpDraw(dt);
+    /* all seven home and you not, a while after: the race is over for you */
+    if (Rr.myFin == null && Rr.rivals.every(v => v.fin != null)) { Rr.endT += dt; if (Rr.endT > (G.online ? 25 : 12)) { Rr.myFin = Infinity; Rr.over = true; mode = "goal"; caption("Race over", true);
+      if (G.online) { if (NP.host) gpNetFin(NP.me, 9999); else Online.toHost({ t: "np.gfin", time: 9999 }); } else setTimeout(() => gpResults(), 1600); } }
+  }
+  /* where a rival's run has it now */
+  function gpSample(v) {
+    const tr = v.track;
+    while (v.at + 1 < tr.length && tr[v.at + 1][0] <= v.u) v.at++;
+    const a = tr[v.at], b = tr[Math.min(tr.length - 1, v.at + 1)], f = b[0] > a[0] ? clamp((v.u - a[0]) / (b[0] - a[0]), 0, 1) : 0;
+    v.x = a[1] + (b[1] - a[1]) * f; v.y = a[2] + (b[2] - a[2]) * f; v.f = a;
+  }
+  /* places: home first by time, then by how far along */
+  function gpOrder() {
+    const Rr = GPR, p = player, list = [];
+    list.push({ id: "you", x: p ? p.x : 0, fin: Rr.myFin });
+    for (const v of Rr.rivals) list.push({ id: v.r.id, x: v.x, fin: v.fin });
+    if (GP && GP.online) for (const r of GP.runners) if (r.human && !r.me) { const g = NP.ghosts.get(r.netId); list.push({ id: r.id, x: g ? g.tx : (world ? world.start.x : 0), fin: Rr.seen[r.netId] != null ? Rr.seen[r.netId] : null }); }
+    return list.sort((a, b) => (a.fin == null) - (b.fin == null) || (a.fin != null ? a.fin - b.fin : b.x - a.x));
+  }
+  const gpPlace = id => Math.max(0, gpOrder().findIndex(o => o.id === id));
+  const ORD = n => n + (n % 10 === 1 && n !== 11 ? "st" : n % 10 === 2 && n !== 12 ? "nd" : n % 10 === 3 && n !== 13 ? "rd" : "th");
+  /* the rivals' cards, and the HUD */
+  function gpDraw(dt) {
+    const Rr = GPR, G = GP, w = world; if (!Rr || !w) return;
+    for (const v of Rr.rivals) {
+      if (!v.f) gpSample(v);
+      const a = v.f || [0, w.start.x, w.start.y, "idle", 0, 1];
+      let name = a[3], i = a[4], face = a[5];
+      if (!framesOf(v.who, name)) { name = framesOf(v.who, "run") ? "run" : "idle"; i = Math.floor(w.t * 10); }
+      if (v.stun > 0) { name = framesOf(v.who, "hurt") ? "hurt" : framesOf(v.who, "back") ? "back" : "idle"; i = 0; face = Math.floor(v.stun * 10) % 2 ? 1 : -1; }
+      if (Rr.count > 0) { name = "idle"; i = Math.floor(w.t * 7); face = 1; }
+      if (v.fin != null) { name = "idle"; i = Math.floor(w.t * 7); face = 1; }
+      const n = (framesOf(v.who, name) || [0]).length;
+      setFrame(v.card, name, i % n, face, 0, 0);
+      v.card.position.set(v.x, v.y, 0.04);
+      v.bub.visible = v.shield; v.bub.position.set(v.x, v.y + 1, 0.3);
+      if (v.star > 0 && Math.random() < 0.4) burst(v.x, v.y + Math.random() * 1.6, [0xffffff, 0x9ad8ff, 0xfff070], 1, 1);
+      if (v.boost > 0 && Math.random() < 0.5) burst(v.x - 0.4, v.y + 0.05, [0xd8d0c0, 0xffffff], 1, 1.5);
+    }
+    for (const e of w.powers) if (e.m.visible) { e.m.rotation.y = w.t * 3; e.m.position.y = e.y + Math.sin(w.t * 3 + e.x) * 0.08; }
+    /* the HUD: place, the field along the strip */
+    const ord = gpOrder(), me = ord.findIndex(o => o.id === "you") + 1;
+    const hp = host.querySelector(".gp-place");
+    if (hp && hp.dataset.n !== String(me)) { hp.dataset.n = me; hp.querySelector("b").textContent = me; hp.querySelector("i").textContent = ORD(me).slice(String(me).length); hp.className = "gp-place p" + me; }
+    const goalX = w.goal ? w.goal.x : w.W, x0 = w.start.x;
+    G.runners.forEach((r, i) => {
+      const el = host.querySelector(`[data-gs="${i}"]`); if (!el) return;
+      const o = ord.find(q => q.id === r.id); if (!o) return;
+      el.style.left = (clamp((o.fin != null ? goalX : o.x - x0) / (goalX - x0), 0, 1) * 100).toFixed(2) + "%";
+      el.style.zIndex = 20 - ord.indexOf(o);
+    });
+  }
+  /* a CPU's power: when it makes sense to use it */
+  function gpCpuUse(v) {
+    const Rr = GPR, k = v.pow, T = v.powT, ord = gpOrder(), me = ord.findIndex(o => o.id === v.r.id);
+    const ahead = me > 0 ? ord[me - 1] : null, behind = ord[me + 1] || null;
+    let go = false;
+    if (k === "shoes") go = T > 0.6;
+    else if (k === "shield" || k === "star" || k === "chaos") go = T > 0.4 + (v.r.skill || 1) * 0.3;
+    else if (k === "bomb") go = (ahead && ahead.fin == null && ahead.x - v.x < 70 && T > 0.6) || T > 6;
+    else if (k === "monitor") go = (behind && behind.fin == null && v.x - behind.x < 22 && T > 0.8) || T > 5;
+    else if (k === "thunder") go = ord.some(o => o.id !== v.r.id && o.fin == null && Math.abs(o.x - v.x) < 12) && T > 0.5 || T > 6;
+    if (go) { v.pow = null; gpUse(v.r.id, k); }
+  }
+  const gpRunner = id => id === "you" ? null : GPR.rivals.find(v => v.r.id === id);
+  const gpPos = id => { if (id === "you") return { x: player.x, y: player.y + 1 }; const v = gpRunner(id); if (v) return { x: v.x, y: v.y + 1 };
+    const g = NP.ghosts && NP.ghosts.get(id); return g ? { x: g.x, y: g.y + 1 } : { x: 0, y: 0 }; };
+  /* a power used, by you ("you") or a rival (its id) */
+  function gpUse(id, k) {
+    const Rr = GPR, p = player, v = gpRunner(id), mine = id === "you", at = gpPos(id);
+    if (mine) hudToast(POWERS[k].say);
+    switch (k) {
+      case "shoes": if (mine) { p.speedT = 4.5; SFX.dash(); } else v.boost = 3.6; break;
+      case "shield": if (mine) { Rr.myShield = true; SFX.set(); } else v.shield = true; break;
+      case "star": if (mine) { p.star = 7; SFX.star(); } else v.star = 6; break;
+      case "bomb": {
+        const ord = gpOrder(), me = ord.findIndex(o => o.id === id), tgt = me > 0 ? ord[me - 1] : null;
+        const m = new THREE.Mesh(vox(vx => { for (let a = -3; a <= 3; a++) for (let b = -3; b <= 3; b++) for (let c = -3; c <= 3; c++) if (Math.hypot(a, b, c) <= 3.2) vx.set(a, b, c, (a + b) % 3 ? 0x1a1a2a : 0x3a3a4a); vx.box(0, 4, 0, 0, 5, 0, 0xffd23a); }, 0.09), materials().vox);
+        world.group.add(m); m.position.set(at.x + 0.6, at.y, 0.2);
+        Rr.bombs.push({ from: id, to: tgt && tgt.fin == null ? tgt.id : null, x: at.x + 0.6, y: at.y, t: 0, m });
+        SFX.homing ? SFX.homing() : SFX.dash(); break;
+      }
+      case "monitor": {
+        const m = new THREE.Mesh(vox(vx => { vx.box(-5, 0, -4, 5, 11, 4, 0xc8ccd8); vx.box(-4, 3, 5, 4, 9, 5, 0x2a3a6a); vx.box(-2, 4, 6, 2, 8, 6, 0xffc890); vx.box(-3, 4, 6, 3, 4, 6, 0xd8762a); vx.set(-1, 7, 7, 0x1a1a1a); vx.set(1, 7, 7, 0x1a1a1a); vx.box(-2, 8, 6, 2, 8, 6, 0xd8302a); }, 0.08), materials().vox);
+        let gy = at.y - 1; for (let j = Math.floor(gy) + 1; j >= 0; j--) if (solid(tile(Math.floor(at.x - 1.6), j)) || tile(Math.floor(at.x - 1.6), j) === "-") { gy = j + 1; break; }
+        world.group.add(m); m.position.set(at.x - 1.6, gy, 0.1);
+        const tid = mine ? (NP.me || "me") + ":" + (++Rr.tid) : null;
+        Rr.traps.push({ from: id, x: at.x - 1.6, y: gy, m, t: 0, life: 40, tid });
+        if (mine) gpSend({ k: "trap", x: at.x - 1.6, y: gy, tid });
+        SFX.pop(); break;
+      }
+      case "thunder": {
+        burst(at.x, at.y, [0xffe060, 0xffffff, 0x9ad8ff], 26, 9); flash(at.x, at.y, 7, 0xffe060); SFX.impact();
+        for (const o of gpOrder()) if (o.id !== id && o.fin == null && (gpRunner(o.id) || o.id === "you")) { const q = gpPos(o.id); if (Math.abs(q.x - at.x) < 13 && Math.abs(q.y - at.y) < 8) gpHit(o.id, id); }
+        if (mine) gpSend({ k: "thunder", x: at.x, y: at.y });
+        break;
+      }
+      case "chaos": {
+        Rr.freeze = 2.0; Rr.freezeBy = id; caption("Chaos Control!"); SFX.star();
+        if (mine) gpSend({ k: "chaos" });
+        if (!mine) hudToast(castOf(v.who).name + ": Chaos Control!");
+        break;
+      }
+    }
+  }
+  /* a runner hit (a bomb, a fake monitor, the thunder, someone invincible): down a moment; a
+     shield takes it instead; invincible, nothing */
+  function gpHit(id, by, k) {
+    const Rr = GPR;
+    if (id === "you") {
+      const p = player;
+      if (p.star > 0 || Rr.myFin != null) return;
+      if (Rr.myShield) { Rr.myShield = false; burst(p.x, p.y + p.hh / 2, [0x6ac8ff, 0xffffff], 14, 5); SFX.pop(); return; }
+      p.vx = 0; p.vy = 6; p.ground = false; p.state = "hurt"; p.st = 0.55; p.curl = false; p.mv = null; p.sp = null; p.inv = 1.2;
+      Rr.spin = 0.9; SFX.hurt(); flashHud(); burst(p.x, p.y + 1, [0xffffff, 0xf2d040], 10, 5);
+      if (p.carrots > 0) scatterRings(p);
+      return;
+    }
+    const v = gpRunner(id);
+    if (!v) { if (GP && GP.online && by === "you") gpSend({ k: "hit", to: id }); return; }   // (another player: theirs to take)
+    if (v.fin != null || v.star > 0) return;
+    if (GP && GP.online && by === "you") gpSend({ k: "cpuHit", id });
+    if (v.shield) { v.shield = false; burst(v.x, v.y + 1, [0x6ac8ff, 0xffffff], 12, 5); return; }
+    v.stun = 1.3 * (k || 1); burst(v.x, v.y + 1, [0xffffff, 0xf2d040], 10, 5);
+    if (by === "you") hudToast(castOf(v.who).name + " goes down!");
+  }
+  /* bombs flying, fake monitors lying in wait */
+  function gpStepShots(dt) {
+    const Rr = GPR, p = player;
+    for (const b of Rr.bombs) {
+      if (b.gone) continue;
+      b.t += dt;
+      const tgt = b.to ? gpPos(b.to) : { x: b.x + 30, y: b.y };
+      const dx = tgt.x - b.x, dy = tgt.y - b.y, d = Math.hypot(dx, dy) || 1, sp = 26;
+      b.x += dx / d * sp * dt; b.y += dy / d * sp * dt;
+      b.m.position.set(b.x, b.y, 0.2); b.m.rotation.z += dt * 8;
+      if (Math.random() < 0.6) burst(b.x - dx / d * 0.4, b.y, [0xffd23a, 0xff8a2a], 1, 1);
+      if ((b.to && d < 0.9) || b.t > 4) {
+        b.gone = true; world.group.remove(b.m); burst(b.x, b.y, [0xff8a2a, 0xffd23a, 0x3a3a3a], 22, 7); SFX.impact();
+        if (b.to && d < 0.9) gpHit(b.to, b.from);
+      }
+    }
+    Rr.bombs = Rr.bombs.filter(b => !b.gone);
+    for (const tp of Rr.traps) {
+      if (tp.gone) continue;
+      tp.t += dt; tp.life -= dt;
+      if (tp.life <= 0) { tp.gone = true; world.group.remove(tp.m); continue; }
+      const armed = tp.t > 0.6;
+      const hitBy = [];
+      if (armed && Math.abs(p.x - tp.x) < 0.8 && Math.abs(p.y - tp.y) < 1.4 && Rr.myFin == null) hitBy.push("you");
+      for (const v of Rr.rivals) if (armed && v.fin == null && Math.abs(v.x - tp.x) < 0.8 && Math.abs(v.y - tp.y) < 1.4 && Rr.rnd() < 0.85) hitBy.push(v.r.id);
+      if (hitBy.length) { if (tp.tid && hitBy.includes("you")) gpSend({ k: "trapGone", tid: tp.tid }); tp.gone = true; world.group.remove(tp.m); burst(tp.x, tp.y + 0.5, [0xff8a2a, 0xffd23a, 0xc8ccd8], 18, 6); SFX.impact(); hitBy.forEach(id => gpHit(id, tp.from)); }
+    }
+    Rr.traps = Rr.traps.filter(tp => !tp.gone);
+  }
+  /* home (finish() comes here): your time; the rest run on a moment, then the results */
+  function gpHome(time) {
+    const Rr = GPR; if (!Rr || Rr.myFin != null) return;
+    Rr.myFin = time; Rr.fin.push({ id: "you", t: time });
+    const pl = gpPlace("you") + 1;
+    caption(ORD(pl) + "!", true);
+    if (GP.online) { if (NP.host) gpNetFin(NP.me, time); else Online.toHost({ t: "np.gfin", time }); setTimeout(() => { if (GPR && !GPR.done) caption("Waiting for the others…", true); }, 2600); return; }
+    setTimeout(() => gpResults(), 2400);
+  }
+  /* the results, as Mario Kart 64 gives them: the finishing order with times, then the points
+     added up, and the cup's standings */
+  function gpResults(net) {
+    const Rr = GPR, G = GP; if (!Rr || Rr.done) return;
+    Rr.done = true; Rr.over = true;
+    host.classList.remove("gp-frozen");
+    /* those still running: home when their runs would have them home */
+    for (const v of Rr.rivals) if (v.fin == null) { const rest = (v.simT - v.u) / Math.max(0.3, v.rate); v.fin = world.t + rest; }
+    if (Rr.myFin == null) Rr.myFin = Infinity;
+    const ord = net ? net.map(x => ({ id: gpLocalId(x.id), fin: x.t == null || x.t >= 9999 ? Infinity : x.t })) : gpOrder();
+    const res = ord.map((o, i) => { const r = G.runners.find(q => q.id === o.id) || G.runners[0]; return { id: r.id, who: r.who, name: r.me ? "You" : r.name, me: !!r.me, t: o.fin == null ? Infinity : o.fin, pts: GP_PTS[i] }; });
+    const myPlace = res.findIndex(r => r.me);
+    const ok = G.online || myPlace < 4;
+    Rr.res = res;
+    mode = "results"; bgm("competition-results");
+    host.querySelector(".adv-hud").classList.remove("on");
+    const ov = host.querySelector(".adv-ov");
+    const before = Object.assign({}, G.pts);
+    ov.innerHTML = `
+      <div class="panel adv-small pop gp-res">
+        <div class="panel-hd gold">${ico("flag")}${esc(Rr.def.name)}: the results</div>
+        <div class="gp-rlist">${res.map((r, i) => `
+          <p class="${r.me ? "me" : ""}"><em class="num p${i + 1}">${ORD(i + 1)}</em><canvas width="44" height="40" data-face="${r.who}"></canvas><b>${esc(r.name === "You" ? castOf(r.who).name + " (you)" : r.name)}</b><span class="num">${r.t === Infinity ? "--:--.-" : fmt(r.t)}</span><i class="num">${r.pts ? "+" + r.pts : ""}</i></p>`).join("")}</div>
+        <div class="adv-btns"><button class="btn" id="gpNext" data-focus data-enter>${ico("next")}${ok ? "The standings" : "Go on"}</button></div>
+      </div>`;
+    ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 1));
+    const record = () => { if (Rr.recorded) return; Rr.recorded = true; res.forEach(r => { G.pts[r.id] += r.pts; }); G.done[G.race] = res; };
+    if (ok) record();
+    ov.querySelector("#gpNext").onclick = () => {
+      if (!ok) { gpRetry(res, myPlace); return; }
+      gpStandings(before, res);
+    };
+    setTimeout(autoFocus, 0);
+  }
+  /* fifth or worse: as in Mario Kart 64, no points for anyone till the race is won back */
+  function gpRetry(res, myPlace) {
+    const G = GP, ov = host.querySelector(".adv-ov");
+    ov.innerHTML = `
+      <div class="panel adv-small pop">
+        <div class="panel-hd">${ico("info")}${ORD(myPlace + 1)}: out of the points</div>
+        <p class="adv-note">Only the first four score in the grand prix. Run this race again to stay in the cup.</p>
+        <div class="adv-btns">
+          <button class="btn" id="gpAgain" data-focus data-enter>${ico("flag")}Retry the race</button>
+          <button class="btn ghost" id="gpQuit" data-back>${ico("door")}Leave the cup</button>
+        </div>
+      </div>`;
+    ov.querySelector("#gpAgain").onclick = () => { G.retries++; gpEndRace(); gpGrid(); };
+    ov.querySelector("#gpQuit").onclick = () => gpQuit();
+    setTimeout(autoFocus, 0);
+  }
+  /* the standings: everyone's points with this race's added, counting up, then in their new order */
+  function gpStandings(before, res) {
+    const G = GP, ov = host.querySelector(".adv-ov");
+    const rows = G.runners.map(r => ({ r, b: before[r.id], a: G.pts[r.id], add: (res.find(x => x.id === r.id) || {}).pts || 0 }));
+    const byB = rows.slice().sort((x, y) => y.b - x.b), byA = rows.slice().sort((x, y) => y.a - x.a);
+    const last = G.race >= 3;
+    ov.innerHTML = `
+      <div class="panel adv-small pop gp-res">
+        <div class="panel-hd gold">${ico("trophy")}${esc(GPD().CUPS[G.cup].name)}: after race ${G.race + 1} of 4</div>
+        <div class="gp-rlist gp-stand">${byB.map((x, i) => `
+          <p class="${x.r.me ? "me" : ""}" data-sid="${x.r.id}" style="--i:${i}"><em class="num p${i + 1}">${ORD(i + 1)}</em><canvas width="44" height="40" data-face="${x.r.who}"></canvas><b>${esc(x.r.me ? castOf(x.r.who).name + " (you)" : x.r.name)}</b><i class="num">${x.add ? "+" + x.add : ""}</i><span class="num" data-pts>${x.b}</span></p>`).join("")}</div>
+        <div class="adv-btns">
+          <button class="btn" id="gpNext" data-focus data-enter>${ico("next")}${last ? "The award ceremony" : "Race " + (G.race + 2) + ": " + esc(gpCourse(GPD().CUPS[G.cup].courses[G.race + 1]).name)}</button>
+          ${last ? "" : `<button class="btn ghost" id="gpQuit" data-back>${ico("door")}Leave the cup</button>`}
+        </div>
+      </div>`;
+    ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 1));
+    /* count them up, then move each row to its new place */
+    const list = ov.querySelector(".gp-stand"), H0 = list.querySelector("p") ? list.querySelector("p").offsetHeight + 4 : 46;
+    setTimeout(() => {
+      rows.forEach(x => { const el = list.querySelector(`[data-sid="${x.r.id}"]`), sp = el && el.querySelector("[data-pts]"); if (!sp || !x.add) return;
+        let n = x.b; const iv = setInterval(() => { n++; sp.textContent = n; if (n >= x.a) clearInterval(iv); }, 70); });
+      setTimeout(() => {
+        rows.forEach(x => { const el = list.querySelector(`[data-sid="${x.r.id}"]`); if (!el) return; const from = byB.indexOf(x), to = byA.indexOf(x);
+          el.style.transform = `translateY(${(to - from) * H0}px)`; const em = el.querySelector("em"); em.textContent = ORD(to + 1); em.className = "num p" + (to + 1); });
+      }, 900);
+    }, 450);
+    const nb = ov.querySelector("#gpNext");
+    if (G.online && !NP.host) { nb.disabled = true; nb.innerHTML = `${ico("info")}The host starts the next one`; }
+    nb.onclick = () => { if (G.online) { if (!NP.host) return; Online.toAll({ t: "np.gnext" }, true); } gpNetNext(); };
+    if (ov.querySelector("#gpQuit")) ov.querySelector("#gpQuit").onclick = () => gpQuit();
+    setTimeout(autoFocus, 0);
+  }
+  function gpEndRace() {
+    const Rr = GPR; GPR = null;
+    host.classList.remove("gp-frozen");
+    const h = host.querySelector(".gp-hud"); if (h) h.remove();
+    const pb = host.querySelector(".gp-pwrap"); if (pb) pb.remove();
+    if (Rr && world) { for (const v of Rr.rivals) { world.group.remove(v.card); world.group.remove(v.bub); } }
+  }
+  /* the award ceremony: the top three on the podium; a trophy for you if you're there */
+  function gpPodium() {
+    const G = GP, cup = GPD().CUPS[G.cup];
+    const order = G.runners.slice().sort((a, b) => G.pts[b.id] - G.pts[a.id] || (a.me ? -1 : b.me ? 1 : 0));
+    const place = order.findIndex(r => r.me) + 1;
+    if (place <= 3 && !G.online) {
+      const T = gpSave().trophies[cup.id] = gpSave().trophies[cup.id] || {};
+      T[G.cls] = Math.min(T[G.cls] || 9, place); save(saveData);
+    }
+    bgm("gp-trophy", { once: true });
+    const ov = screenOn("story");
+    const top = order.slice(0, 3), steps = [top[1], top[0], top[2]], H = ["s2", "s1", "s3"];
+    ov.innerHTML = `
+      <div class="panel adv-small pop gp-podium">
+        <div class="panel-hd gold">${ico("trophy")}${esc(cup.name)} · ${esc(G.k.name)}</div>
+        <div class="gp-pod">${steps.map((r, i) => r ? `
+          <div class="gp-step ${H[i]} ${r.me ? "me" : ""}"><canvas width="176" height="144" data-face="${r.who}"></canvas><b>${esc(r.me ? castOf(r.who).name + " (you)" : r.name)}</b><span class="num">${G.pts[r.id]} pts</span><div class="gp-blk">${H[i].slice(1)}</div></div>` : "").join("")}</div>
+        <p class="adv-note">${place <= 3 ? `${["", "Gold", "Silver", "Bronze"][place]} trophy! ${esc(cup.name)}, ${esc(G.k.name)} class.` : `${ORD(place)} overall: the podium is ${esc(top[0].name)}'s this time. Try the cup again!`}</p>
+        <div class="adv-btns">
+          <button class="btn" id="gpAgain" data-focus data-enter>${ico("flag")}Race the cup again</button>
+          <button class="btn ghost" id="gpBack" data-back>${ico("back")}Red Ring Circuit</button>
+        </div>
+      </div>`;
+    ov.querySelectorAll("[data-face]").forEach((cv, i) => { paintCard(cv, cv.dataset.face, "portrait", 2); if (i !== 1) cv.style.transform = flipFor(cv.dataset.face, i ? "r" : "l") ? "scaleX(-1)" : ""; });   // (second and third face the winner)
+    if (G.online) { ov.querySelector("#gpAgain").remove(); const bb = ov.querySelector("#gpBack"); bb.innerHTML = `${ico("back")}Back to the room`; bb.setAttribute("data-focus", ""); bb.onclick = () => { GP = null; npBackToRoom(); }; }
+    else {
+      ov.querySelector("#gpAgain").onclick = () => gpBegin({ cup: G.cup, cls: G.cls, who: G.runners[0].who });
+      ov.querySelector("#gpBack").onclick = () => { GP = null; gpMenu(); };
+    }
+    SFX.goal();
+    setTimeout(autoFocus, 0);
+  }
+  function gpQuit() { const on = GP && GP.online; gpEndRace(); GP = null; if (on) { if (root.Online) Online.leave(); return; } gpMenu(); }
+  function gpNetNext() {
+    const G = GP; if (!G) return;
+    if (GPR && !GPR.recorded && GPR.res) { GPR.res.forEach(r => { G.pts[r.id] += r.pts; }); GPR.recorded = true; }
+    gpEndRace();
+    if (G.race >= 3) gpPodium(); else { G.race++; gpGrid(); }
+  }
+
+  /* ---- the grand prix online: a room's players race the cup together. Everyone runs their own
+     copy of each course, the other players shown as ghosts; the CPUs filling the eight places are
+     made the same on every machine (the same runners, the same seeded runs). A power that reaches
+     another player goes to them over the room (np.pw); the host gathers everyone's time and sends
+     the one result (np.gres), so the points and standings are the same for all. No retries online:
+     the cup goes on whatever your place. */
+  function npGP(plan) {
+    needGP(() => {
+      const cup = GPD().CUPS[plan.cup], meM = plan.mem.find(m => m.id === NP.me);
+      if (meM) { NP.who = meM.who; NP.em = meM.em; }          // (your runner: the one you picked in the room)
+      const humans = plan.mem.map(m => ({ id: m.id === NP.me ? "you" : m.id, netId: m.id, who: m.who === "emerl" ? "emerl" : m.who, name: m.name, me: m.id === NP.me, human: true }));
+      const cpus = plan.cpus.map((who, i) => ({ id: "cpu" + i, who, name: castOf(who).name, skill: plan.skill[i] }));
+      GP = { cup: plan.cup, cupId: cup.id, cls: plan.cls, k: GP_CLS[plan.cls], race: 0, online: true, runners: humans.concat(cpus), pts: {}, done: [], retries: 0 };
+      GP.runners.forEach(r => { GP.pts[r.id] = 0; });
+      gpGrid();
+    });
+  }
+  const gpNetId = id => id === "you" ? NP.me : id;
+  const gpLocalId = id => id === NP.me ? "you" : id;
+  function gpSend(msg) {
+    if (!GP || !GP.online || !NP.on) return;
+    msg = Object.assign({ t: "np.pw", by: NP.me }, msg);
+    if (NP.host) Online.toAll(msg, true); else Online.toHost(msg);
+  }
+  /* a power from another player, here */
+  function gpNetPw(d) {
+    const Rr = GPR; if (!Rr || !GP || d.by === NP.me) return;
+    const p = player;
+    switch (d.k) {
+      case "hit": if (d.to === NP.me) gpHit("you", d.by); break;
+      case "cpuHit": { const v = gpRunner(d.id); if (v && v.fin == null && v.star <= 0) { if (v.shield) v.shield = false; else v.stun = 1.3; } break; }
+      case "thunder": if (p && Math.abs(p.x - d.x) < 13 && Math.abs(p.y + 1 - d.y) < 8) gpHit("you", d.by); burst(d.x, d.y, [0xffe060, 0xffffff], 14, 7); break;
+      case "chaos": Rr.freeze = 2.0; Rr.freezeBy = d.by; caption("Chaos Control!"); SFX.star(); break;
+      case "trap": {
+        const m = new THREE.Mesh(vox(vx => { vx.box(-5, 0, -4, 5, 11, 4, 0xc8ccd8); vx.box(-4, 3, 5, 4, 9, 5, 0x2a3a6a); vx.box(-2, 4, 6, 2, 8, 6, 0xffc890); vx.box(-3, 4, 6, 3, 4, 6, 0xd8762a); vx.set(-1, 7, 7, 0x1a1a1a); vx.set(1, 7, 7, 0x1a1a1a); vx.box(-2, 8, 6, 2, 8, 6, 0xd8302a); }, 0.08), materials().vox);
+        world.group.add(m); m.position.set(d.x, d.y, 0.1);
+        Rr.traps.push({ from: d.by, x: d.x, y: d.y, m, t: 0, life: 40, tid: d.tid }); break;
+      }
+      case "trapGone": { const tp = Rr.traps.find(q => q.tid === d.tid); if (tp && !tp.gone) { tp.gone = true; world.group.remove(tp.m); burst(tp.x, tp.y + 0.5, [0xff8a2a, 0xffd23a], 12, 5); } break; }
+    }
+  }
+  /* the host: everyone's ready on the grid (or long enough), then Go for all */
+  function gpNetReady(id) {
+    const Rr = GPR; if (!GP || !GP.online || !NP.host) return;
+    GP.ready = GP.ready || new Set(); GP.ready.add(id);
+    const here = GP.runners.filter(r => r.human && (r.me || (NP.room && NP.room.members.some(m => m.id === r.netId))));
+    if (here.every(r => GP.ready.has(r.netId)) && !GP.goSent) { GP.goSent = true; Online.toAll({ t: "np.ggo" }, true); gpNetGo(); }
+  }
+  function gpNetGo() { const Rr = GPR; if (Rr && Rr.count === Infinity) Rr.count = 4.2; else if (GP) GP.goEarly = true; }
+  /* the host: a player home; once all are (or a while after the first), the result */
+  function gpNetFin(id, time) {
+    if (!GP || !GP.online || !NP.host || !GPR) return;
+    const Rr = GPR; Rr.hfin = Rr.hfin || {}; if (Rr.hfin[id] != null) return;
+    Rr.hfin[id] = time;
+    const here = GP.runners.filter(r => r.human && (r.me || (NP.room && NP.room.members.some(m => m.id === r.netId))));
+    const all = here.every(r => Rr.hfin[r.netId] != null);
+    if (all) gpNetResult();
+    else if (!Rr.netT) Rr.netT = setTimeout(() => gpNetResult(), 45000);
+  }
+  function gpNetResult() {
+    const Rr = GPR, G = GP; if (!Rr || !G || Rr.netSent) return;
+    Rr.netSent = true; clearTimeout(Rr.netT);
+    for (const v of Rr.rivals) if (v.fin == null) v.fin = world.t + (v.simT - v.u) / Math.max(0.3, v.rate);
+    const res = G.runners.map(r => ({ id: r.human ? r.netId : r.id, t: r.human ? (Rr.hfin[r.netId] != null ? Rr.hfin[r.netId] : null) : (gpRunner(r.id) || {}).fin }))
+      .map(x => ({ id: x.id, t: x.t == null ? null : +x.t.toFixed(2) }))
+      .sort((a, b) => (a.t == null) - (b.t == null) || (a.t || 0) - (b.t || 0));
+    Online.toAll({ t: "np.gres", res }, true);
+    gpResults(res);
+  }
+
+
   /* the camera goes along the stage's low road on its own; nobody is there to see */
   function titleGlide(dt) {
     const p = player, w = world;
@@ -8267,7 +10336,8 @@
   }
 
   function menu() {
-    endBattle(); storyRun = null; talk = null;
+    if (pendingFirst(menu)) return;
+    endBattle(); storyRun = null; talk = null; RACE = null;
     mode = "menu"; paused = false; parade = null; music();
     const ov = host.querySelector(".adv-ov"), list = stages();
     host.querySelector(".adv-hud").classList.remove("on");
@@ -8278,17 +10348,18 @@
           <div class="panel-hd">${ico("person")}Free Exhibition: who runs</div>
           <div class="adv-cast">
             ${CAST.map(c => `
-              <button class="adv-who ${c.id === castId ? "on" : ""}" data-cast="${c.id}">
-                <div class="adv-bust"><canvas class="adv-spr" width="176" height="144" data-who="${c.id}"></canvas></div>
+              <button class="adv-who ${c.id === castId ? "on" : ""} ${hasFighter(c.id) ? "" : "locked"}" data-cast="${c.id}">
+                <div class="adv-bust"><canvas class="adv-spr" width="176" height="144" data-who="${c.id}" ${hasFighter(c.id) ? "" : 'data-dark="1"'}></canvas></div>
                 <div class="adv-who-tx">
-                  <b>${esc(c.name)}</b>
-                  <span class="adv-mv">${ico("star")}${esc(c.moves)}</span>
-                  <span class="adv-gr">${Object.entries(c.grades).map(([k, g]) => `<i>${k}<b class="g g${g}">${g}</b></i>`).join("")}</span>
-                  <small>${esc(c.text)}</small>
+                  <b>${hasFighter(c.id) ? esc(c.name) : "???"}</b>
+                  ${hasFighter(c.id) ? `<span class="adv-mv">${ico("star")}${esc(c.moves)}</span>` : `<span class="adv-lockhint">${ico("lock")}${esc((UNLOCK[c.id] || {}).hint || "")}</span>`}
+                  <span class="adv-gr">${Object.entries(c.grades).map(([k, g]) => `<i>${k}${hasFighter(c.id) ? `<b class="g g${g}">${g}</b>` : `<b class="g">?</b>`}</i>`).join("")}</span>
+                  ${hasFighter(c.id) ? `<small>${esc(c.text)}</small>` : ""}
                 </div>
               </button>`).join("")}
           </div>
           <div class="panel-hd adv-hd2">${ico("flag")}Zone</div>
+          <div class="seg adv-seg adv-exmode">${[["run", "Act 1 and Act 2"], ["race", "Stage Racing: Act 3"]].map(([v, l]) => `<button data-exm="${v}" data-k="exm-${v}" class="${exSet().mode === v ? "sel" : ""}">${l}</button>`).join("")}</div>
           <div class="adv-acts"></div>
           <div class="adv-stages">
             ${list.map((s, i) => {
@@ -8322,6 +10393,7 @@
     ov.querySelectorAll(".adv-spr").forEach(cv => paintCard(cv, cv.dataset.who));
     ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "idle", 1));
     ov.querySelectorAll("[data-cast]").forEach(b => b.onclick = () => {
+      if (!hasFighter(b.dataset.cast)) { note((UNLOCK[b.dataset.cast] || {}).hint || "Not on the team yet."); return; }
       castId = b.dataset.cast; saveData.cast = castId; save(saveData);
       ov.querySelectorAll("[data-cast]").forEach(x => x.classList.toggle("on", x === b));
       world.group.remove(player.spr); if (player.dust) world.group.remove(player.dust);
@@ -8333,14 +10405,44 @@
       load3d(i, firstAct(i)); music(); paintActs(ov);
     });
     paintActs(ov);
-    ov.querySelector("#advStart").onclick = () => play();
+    ov.querySelectorAll("[data-exm]").forEach(b => b.onclick = () => { exSet().mode = b.dataset.exm; save(saveData); ov.querySelectorAll("[data-exm]").forEach(x => x.classList.toggle("sel", x === b)); paintActs(ov); });
+    ov.querySelector("#advStart").onclick = () => {
+      if (exSet().mode !== "race") { play(); return; }
+      if (!actCleared(stageIdx, 1)) { note(`Clear ${stages()[stageIdx].name} Act 2 to open its racecourse.`); return; }
+      const e = exSet();
+      raceStart({ def: raceDef(stageIdx), who: exRival(), pace: PACE[e.pace] || PACE.normal, backLabel: "Free Exhibition", onBack: () => menu() });
+    };
     ov.querySelector("#advBack").onclick = () => mainMenu();
     autoFocus();
   }
   /* the zone's Acts, to pick from: each one's best time and grade; Act 2 opens once Act 1 is cleared */
   const firstAct = i => { for (let a = 0; a < nActs(i); a++) if (!actCleared(i, a)) return a; return 0; };
+  /* Stage Racing's settings (kept): the mode, the rival, the pace */
+  const exSet = () => {                                  // (the one kept object: filled in, never swapped out)
+    const e = saveData.exRace || (saveData.exRace = {}), d = { mode: "run", rival: "metal", pace: "normal" };
+    for (const k in d) if (e[k] == null) e[k] = d[k];
+    return e;
+  };
+  /* the rivals for a zone's racecourse: those the robot gets through it fairly */
+  const rivalsFor = i => { const l = cleanRunners(stages()[i].id + "-3"); return l.length ? l : ["sonic"]; };
+  const exRival = () => { const e = exSet(), l = rivalsFor(stageIdx); return l.includes(e.rival) ? e.rival : l[0]; };
+  function paintRace(ov, el) {
+    const z = stages()[stageIdx], e = exSet(), open = actCleared(stageIdx, 1), r = saveData.stages[z.id + "-3"] || {}, riv = exRival();
+    el.innerHTML = `
+      <div class="adv-race-set">
+        <div class="adv-act on"><b>Act 3</b><i>${esc(z.name)}<br>The racecourse: race a rival to the goal post</i>
+          <span class="num">${open ? (r.best != null ? fmt(r.best) : "--:--.-") : ""}</span>${open ? "" : ico("lock")}</div>
+        <div class="setrow"><div class="setlab"><b>Rival</b><i>Any of the cast who can run it clean.</i></div><div class="adv-pick"><button class="adv-arr" data-rv="-1" data-k="rv-prev">${ico("back")}</button><canvas width="44" height="40" data-face="${riv}"></canvas><b>${esc(castOf(riv).name)}</b><button class="adv-arr" data-rv="1" data-k="rv-next">${ico("next")}</button></div></div>
+        <div class="setrow"><div class="setlab"><b>Pace</b><i>How fast the rival goes: Hard is flat out.</i></div><div class="seg adv-seg">${[["easy", "Easy"], ["normal", "Normal"], ["hard", "Hard"]].map(([v, l]) => `<button data-pace="${v}" data-k="pace-${v}" class="${e.pace === v ? "sel" : ""}">${l}</button>`).join("")}</div></div>
+        ${open ? "" : `<p class="adv-note">${ico("lock")}Clear ${esc(z.name)} Act 2 to open its racecourse.</p>`}
+      </div>`;
+    el.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 1));
+    el.querySelectorAll("[data-rv]").forEach(b => b.onclick = () => { e.rival = cycle(rivalsFor(stageIdx), riv, +b.dataset.rv); save(saveData); paintRace(ov, el); });
+    el.querySelectorAll("[data-pace]").forEach(b => b.onclick = () => { e.pace = b.dataset.pace; save(saveData); paintRace(ov, el); });
+  }
   function paintActs(ov) {
     const el = ov.querySelector(".adv-acts"); if (!el) return;
+    if (exSet().mode === "race") { paintRace(ov, el); return; }
     const z = stages()[stageIdx];
     el.innerHTML = Array.from({ length: nActs(stageIdx) }, (_, a) => {
       const r = saveData.stages[z.id + "-" + (a + 1)] || {}, open = actOpen(stageIdx, a), last = a === nActs(stageIdx) - 1;
@@ -8360,7 +10462,7 @@
       const cfg = battle.cfg;
       if (cfg.kind === "training") return bgm("training");
       if (storyRun && storyRun.i === storyRun.ep.chapters.length - 1) return bgm("story-final");      // the story's last fight
-      return bgm(BATTLE_BGM[(cfg.arena || 0) % BATTLE_BGM.length]);
+      return bgm(BATTLE_BGM[(battle.arena != null ? battle.arena : cfg.arena || 0) % BATTLE_BGM.length]);
     }
     if (mode === "play" || mode === "goal") {
       const b = world && world.boss;
@@ -8439,6 +10541,21 @@
     const ov = host.querySelector(".adv-ov");
     if (!paused) { ov.innerHTML = ""; last = 0; return; }
     if (battle) return battlePause(ov);
+    if (GPR) {                                           // the grand prix: on, the race again, or out of the cup
+      ov.innerHTML = `
+      <div class="panel adv-small pop">
+        <div class="panel-hd">${ico("info")}Paused</div>
+        <div class="adv-btns">
+          <button class="btn" id="advRes">${ico("next")}Keep racing</button>
+          <button class="btn ghost" id="advRe">Restart the race</button>
+          <button class="btn ghost" id="advQuit">${ico("door")}Leave the cup</button>
+        </div>
+      </div>`;
+      ov.querySelector("#advRes").onclick = () => togglePause();
+      ov.querySelector("#advRe").onclick = () => { paused = false; GP.retries++; gpEndRace(); gpGrid(); };
+      ov.querySelector("#advQuit").onclick = () => { paused = false; gpQuit(); };
+      autoFocus(); return;
+    }
     ov.innerHTML = `
       <div class="panel adv-small pop">
         <div class="panel-hd">${ico("info")}Paused</div>
@@ -8456,6 +10573,7 @@
 
   function results(r) {
     if (!host) return;
+    checkUnlocks();                                       // (animals freed, Red Star Rings found: shown at the next menu)
     mode = "results";
     host.querySelector(".adv-hud").classList.remove("on");
     const list = stages(), moreActs = !storyRun && actIdx + 1 < nActs(stageIdx);
@@ -8548,11 +10666,18 @@
     }
   }
   const resolveWho = w => w === "random" || !CAST.some(c => c.id === w) ? CAST[Math.floor(Math.random() * CAST.length)].id : w;
-  const randomArena = () => Math.floor(Math.random() * stages().length);
+  const randomArena = () => { const o = openArenas(); return o.length ? o[Math.floor(Math.random() * o.length)] : 0; };
   /* the match a room's host starts: everything everyone's game needs to set it up the same */
   function npPlan(R, hostId) {
     const mem = R.members.map(m => ({ id: m.id, name: m.name, who: resolveWho(m.who), em: m.em || null, team: m.team || 0, r: m.r || 1000, uid: m.uid }));
     if (R.mode === "race") return { kind: "race", zone: clamp(R.zone | 0, 0, stages().length - 1), mem };
+    if (R.mode === "gp") {                                // the grand prix: the room's players, CPUs in the other places
+      const used = new Set(mem.map(m => m.who)), pool = CAST.map(c => c.id).filter(id => !used.has(id));
+      U.shuffle(pool);
+      const n = Math.max(0, 8 - mem.length), cpus = [];
+      for (let k = 0; k < n; k++) cpus.push(pool[k % pool.length]);
+      return { kind: "gp", cup: clamp(R.gpCup | 0, 0, GP_CUP_NAMES.length - 1), cls: GP_CLS[R.gpCls] ? R.gpCls : "gale", mem, cpus, skill: cpus.map(() => +(0.97 + Math.random() * 0.07).toFixed(3)) };
+    }
     if (R.mode === "story") {
       const ep = epOf(R.ep); if (!ep) return { err: "Pick an episode first." };
       return { kind: "story", ep: R.ep, ch: clamp(R.ch | 0, 0, ep.chapters.length - 1), mem, hero: hostId };
@@ -8581,6 +10706,7 @@
     else if (plan.kind === "race") npRace(plan, null);
     else if (plan.kind === "story") npStory(plan);
     else if (plan.kind === "tourney") { TOUR = plan.T; TOUR.me = null; tourBracket(); }
+    else if (plan.kind === "gp") npGP(plan);
     if (root.Online) Online.setPresence();
   }
   /* a battle: on the host, its guests' fighters steered by what they send; on a guest, a mirror */
@@ -8715,6 +10841,7 @@
     const me = B.fs.find(f => f.net === NP.me);
     let rec = null;
     if (me && root.Auth && Auth.user) {
+      if (B.winner === me.team && saveData) { PROG().wins++; save(saveData); checkUnlocks(); }      // (online wins count toward Shadow's challenge too)
       const rivals = B.fs.filter(f => f.team !== me.team && f.net);
       rec = Auth.record({ kind: "battle", won: B.winner === me.team, kos: me.kos, who: me.c.id, online: true, oppR: rivals.length ? rivals.reduce((t, f) => t + f.netR, 0) / rivals.length : null });
     }
@@ -8746,7 +10873,7 @@
   }
   function npBackToRoom() {
     if (NP.race) clearTimeout(NP.race.timer);
-    NP.on = false; npClear(); endBattle(); storyRun = null; paused = false; NP.race = null; NP.story = null;
+    NP.on = false; npClear(); endBattle(); storyRun = null; paused = false; NP.race = null; NP.story = null; if (GP && GP.online) { gpEndRace(); GP = null; }
     if (NP.host && root.Online) Online.matchEnded();
     if (root.AdventureOnline) AdventureOnline.backToRoom();
   }
@@ -8754,7 +10881,7 @@
   function npStop() {
     if (!NP.on) return;
     if (NP.race) clearTimeout(NP.race.timer);
-    NP.on = false; npClear(); endBattle(); storyRun = null; paused = false; NP.race = null; NP.story = null;
+    NP.on = false; npClear(); endBattle(); storyRun = null; paused = false; NP.race = null; NP.story = null; if (GP && GP.online) { gpEndRace(); GP = null; }
     if (TOUR && TOUR.online) TOUR = null;
   }
   /* a fighter's name tags again (a player left and a CPU took over) */
@@ -8769,6 +10896,7 @@
     const g = NP.ghosts.get(id); if (g) { world.group.remove(g.spr); NP.ghosts.delete(id); }
     if (NP.race && NP.host) npRaceCheck();
     if (NP.story && NP.host && NP.story.stage === "before") npStoryCheck();
+    if (GP && GP.online && NP.host) { if (GPR && !GPR.go) gpNetReady(NP.me); if (GPR && Object.keys(GPR.hfin || {}).length) { const here = GP.runners.filter(r => r.human && (r.me || (NP.room && NP.room.members.some(m => m.id === r.netId && m.id !== id)))); if (here.every(r => GPR.hfin[r.netId] != null)) gpNetResult(); } }
     if (TOUR && TOUR.online) TOUR.ents.forEach(e => { if (e.net === id) { e.net = null; e.cpu = true; e.lvl = 1; e.name += " (CPU)"; } });
   }
   function npChatLine(c) { if (root.AdventureOnline) AdventureOnline.toast((c.sys ? "" : c.n + ": ") + (c.sys || c.x), "msg", 3600); }
@@ -8779,6 +10907,9 @@
       case "np.g": Online.toAll(Object.assign({}, d, { id }), true); npGhost(id, d); break;
       case "np.fin": npRaceFin(id, +d.time || 0); break;
       case "np.ok": if (NP.story) { NP.story.ok.add(id); npStoryCheck(); } break;
+      case "np.gok": gpNetReady(id); break;
+      case "np.gfin": gpNetFin(id, +d.time || 9999); break;
+      case "np.pw": Online.toAll(Object.assign({}, d, { by: id }), true); gpNetPw(Object.assign({}, d, { by: id })); break;
     }
   }
   function npGuestGot(d) {
@@ -8797,6 +10928,10 @@
       case "np.sgo": npStoryGo(d); break;
       case "np.tour": if (NP.on) { TOUR = d.T; tourBracket(); } break;
       case "np.tm": if (NP.on) { TOUR = d.T; npBattle(d.cfg); } break;
+      case "np.ggo": gpNetGo(); break;
+      case "np.pw": gpNetPw(d); break;
+      case "np.gres": if (GPR) { if (mode !== "goal" && mode !== "play") mode = "goal"; gpResults(d.res); } break;
+      case "np.gnext": gpNetNext(); break;
     }
   }
   /* the pause menu, online: the match goes on behind it */
@@ -8815,7 +10950,7 @@
   function npRace(plan, story) {
     const meM = plan.mem.find(m => m.id === NP.me) || plan.mem[0];
     NP.who = story && NP.host ? story.ch.who : meM.who; NP.em = meM.em;
-    NP.def = story ? (story.ch.kind === "zone" ? actDef(stageAt(story.ch.zone), story.act || 0) : storyDef(story.ch)) : actDef(plan.zone, 0);
+    NP.def = story ? (story.ch.kind === "zone" ? actDef(stageAt(story.ch.zone), story.act || 0) : story.ch.kind === "race" ? raceDef(stageAt(story.ch.zone)) : storyDef(story.ch)) : actDef(plan.zone, 0);
     NP.race = { fin: new Map(), go: false, count: 0, story, mine: null, done: false, timer: null, said: -1 };
     play();
     world.played = true; world.t = 0;
@@ -8950,6 +11085,7 @@
     storyRun = { who: ep.who, ep, i: plan.ch, ch, net: true };
     if (ch.kind === "run") { storyRun.def = storyDef(ch); loadDef(storyRun.def); glideX = 12; camX = 15; }
     else if (ch.kind === "zone") { NP.story.act = storyRun.act = 0; storyRun.def = actDef(stageAt(ch.zone), 0); loadDef(storyRun.def); glideX = 12; camX = 15; }
+    else if (ch.kind === "race") { storyRun.def = raceDef(stageAt(ch.zone)); loadDef(storyRun.def); glideX = 12; camX = 15; }
     else { disposeWorld(); world = buildWorld(arenaDef(stageAt(ch.arena))); player = makePlayer(castOf(ch.who)); glideX = world.W / 2; snapCamera(); }
     music();
     playScene(ch.before, () => npStoryOk());
@@ -9045,7 +11181,7 @@
   function tourMake(o) {
     const size = o.size === 16 ? 16 : 8;
     const humans = o.humans.slice(0, size).map(h => Object.assign({ cpu: false }, h));
-    const used = new Set(humans.map(e => e.who)), cpus = [];
+    const used = new Set(humans.map(e => e.who).concat(o.cup ? [o.cup] : [])), cpus = [];
     while (humans.length + cpus.length < size) {
       let pool = CAST.filter(c => !used.has(c.id)); if (!pool.length) pool = CAST;
       const c = pool[Math.floor(Math.random() * pool.length)]; used.add(c.id);
@@ -9057,11 +11193,12 @@
     U.shuffle(cpus);
     const order = seedOrder(size), ents = new Array(size);
     humans.forEach((h, i) => { ents[order[i]] = h; });
+    if (o.cup) ents[order[humans.length]] = { cpu: true, who: o.cup, name: castOf(o.cup).name, lvl: 2, boss: true };   // (the host of the Cup, in the other half)
     for (let i = 0; i < size; i++) if (!ents[i]) ents[i] = cpus.pop();
     const rounds = []; let n = size / 2;
     rounds.push(Array.from({ length: n }, (_, k) => ({ a: 2 * k, b: 2 * k + 1, w: null })));
     while (n > 1) { n /= 2; rounds.push(Array.from({ length: n }, () => ({ a: null, b: null, w: null }))); }
-    return { size, goal: o.goal || 2, arena: o.arena == null ? -1 : o.arena, lvl: o.lvl == null ? 1 : o.lvl, online: !!o.online, ents, rounds, r: 0, done: false, champ: null, recd: false };
+    return { size, goal: o.goal || 2, arena: o.arena == null ? -1 : o.arena, lvl: o.lvl == null ? 1 : o.lvl, online: !!o.online, cup: o.cup || null, ents, rounds, r: 0, done: false, champ: null, recd: false };
   }
   /* the next match to play (rounds done carry their winners on) */
   function tourNext() {
@@ -9081,6 +11218,7 @@
   /* two CPUs: the higher level mostly wins, now and then not */
   function tourSim(m) {
     const T = TOUR, A2 = T.ents[m.a], B2 = T.ents[m.b];
+    if (A2.boss || B2.boss) { m.w = A2.boss ? m.a : m.b; m.sim = true; return; }     // (the Cup's host never loses before the final)
     const s = e => e.lvl * 1.1 + (HP_K[e.who] || 1) * 0.6 + Math.random() * 1.6;
     m.w = s(A2) >= s(B2) ? m.a : m.b; m.sim = true;
   }
@@ -9122,6 +11260,10 @@
     const out = T.rounds.some(R => R.some(m => m.w != null && (m.a === mine || m.b === mine) && m.w !== mine));
     if (!out && !T.done) return null;
     T.recd = true;
+    if (T.done && T.champ === mine && !T.online) {
+      if (T.size === 8) { PROG().cups++; save(saveData); }
+      if (T.cup && !hasFighter(T.cup)) { grantFighter(T.cup); PENDING.push({ id: T.cup, kind: "join" }); }
+    }
     const wins = T.rounds.reduce((n, R) => n + R.filter(m => m.w === mine).length, 0);
     return Auth.record({ kind: "tourney", rounds: wins, champ: T.champ === mine, online: T.online });
   }
@@ -9143,7 +11285,7 @@
       <div class="ao-page pop tr-page">
         <div class="ao-head">
           <button class="btn ghost" data-quit data-back>${ico("back")}${T.online ? "Leave the room" : "Quit"}</button>
-          <h2>${ico("crown")}Tournament · ${T.size}</h2>
+          <h2>${ico("crown")}${T.cup ? "The " + esc(castOf(T.cup).name.replace(/^Dr\. /, "")) + " Cup" : "Tournament · " + T.size}</h2>
           <span class="ao-net">${T.done ? "Over" : esc(ROUND_N(T.size, T.r))} · ${T.goal} ${T.goal === 1 ? "life" : "lives"} a match</span>
         </div>
         <div class="panel tr-wrap"><div class="tr-bracket">${T.rounds.map((R, r) => `
@@ -9185,14 +11327,16 @@
   let tourSet = null;
   function tourSetup() {
     tourSet = tourSet || { size: 8, lvl: 1, goal: 2, arena: -1 };
-    const ov = screenOn("tourney"), t = tourSet, zs = stages();
+    const ov = screenOn("tourney"), t = tourSet, zs = stages(), can16 = PROG().cups >= 1;
+    if (!can16) t.size = 8;
+    if (t.arena >= 0 && !unlocked(t.arena)) t.arena = -1;
     const segs = (k, opts) => `<div class="seg adv-seg">${opts.map(([v, l]) => `<button data-t="${k}" data-v="${v}" class="${String(t[k]) === String(v) ? "sel" : ""}">${l}</button>`).join("")}</div>`;
     ov.innerHTML = `
       <div class="adv-menu pop">
         <div class="panel adv-panel">
           <div class="panel-hd">${ico("crown")}Tournament</div>
           <p class="adv-note">A knock-out bracket: you and CPUs, one battle a match, the winner on to the next round.</p>
-          <div class="setrow"><div class="setlab"><b>Places</b></div>${segs("size", [[8, "8"], [16, "16"]])}</div>
+          <div class="setrow"><div class="setlab"><b>Places</b>${can16 ? "" : "<i>16 places open once you've won a tournament of 8.</i>"}</div>${can16 ? segs("size", [[8, "8"], [16, "16"]]) : `<div class="seg adv-seg"><button class="sel">8</button><button disabled title="Win a tournament of 8 first">${ico("lock")}16</button></div>`}</div>
           <div class="setrow"><div class="setlab"><b>CPUs</b><i>Around this level, a little either side.</i></div>${segs("lvl", [[0, "Easy"], [1, "Normal"], [2, "Hard"]])}</div>
           <div class="setrow"><div class="setlab"><b>Lives a match</b></div>${segs("goal", [[1, "1"], [2, "2"], [3, "3"]])}</div>
           <div class="setrow"><div class="setlab"><b>Arena</b></div><div class="adv-pick"><button class="adv-arr" data-ar="-1">${ico("back")}</button><b>${t.arena < 0 ? "A new one every match" : esc(zs[t.arena].name)}</b><button class="adv-arr" data-ar="1">${ico("next")}</button></div></div>
@@ -9205,8 +11349,9 @@
       </div>`;
     ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 1));
     ov.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { t[b.dataset.t] = +b.dataset.v; tourSetup(); });
-    ov.querySelectorAll("[data-ar]").forEach(b => b.onclick = () => { const n = zs.length + 1; t.arena = ((t.arena + 1 + (+b.dataset.ar)) % n + n) % n - 1; tourSetup(); });
-    ov.querySelectorAll("[data-pk]").forEach(b => b.onclick = () => { const i = CAST.findIndex(c => c.id === castId); castId = CAST[(i + (+b.dataset.pk) + CAST.length) % CAST.length].id; saveData.cast = castId; save(saveData); tourSetup(); });
+    if (pendingFirst(tourSetup)) return;
+    ov.querySelectorAll("[data-ar]").forEach(b => b.onclick = () => { t.arena = cycle([-1].concat(openArenas()), t.arena, +b.dataset.ar); tourSetup(); });
+    ov.querySelectorAll("[data-pk]").forEach(b => b.onclick = () => { castId = cycleTeam(castId, +b.dataset.pk); saveData.cast = castId; save(saveData); tourSetup(); });
     ov.querySelector("[data-go]").onclick = () => {
       TOUR = tourMake({ size: t.size, lvl: t.lvl, goal: t.goal, arena: t.arena, online: false, humans: [{ name: root.Auth && Auth.user ? Auth.name : "You", who: castId, me: true }] });
       tourBracket();
@@ -9229,6 +11374,7 @@
     try { if (root.Sound && Sound.stop) Sound.stop(); } catch (e) {}                 // the cabinet plays its own music
     loadSamples();
     castId = CAST.some(c => c.id === saveData.cast) ? saveData.cast : "sonic";
+    teamCatchUp();
     const list = stages();
     if (!list.length) return false;
     stageIdx = 0;
@@ -9260,12 +11406,15 @@
       onLogin: id => {
         saveData = loadAcct(id);
         castId = CAST.some(c => c.id === saveData.cast) ? saveData.cast : "sonic";
+        PENDING = []; RETRO = null; teamCatchUp();
         const list = stages(); stageIdx = 0;
         for (let i = list.length - 1; i >= 0; i--) if (unlocked(i)) { stageIdx = i; break; }
         if (cleared(stageIdx) && stageIdx + 1 < list.length && unlocked(stageIdx + 1)) stageIdx++;
         actIdx = firstAct(stageIdx);
       },
-      onLogout: () => { npStop(); TOUR = null; saveData = load(); title(); },
+      onLogout: () => { npStop(); TOUR = null; saveData = load(); PENDING = []; RETRO = null; title(); },
+      fighters: () => fightersN(), hasFighter: id => hasFighter(id), gpCups: () => GP_CUP_NAMES, openZones: () => openArenas().map(i => ({ i, id: stages()[i].id, name: stages()[i].name })),
+      can16: () => PROG().cups >= 1, randomArena: () => randomArena(),
       np: { start: npStart, plan: npPlan, hostGot: npHostGot, guestGot: npGuestGot, stop: npStop, memberLeft: npMemberLeft, active: () => NP.on, chatLine: npChatLine },
     };
   }
@@ -9289,11 +11438,14 @@
   }
 
   root.Adventure = { ok: true, open, close, CAST, THEMES,
-    _debug: { get world() { return world; }, get player() { return player; }, step: (s, n) => { for (let k = 0; k < (n || 1); k++) { readInput(); step(s); worldStep(s); input.jp = input.zp = input.xp = input.cp = 0; } },
+    _debug: { get world() { return world; }, get player() { return player; }, get GP() { return GP; }, get GPR() { return GPR; }, gpBegin: o => gpBegin(o), npStart: (h, R, plan, me) => npStart(h, R, plan, me), npPlan: (R, id) => npPlan(R, id), get NP() { return NP; }, gpSim: (id, who, seed) => { const r = simRun(gpDef(id), who, seed == null ? 1000 : seed); return { ok: r.ok, time: r.time, end: r.track.length ? r.track[r.track.length - 1][1] : null }; }, gpUse: (id, k) => gpUse(id, k), gpHit: (id, by) => gpHit(id, by), gpPodium: () => gpPodium(), gpMenu: () => gpMenu(), gpDef: id => gpDef(id), coursePic: id => coursePic(id), gpCleanAdd: (id, list) => { GP_CLEAN[id] = list; }, step: (s, n) => { for (let k = 0; k < (n || 1); k++) { readInput(); step(s); worldStep(s); input.jp = input.zp = input.xp = input.cp = 0; } },
               play: (i, id, a) => { if (id) castId = id; if (i != null) stageIdx = i; actIdx = a || 0; play(); }, draw: dt => draw(dt || 1 / 60), input: INPUT0, keys, touch, parse,
               get battle() { return battle; }, get punch() { return punch; }, get np() { return NP; }, get tour() { return TOUR; }, frame: t => frame(t), tourSetup, tourMake, tourBracket, tourGo, get demo() { return demo; }, demoTick: (secs, h) => { for (let t = 0; t < secs && demo; t += h || 0.05) demoTick(h || 0.05); }, title, get mode() { return mode; }, get talk() { return talk; }, startBattle, mainMenu, storyMenu, storyEpisode, playChapter, battleSetup, get storyRun() { return storyRun; }, EPS,
               trainingSetup, optionsScreen, arenaDef, emerlLearn, emerlSkills, emerlCast, get saveData() { return saveData; },
               bossWeak: () => world && world.boss && BRAIN[world.boss.key].weak(world.boss),
+              simRun: (where, who) => simRun(typeof where === "number" ? actDef(where, 0) : /^r\d+$/.test(where) ? raceDef(+where.slice(1)) : storyStages().find(st => st.id === where), who),
+              raceDef: i => raceDef(i),
+              raceStart: o => raceStart(o), get race() { return RACE; }, actDef: (i, a) => actDef(i, a), storyStages: () => storyStages(),
               get tut() { return TUT; }, tutorialStart, trainingMenu, tutLessons: () => tutLessons().map(l => l.id),
               tutJump: id => { if (!TUT) return; TUT.i = LESSONS.findIndex(l => l.id === id) - 1; TUT.ok = null; tutNext(); },
               get bgm() { return BGM; }, get samples() { return Object.keys(SAMPLES); }, sfx: SFX, tick: (n, h) => { for (let k = 0; k < (n || 1); k++) { if (battle) battleTick(h || 1 / 120); } } } };

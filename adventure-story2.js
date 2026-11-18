@@ -52,7 +52,7 @@
         [N, "Rouge glides off the summit with the ring. She doesn't look back. If she had, she'd have seen Knuckles grinning."],
         ["knuckles", "Go on, then. Lead me straight to whoever you're working for."],
       ] },
-    { title: "Rooftop Run", kind: "run", stage: "s-rooftops",
+    { title: "Rooftop Run", kind: "race", zone: "club", rival: "knuckles",
       before: [
         [N, "The city after midnight. Rouge flies from roof to roof. Behind her, a red echidna is gliding, and gaining."],
         ["rouge", "He followed me all the way from the mountain? Persistent. I'll give him that."],

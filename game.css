@@ -396,9 +396,37 @@
 
 /* ---- story talk: Sonic Battle's white speech box, its tail to whoever speaks */
 .adv-talk{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;padding:16px 16px 22px;cursor:pointer}
-.adv-tk-face{position:absolute;bottom:156px;width:264px;height:216px;image-rendering:pixelated;opacity:0;transition:opacity .25s,filter .2s;pointer-events:none;filter:drop-shadow(3px 3px 0 var(--sx-ink))}
+.adv-tk-face{position:absolute;bottom:calc(var(--tkb,156px) - var(--tko,54px));width:264px;height:216px;image-rendering:pixelated;opacity:0;transition:opacity .25s,filter .2s;pointer-events:none;filter:drop-shadow(3px 3px 0 var(--sx-ink))}
 .adv-tk-face.l{left:max(16px,calc(50% - 450px))}
-.adv-tk-face.r{right:max(16px,calc(50% - 450px));transform:scaleX(-1)}
+.adv-tk-face.r{right:max(16px,calc(50% - 450px))}
+.adv-tk-face.flip{transform:scaleX(-1)}
+/* the busts' gestures (translate, rotate and scale: the mirroring stays the transform's); --dir is toward the middle */
+.adv-tk-face{--dir:1}.adv-tk-face.r{--dir:-1}
+.adv-tk-face.g-enter{animation:tkEnter .38s cubic-bezier(.2,.9,.3,1.1) both}
+.adv-tk-face.g-hop{animation:tkHop .42s ease-out 2}
+.adv-tk-face.g-laugh{animation:tkLaugh .16s ease-in-out 7}
+.adv-tk-face.g-shake{animation:tkShake .07s linear 8}
+.adv-tk-face.g-shock{animation:tkShock .5s cubic-bezier(.2,1.5,.4,1)}
+.adv-tk-face.g-tilt{animation:tkTilt 1.1s ease-in-out}
+.adv-tk-face.g-slump{animation:tkSlump 1.3s ease-in-out both}
+.adv-tk-face.g-nod{animation:tkNod .3s ease-in-out 2}
+.adv-tk-face.g-lean{animation:tkLean .55s ease-out both}
+.adv-tk-face.g-think{animation:tkThink 1.6s ease-in-out}
+.adv-tk-face.g-flinch{animation:tkFlinch .32s ease-out}
+.adv-tk-face.g-flee{animation:tkFlee 1.15s ease-in both}
+@keyframes tkEnter{from{translate:calc(var(--dir) * -140px) 0;opacity:0}to{translate:0 0;opacity:1}}
+@keyframes tkHop{0%,100%{translate:0 0}40%{translate:0 -24px}}
+@keyframes tkLaugh{0%,100%{translate:0 0;rotate:0deg}50%{translate:0 -9px;rotate:calc(var(--dir) * -2deg)}}
+@keyframes tkShake{0%,100%{translate:0 0}25%{translate:-7px 0}75%{translate:7px 0}}
+@keyframes tkShock{0%{translate:0 0;scale:1}28%{translate:calc(var(--dir) * -28px) -30px;scale:1.08}100%{translate:0 0;scale:1}}
+@keyframes tkTilt{0%,100%{rotate:0deg;translate:0 0}25%,75%{rotate:calc(var(--dir) * -8deg);translate:0 -4px}}
+@keyframes tkSlump{0%{translate:0 0}45%,80%{translate:0 16px;scale:1 .95}100%{translate:0 8px;scale:1 .98}}
+@keyframes tkNod{0%,100%{translate:0 0}50%{translate:0 10px}}
+@keyframes tkLean{0%{translate:0 0}45%{translate:calc(var(--dir) * 30px) -4px}100%{translate:calc(var(--dir) * 12px) 0}}
+@keyframes tkThink{0%,100%{rotate:0deg}30%{rotate:calc(var(--dir) * 4deg)}65%{rotate:calc(var(--dir) * -3deg)}}
+@keyframes tkFlinch{0%,100%{translate:0 0}35%{translate:calc(var(--dir) * -16px) -8px}}
+@keyframes tkFlee{0%{translate:0 0;opacity:1}8%{translate:calc(var(--dir) * 10px) -14px}16%{translate:calc(var(--dir) * -6px) 0}24%{translate:calc(var(--dir) * -30px) -12px}32%{translate:calc(var(--dir) * -62px) 0}40%{translate:calc(var(--dir) * -104px) -12px}48%{translate:calc(var(--dir) * -150px) 0}56%{translate:calc(var(--dir) * -206px) -12px}64%{translate:calc(var(--dir) * -270px) 0}72%{translate:calc(var(--dir) * -340px) -10px;opacity:1}100%{translate:calc(var(--dir) * -560px) -6px;opacity:0}}
+@media (prefers-reduced-motion:reduce){.adv-tk-face[class*=" g-"]{animation-duration:.01s!important;animation-iteration-count:1!important}}
 .adv-tk-face.in{opacity:1}
 .adv-tk-face.in:not(.talking){filter:brightness(.45) saturate(.4) drop-shadow(3px 3px 0 var(--sx-ink))}
 .adv-tk-box{position:relative;width:min(900px,100%);min-height:124px;background:#fff;border:4px solid var(--sx-ink);border-radius:14px;padding:22px 26px 30px;box-shadow:0 6px 0 rgba(5,10,34,.55)}
@@ -437,7 +465,7 @@
   .adv-kh,.adv-kr{grid-template-columns:1fr 110px 110px}
   .adv-fcards{right:64px;gap:6px 10px}.adv-fc{width:156px;gap:5px}.adv-fc-face{width:34px;height:31px}
   .adv-clock{font-size:22px}
-  .adv-tk-face{width:150px;height:122px;bottom:200px}.adv-tk-face.l{left:6px}.adv-tk-face.r{right:6px}.adv-tk-text{font-size:16px}
+  .adv-tk-face{width:150px;height:122px;--tko:40px}.adv-tk-face.l{left:6px}.adv-tk-face.r{right:6px}.adv-tk-text{font-size:16px}
   .adv-mv-r{grid-template-columns:100px 1fr}
   .adv-name b{padding:8px 34px 10px 34px}
   .adv-comm span{font-size:13px}
@@ -762,10 +790,153 @@
   gap:clamp(10px,4vw,44px);padding:12px 16px;background:var(--sx-navy);border-block:4px solid var(--sx-ink);
   box-shadow:inset 0 4px 0 var(--sx-blue),inset 0 -4px 0 var(--sx-red);pointer-events:none;animation:advVsIn .3s ease-out both}
 .adv-vs canvas{width:clamp(96px,22vw,176px);height:auto;image-rendering:pixelated;animation:advVsL .35s ease-out both}
-.adv-vs canvas:last-child{transform:scaleX(-1);animation-name:advVsR}
+.adv-vs canvas:last-child{animation-name:advVsR}
+.adv-vs canvas.flip{transform:scaleX(-1)}
 .adv-vs b{font:900 italic clamp(48px,10vw,96px)/1 var(--sx-big);color:var(--sx-yel);-webkit-text-stroke:8px var(--sx-ink);paint-order:stroke fill;
   animation:advVsB .4s .1s ease-out both}
 @keyframes advVsIn{from{transform:translateY(-50%) scaleY(0)}to{transform:translateY(-50%) scaleY(1)}}
 @keyframes advVsL{from{translate:-60vw 0}to{translate:0 0}}
 @keyframes advVsR{from{translate:60vw 0}to{translate:0 0}}
 @keyframes advVsB{from{scale:2.4;opacity:0}to{scale:1;opacity:1}}
+
+/* a race: the rival's card under your rings, with how far ahead or behind it is */
+.adv-race{position:absolute;left:12px;top:64px;display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;background:var(--sx-navy);
+  border:3px solid var(--sx-ink);border-radius:10px;box-shadow:inset 0 0 0 2px var(--sx-red),0 4px 0 var(--sx-ink);pointer-events:none}
+.adv-race canvas{width:44px;height:36px;image-rendering:pixelated}
+.adv-race b{display:block;font:700 13px/1.1 var(--sx-pix);color:var(--sx-yel);text-shadow:var(--sx-out1)}
+.adv-race span{display:block;font:600 12px/1.2 var(--sx-pix);color:#fff;text-shadow:var(--sx-out1)}
+
+/* ---- the team: the band on the main menu, the Fighters screen, locked fighters, the unlock cards */
+.adv-team{display:flex;align-items:center;gap:10px;margin:0 auto 10px;padding:7px 14px;max-width:560px;width:100%;border:3px solid var(--sx-ink);border-radius:12px;
+  background:var(--sx-navy);color:#fff;cursor:pointer;box-shadow:inset 0 0 0 2px var(--sx-blue),0 4px 0 var(--sx-ink);pointer-events:auto}
+.adv-team:hover,.adv-team.kb{background:var(--sx-navy2)}
+.adv-team .ico{width:18px;height:18px;flex:none}
+.adv-team b{font:700 15px/1 var(--sx-pix);color:var(--sx-yel);text-shadow:var(--sx-out1);white-space:nowrap}
+.adv-team i{font:600 12.5px/1.2 var(--sx-pix);font-style:normal;color:var(--sx-pale);text-align:left}
+.adv-team em{margin-left:auto;font:700 12.5px/1 var(--sx-pix);font-style:normal;color:#fff;background:var(--sx-red);border:2px solid var(--sx-ink);border-radius:8px;padding:5px 8px}
+.adv-roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;padding:8px 12px 12px}
+.adv-rst{display:flex;align-items:center;gap:10px;padding:6px 8px;border:2px solid var(--sx-ink);border-radius:10px;background:var(--sx-navy2)}
+.adv-rst canvas{width:66px;height:54px;image-rendering:pixelated;flex:none;border-radius:6px;background:var(--sx-sky)}
+.adv-rst-tx{flex:1;min-width:0}
+.adv-rst-tx b{display:block;font:700 14px/1.1 var(--sx-pix);text-shadow:var(--sx-out1)}
+.adv-rst-tx i{display:block;font:500 12px/1.3 var(--sx-pix);font-style:normal;color:var(--sx-pale);margin-top:2px}
+.adv-rst-tx em{display:block;font:700 12px/1.2 var(--sx-pix);font-style:normal;color:var(--sx-yel);margin-top:3px}
+.adv-rst.chal{box-shadow:inset 0 0 0 2px var(--sx-yel)}
+.adv-rst .btn{flex:none;padding:7px 10px}
+/* not on the team: a silhouette */
+.adv-rst.locked{opacity:.92}
+.adv-lockhint{display:flex;gap:5px;align-items:flex-start;font:600 12px/1.3 var(--sx-pix);color:var(--sx-yel);text-shadow:var(--sx-out1)}
+.adv-lockhint .ico{width:13px;height:13px;flex:none;margin-top:1px}
+.adv-who.locked .adv-mv,.adv-who.locked .adv-gr,.adv-who.locked small{display:none}
+.adv-ulk{text-align:center;max-width:460px}
+.adv-ulk-band{margin:-2px -2px 8px;padding:8px 12px;background:var(--sx-red);border-bottom:3px solid var(--sx-ink);font:900 italic 20px/1 var(--sx-big);color:var(--sx-yel);
+  -webkit-text-stroke:5px var(--sx-ink);paint-order:stroke fill;text-transform:uppercase;letter-spacing:.02em}
+.adv-ulk>canvas{width:176px;height:144px;image-rendering:pixelated;margin:4px auto;display:block;animation:advUlkIn .45s ease-out both}
+.adv-ulk-name{display:block;font:900 italic clamp(20px,4.6vw,26px)/1.15 var(--sx-big);color:#fff;-webkit-text-stroke:5px var(--sx-ink);paint-order:stroke fill;margin:4px 10px}
+.adv-ulk-row{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;padding:4px 10px}
+.adv-ulk-row span{display:flex;flex-direction:column;align-items:center;gap:3px}
+.adv-ulk-row canvas{width:66px;height:54px;image-rendering:pixelated;background:var(--sx-sky);border:2px solid var(--sx-ink);border-radius:6px}
+.adv-ulk-row b{font:700 12px/1 var(--sx-pix);text-shadow:var(--sx-out1)}
+@keyframes advUlkIn{from{transform:scale(.3);opacity:0}60%{transform:scale(1.12);opacity:1}to{transform:scale(1)}}
+/* a Random arena */
+.adv-arena-rand{display:grid;place-items:center;background:var(--sx-navy2)}
+.adv-arena-rand b{font:900 italic 64px/1 var(--sx-big);color:var(--sx-yel);-webkit-text-stroke:6px var(--sx-ink);paint-order:stroke fill}
+/* Free Exhibition: a solo run or Stage Racing */
+.adv-exmode{margin:6px 12px 2px}
+.adv-race-set{display:flex;flex-direction:column;gap:4px;padding:2px 0 6px}
+.adv-race-set .adv-act{cursor:default}
+.adv-race-set .setrow{padding:6px 12px}
+
+/* ---- Red Ring Circuit, the grand prix: the cup select with its course pictures, the grid, the HUD
+   (your place, the field along the course, the power box), the results and the podium */
+.gp-menu .adv-panel{width:min(980px,100%)}
+.gp-top{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;padding:6px 14px 0}
+.gp-sel{display:grid;grid-template-columns:minmax(200px,260px) 1fr;gap:14px;padding:10px 14px 4px}
+.gp-cups{display:flex;flex-direction:column;gap:6px}
+.adv .gp-cup{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 11px;border:3px solid var(--sx-ink);border-radius:9px;
+  background:var(--sx-navy2);color:#fff;font:700 16px/1 var(--sx-pix);text-shadow:var(--sx-out1);cursor:pointer;text-align:left}
+.adv .gp-cup b{display:flex;align-items:center;gap:6px}
+.adv .gp-cup.on{background:var(--sx-blue);box-shadow:inset 0 0 0 2px var(--sx-yel),0 3px 0 var(--sx-ink)}
+.adv .gp-cup.locked{opacity:.6}
+.adv .gp-cup.kb{outline:3px solid var(--sx-yel);outline-offset:1px}
+.gp-tros{display:flex;gap:2px}
+.gp-tro .ico{width:16px;height:16px;filter:grayscale(1) brightness(.45)}
+.gp-tro.p1 .ico{filter:none}
+.gp-tro.p2 .ico{filter:grayscale(1) brightness(1.35)}
+.gp-tro.p3 .ico{filter:sepia(1) saturate(2.4) hue-rotate(-18deg) brightness(.8)}
+.gp-prev{border:3px solid var(--sx-ink);border-radius:10px;background:var(--sx-ink);padding:8px}
+.gp-prev-hd{display:flex;align-items:baseline;gap:10px;padding:0 4px 8px}
+.gp-prev-hd b{font:900 italic 22px/1 var(--sx-big);color:var(--sx-yel);-webkit-text-stroke:5px var(--sx-ink);paint-order:stroke fill}
+.gp-prev-hd i{font:600 13px/1.2 var(--sx-pix);color:var(--sx-pale);font-style:normal}
+.gp-pics{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.gp-pic{position:relative;border:3px solid var(--sx-navy2);border-radius:8px;overflow:hidden;background:#101a44}
+.gp-pic canvas{display:block;width:100%;height:auto;aspect-ratio:240/150}
+.gp-pic span{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:7px;padding:5px 8px;background:rgba(5,10,34,.82);font:700 13px/1 var(--sx-pix);text-shadow:var(--sx-out1)}
+.gp-pic em{display:grid;place-items:center;width:20px;height:20px;border-radius:5px;background:var(--sx-red);border:2px solid var(--sx-ink);font:900 italic 13px/1 var(--sx-big);font-style:normal}
+.gp-grid{width:min(720px,100%)}
+.gp-grid-c{display:flex;gap:14px;align-items:center;padding:12px 14px 4px}
+.gp-grid-c canvas{width:240px;height:150px;border:3px solid var(--sx-ink);border-radius:8px;flex:none}
+.gp-grid-c b{display:block;font:900 italic 26px/1.05 var(--sx-big);color:var(--sx-yel);-webkit-text-stroke:6px var(--sx-ink);paint-order:stroke fill}
+.gp-grid-c i{display:block;margin-top:6px;font:600 14px/1.3 var(--sx-pix);color:var(--sx-pale);font-style:normal}
+.gp-grid-c em{display:inline-block;margin-top:8px;padding:4px 9px;border:2px solid var(--sx-ink);border-radius:6px;background:var(--sx-red);font:700 13px/1 var(--sx-pix);font-style:normal}
+.gp-line{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px 14px}
+.gp-line span{display:flex;align-items:center;gap:6px;padding:3px 6px;border:2px solid var(--sx-ink);border-radius:7px;background:var(--sx-navy2);font:600 12px/1.1 var(--sx-pix);min-width:0}
+.gp-line span.me{box-shadow:inset 0 0 0 2px var(--sx-yel)}
+.gp-line canvas{width:30px;height:32px;image-rendering:pixelated;flex:none}
+.gp-line b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gp-load{margin:4px 14px 0;height:12px;border:3px solid var(--sx-ink);border-radius:7px;background:var(--sx-navy2);overflow:hidden}
+.gp-load i{display:block;height:100%;background:var(--sx-yel);transition:width .15s}
+.gp-load-t{margin:6px 14px 12px}
+/* the HUD */
+.gp-hud{position:absolute;inset:0;pointer-events:none}
+.gp-place{position:absolute;right:14px;bottom:18px;display:flex;align-items:flex-start;font:900 italic 64px/1 var(--sx-big);color:#fff;-webkit-text-stroke:9px var(--sx-ink);paint-order:stroke fill}
+.gp-place i{font-size:26px;font-style:normal;margin-top:6px}
+.gp-place.p1{color:var(--sx-yel)}.gp-place.p2{color:#dfe6f2}.gp-place.p3{color:#e0904a}
+.gp-strip{position:absolute;left:50%;top:58px;transform:translateX(-50%);width:min(560px,calc(100% - 220px));height:26px;border:3px solid var(--sx-ink);border-radius:13px;background:rgba(12,29,102,.85)}
+.gp-strip-in{position:absolute;left:14px;right:22px;top:0;bottom:0}
+.gp-strip span{position:absolute;top:-3px;width:26px;height:26px;margin-left:-13px;border-radius:50%;border:2px solid var(--sx-ink);background:var(--sx-navy2);overflow:hidden;transition:left .2s linear}
+.gp-strip span.me{border-color:var(--sx-yel);box-shadow:0 0 0 2px var(--sx-ink)}
+.gp-strip canvas{width:22px;height:22px;image-rendering:pixelated}
+.gp-goal{position:absolute;right:-18px;top:2px;width:14px;height:16px;background:repeating-conic-gradient(#fff 0 25%,#050a22 0 50%) 0 0/7px 8px;border:2px solid var(--sx-ink)}
+.gp-pow{position:absolute;left:50%;top:92px;transform:translateX(-50%);width:62px;height:62px;border:3px solid var(--sx-ink);border-radius:12px;background:var(--sx-navy);box-shadow:inset 0 0 0 2px var(--sx-red),0 4px 0 var(--sx-ink);display:grid;place-items:center}
+.gp-pow canvas{width:48px;height:48px}
+.gp-pow i{position:absolute;right:-8px;bottom:-8px;padding:2px 5px;border:2px solid var(--sx-ink);border-radius:5px;background:var(--sx-yel);color:var(--sx-ink);font:700 11px/1 var(--sx-pix);font-style:normal}
+.gp-pow i:empty{display:none}
+.gp-pwrap{position:absolute;right:8px;top:-62px;pointer-events:auto}
+.adv .gp-pbtn{width:84px;height:48px;border:3px solid var(--sx-ink);border-radius:12px;background:var(--sx-red);color:#fff;font:700 15px/1 var(--sx-pix);text-shadow:var(--sx-out1)}
+.adv .gp-pbtn.dn{transform:translateY(2px);filter:brightness(1.2)}
+.adv.gp-frozen .adv-3d canvas{filter:hue-rotate(110deg) saturate(.55) brightness(.9)}
+/* results, standings, podium */
+.gp-res{width:min(620px,100%)}
+.gp-rlist{padding:10px 14px 0;display:flex;flex-direction:column;gap:4px;position:relative}
+.gp-rlist p{display:flex;align-items:center;gap:9px;margin:0;padding:4px 9px;border:2px solid var(--sx-ink);border-radius:8px;background:var(--sx-navy2);font:600 14px/1 var(--sx-pix);transition:transform .6s cubic-bezier(.3,.9,.3,1)}
+.gp-rlist p.me{box-shadow:inset 0 0 0 2px var(--sx-yel);background:var(--sx-blue)}
+.gp-rlist em{width:40px;font:900 italic 18px/1 var(--sx-big);color:#fff;-webkit-text-stroke:4px var(--sx-ink);paint-order:stroke fill;font-style:italic}
+.gp-rlist em.p1{color:var(--sx-yel)}.gp-rlist em.p2{color:#dfe6f2}.gp-rlist em.p3{color:#e0904a}
+.gp-rlist canvas{width:40px;height:36px;image-rendering:pixelated}
+.gp-rlist b{flex:1;text-shadow:var(--sx-out1);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gp-rlist span{min-width:62px;text-align:right;font:700 15px/1 var(--sx-pix)}
+.gp-rlist i{min-width:30px;text-align:right;color:var(--sx-yel);font:700 14px/1 var(--sx-pix);font-style:normal}
+.gp-stand span{min-width:42px;font-size:18px;color:var(--sx-yel)}
+.gp-podium{width:min(720px,100%)}
+.gp-pod{display:flex;justify-content:center;align-items:flex-end;gap:10px;padding:16px 14px 0}
+.gp-step{display:flex;flex-direction:column;align-items:center;gap:4px;width:30%}
+.gp-step canvas{width:min(176px,100%);height:auto;aspect-ratio:176/144;image-rendering:pixelated}
+.gp-step b{font:700 14px/1.1 var(--sx-pix);text-shadow:var(--sx-out1);text-align:center}
+.gp-step span{font:600 12px/1 var(--sx-pix);color:var(--sx-pale)}
+.gp-blk{width:100%;display:grid;place-items:center;border:3px solid var(--sx-ink);border-bottom:0;border-radius:8px 8px 0 0;font:900 italic 34px/1 var(--sx-big);-webkit-text-stroke:7px var(--sx-ink);paint-order:stroke fill}
+.gp-step.s1 .gp-blk{height:96px;background:var(--sx-yel);color:#fff}
+.gp-step.s2 .gp-blk{height:70px;background:#c8d0de;color:#fff}
+.gp-step.s3 .gp-blk{height:52px;background:#c8783a;color:#fff}
+.gp-step.me b{color:var(--sx-yel)}
+@media (max-width:760px){
+  .gp-top{grid-template-columns:1fr}
+  .gp-sel{grid-template-columns:1fr}
+  .gp-cups{display:grid;grid-template-columns:1fr 1fr}
+  .adv .gp-cup{padding:7px 8px;font-size:13px}
+  .gp-grid-c{flex-direction:column;align-items:flex-start}
+  .gp-line{grid-template-columns:1fr 1fr}
+  .gp-strip{top:52px;width:calc(100% - 140px)}
+  .gp-place{font-size:46px;bottom:auto;top:96px}
+  .gp-pow{top:86px;width:52px;height:52px}.gp-pow canvas{width:40px;height:40px}
+}

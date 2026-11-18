@@ -39,9 +39,10 @@
   const PROTO = 'rrc-room-1';
   const PEER_JS = ['https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js', 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js'];
   const PREFIX = 'redringcircuit-room-', ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const MAXES = { battle: 4, race: 8, story: 3, tourney: 8 };
-  const MODES = { battle: 'Battle', race: 'Exhibition race', story: 'Story co-op', tourney: 'Tournament' };
-  const MODE_ICO = { battle: 'trophy', race: 'flag', story: 'book', tourney: 'crown' };
+  const MAXES = { battle: 4, race: 8, gp: 8, story: 3, tourney: 8 };
+  const MODES = { battle: 'Battle', race: 'Exhibition race', gp: 'Red Ring Circuit', story: 'Story co-op', tourney: 'Tournament' };
+  const MODE_ICO = { battle: 'trophy', race: 'flag', gp: 'star', story: 'book', tourney: 'crown' };
+  const GP_CLS_N = { breeze: 'Breeze', gale: 'Gale', storm: 'Storm' };
   const QUICK = ['GG!', 'Good luck!', 'Nice combo!', 'Ready!', 'One more?', 'Be right back', 'Thanks for the game!'];
   const DENY = {
     version: 'That room is on a different version of the game. Reload the page and try again.',
@@ -113,7 +114,7 @@
       if (view === 'me') {
         box.innerHTML = `
           <div class="panel ao-login pop">
-            <div class="ao-welcome">${face(A.castId(), 66, 54)}<div><small>Welcome back</small><b>${esc(Auth.name)}<i>${tagOf(Auth.id)}</i></b><span>Level ${Auth.lv()}</span></div></div>
+            <div class="ao-welcome">${face(A.castId(), 66, 54)}<div><small>Welcome back</small><b>${esc(Auth.name)}<i>${tagOf(Auth.id)}</i></b><span>Level ${Auth.lv()}${A.fighters ? ' · Fighters ' + A.fighters() + '/' + A.cast().length : ''}</span></div></div>
             <div class="adv-btns"><button class="btn lg" data-go data-enter data-focus>${ico('flag')}Start</button><button class="btn ghost" data-out>${ico('door')}Switch player</button></div>
           </div>`;
         box.querySelector('[data-go]').onclick = () => onGo();
@@ -172,7 +173,7 @@
       if (!Auth.user) { el.innerHTML = ''; return; }
       const nf = Social.requests(), nm = Social.unread(), st = Net.state;
       el.innerHTML = `
-        <button class="ao-me" data-a="me">${face(A.castId())}<span><b>${esc(Auth.name)}<i>${tagOf(Auth.id)}</i></b><small><em class="ao-dot ${st}"></em>${st === 'up' ? 'Online' : st === 'connecting' ? 'Connecting…' : 'Offline'} · Lv ${Auth.lv()}</small></span></button>
+        <button class="ao-me" data-a="me">${face(A.castId())}<span><b>${esc(Auth.name)}<i>${tagOf(Auth.id)}</i></b><small><em class="ao-dot ${st}"></em>${st === 'up' ? 'Online' : st === 'connecting' ? 'Connecting…' : 'Offline'} · Lv ${Auth.lv()}${A.fighters ? ' · ' + A.fighters() + '/' + A.cast().length + ' fighters' : ''}</small></span></button>
         <button class="ao-tb" data-a="friends">${ico('person')}<span>Friends</span>${nf ? `<i class="ao-badge">${nf}</i>` : ''}</button>
         <button class="ao-tb" data-a="msgs">${ico('mail')}<span>Messages</span>${nm ? `<i class="ao-badge">${nm}</i>` : ''}</button>
         <button class="ao-tb" data-a="out">${ico('door')}<span>Log out</span></button>`;
@@ -244,6 +245,8 @@
       ep: o.ep || A.castId(), ch: 0,
       // a tournament: 8 or 16 places, CPUs in the rest, at their level; the arena (-1: a new one every match)
       size: 8, tlvl: 1, tgoal: 2, tarena: -1,
+      // the grand prix: a cup and a class (CPUs fill the eight places)
+      gpCup: 0, gpCls: 'gale',
     };
   }
   function listing() {
@@ -256,6 +259,7 @@
   function roomWhat(R) {
     const z = i => (A.zones()[i] || {}).name || '';
     if (R.mode === 'race') return z(R.zone) + ' · Act 1';
+    if (R.mode === 'gp') return ((A.gpCups ? A.gpCups() : [])[R.gpCup] || 'A cup') + ' · ' + (GP_CLS_N[R.gpCls] || 'Gale');
     if (R.mode === 'story') { const e = A.eps().find(x => x.who === R.ep); return e ? e.name + ': ' + (e.chapters[R.ch] || '') : ''; }
     if (R.mode === 'tourney') return R.size + ' places · ' + (R.tarena < 0 ? 'any arena' : z(R.tarena));
     return z(R.arena) + ' · ' + (R.rule === 'stock' ? R.goal + (R.goal === 1 ? ' life' : ' lives') : R.goal + ' KOs');
@@ -501,7 +505,7 @@
     const open = listedRooms().filter(r => r.state === 'open' && !r.priv && r.n < r.max && (!mode || r.mode === mode)).sort((a, b) => b.n - a.n);
     if (open.length) { Online.join(open[0].code, ''); return; }
     toast('No open rooms right now: opening one for you.', 'gold');
-    Online.host({ name: Auth.name + '\'s ' + MODES[mode || 'battle'].toLowerCase(), mode: mode || 'battle', arena: Math.floor(Math.random() * A.zones().length) });
+    Online.host({ name: Auth.name + '\'s ' + MODES[mode || 'battle'].toLowerCase(), mode: mode || 'battle', arena: A.randomArena() });
   };
   Online.challenge = (id, o) => Online.host({ name: Auth.name + ' vs ' + Net.nameOf(id), priv: true, listed: false, mode: o.mode || 'battle', arena: o.arena, chal: { to: id, name: Net.nameOf(id) } });
   Online.invite = id => {
@@ -655,27 +659,28 @@
           <button data-p="open" class="${!o.priv && o.listed ? 'sel' : ''}">Anyone (listed)</button>
           <button data-p="priv" class="${o.priv ? 'sel' : ''}">Password</button>
           <button data-p="code" class="${!o.priv && !o.listed ? 'sel' : ''}">Code only</button></div></div>
-        <p class="adv-note">${o.mode === 'battle' ? 'Up to four fighters: players, and CPUs in the seats nobody takes.' : o.mode === 'race' ? 'Up to eight runners race through a zone\'s first Act, each in their own copy, the others shown as ghosts.' : o.mode === 'story' ? 'Up to three: your episode\'s chapters, the others fighting beside you.' : 'A bracket of 8 or 16; up to eight players, CPUs in the other places.'}</p>`;
+        <p class="adv-note">${o.mode === 'battle' ? 'Up to four fighters: players, and CPUs in the seats nobody takes.' : o.mode === 'race' ? 'Up to eight runners race through a zone\'s first Act, each in their own copy, the others shown as ghosts.' : o.mode === 'gp' ? 'The grand prix: four courses of a cup, eight runners (CPUs in the places nobody takes), Red Ring powers, points and a podium.' : o.mode === 'story' ? 'Up to three: your episode\'s chapters, the others fighting beside you.' : 'A bracket of 8 or 16; up to eight players, CPUs in the other places.'}</p>`;
       body.querySelector('[data-n]').oninput = e => { o.name = e.target.value; };
       body.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { o.mode = b.dataset.m; draw(); });
       body.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { o.priv = b.dataset.p === 'priv'; o.listed = b.dataset.p !== 'code'; draw(); });
     };
     draw();
-    modal({ title: 'Host a room', icon: 'flag', body, buttons: [['Open the room', () => Online.host(Object.assign({}, o, { arena: Math.floor(Math.random() * A.zones().length) })), ''], ['Cancel', null, 'ghost']] });
+    modal({ title: 'Host a room', icon: 'flag', body, buttons: [['Open the room', () => Online.host(Object.assign({}, o, { arena: A.randomArena() })), ''], ['Cancel', null, 'ghost']] });
   }
 
   /* ---------------------------------------------------- A ROOM */
   /* the settings: [key, label, choices (value, text)] by mode; arrows for the long lists */
   function settings(R) {
-    const zones = A.zones().map(z => [z.i, z.name]);
+    const zones = (A.openZones ? A.openZones() : A.zones()).map(z => [z.i, z.name]);         // (the arenas of the zones the host has opened)
     if (R.mode === 'race') return [['zone', 'Zone (Act 1)', zones, 'arrows']];
+    if (R.mode === 'gp') return [['gpCup', 'Cup', (A.gpCups ? A.gpCups() : []).map((c, i) => [i, c]), 'arrows'], ['gpCls', 'Class', [['breeze', 'Breeze'], ['gale', 'Gale'], ['storm', 'Storm']]]];
     if (R.mode === 'story') {
-      const eps = A.eps(), e = eps.find(x => x.who === R.ep) || eps[0];
+      const eps = A.eps().filter(x => !A.hasFighter || A.hasFighter(x.who)), e = eps.find(x => x.who === R.ep) || eps[0];
       const upTo = Math.min(e.chapters.length, (A.epDone(e.who) || 0) + 1);
       return [['ep', 'Episode', eps.map(x => [x.who, x.name + ': ' + x.title]), 'arrows'],
               ['ch', 'Chapter', e.chapters.slice(0, upTo).map((t, i) => [i, (i + 1) + '. ' + t]), 'arrows']];
     }
-    if (R.mode === 'tourney') return [['size', 'Places', [[8, '8'], [16, '16']]], ['tlvl', 'CPUs', [[0, 'Easy'], [1, 'Normal'], [2, 'Hard']]],
+    if (R.mode === 'tourney') return [['size', 'Places', A.can16 && !A.can16() ? [[8, '8']] : [[8, '8'], [16, '16']]], ['tlvl', 'CPUs', [[0, 'Easy'], [1, 'Normal'], [2, 'Hard']]],
       ['tgoal', 'Lives a match', [[1, '1'], [2, '2'], [3, '3']]], ['tarena', 'Arena', [[-1, 'A new one every match']].concat(zones), 'arrows']];
     const players = R.members.length;
     return [['arena', 'Arena', zones, 'arrows'], ['rule', 'Rule', [['stock', 'Survival'], ['ko', 'KOs']]],
@@ -730,7 +735,7 @@
                 return `<div class="ao-seg-row"><span>${label}</span><div class="seg adv-seg">${opts.map(o => `<button data-set="${k}" data-v="${esc(JSON.stringify(o[0]))}" class="${String(o[0]) === String(R[k]) ? 'sel' : ''}">${esc(o[1])}</button>`).join('')}</div></div>`;
               }).join('')}
               ${host ? `<div class="ao-seg-row"><span>Room</span><div class="seg adv-seg"><button data-lock class="${R.locked ? 'sel' : ''}">${R.locked ? 'Locked' : 'Lock'}</button><button data-chatoff class="${R.chat === 'off' ? 'sel' : ''}">${R.chat === 'off' ? 'Chat off' : 'Chat on'}</button></div></div>` : ''}
-              <p class="adv-note">${R.mode === 'battle' ? 'CPUs fill the seats nobody takes.' : R.mode === 'race' ? 'First to the goal post wins. Everyone runs their own copy of the Act; the others are ghosts.' : R.mode === 'story' ? 'The host plays the episode\'s hero; everyone else fights beside them, and runs the stages alongside.' : 'A knock-out bracket. Matches between CPUs are settled at once; everyone watches the players\' matches.'}</p>
+              <p class="adv-note">${R.mode === 'battle' ? 'CPUs fill the seats nobody takes.' : R.mode === 'race' ? 'First to the goal post wins. Everyone runs their own copy of the Act; the others are ghosts.' : R.mode === 'gp' ? 'Four races, 9-6-3-1 points for the first four, CPUs in the empty places. Powers hit the other players too.' : R.mode === 'story' ? 'The host plays the episode\'s hero; everyone else fights beside them, and runs the stages alongside.' : 'A knock-out bracket. Matches between CPUs are settled at once; everyone watches the players\' matches.'}</p>
             </div>
             <div class="panel ao-rchat">
               <div class="panel-hd">${ico('chat')}Room chat</div>
@@ -751,7 +756,7 @@
       if (q('[data-ready]')) q('[data-ready]').onclick = () => toHost({ t: 'ready', on: !me.ready });
       q('[data-inv]').onclick = () => inviteForm();
       ov.querySelectorAll('[data-pk]').forEach(b => b.onclick = () => {
-        const ids = A.cast().map(c => c.id).concat(['random']), i = ids.indexOf(me.who), who = ids[(i + (+b.dataset.pk) + ids.length) % ids.length];
+        const ids = A.cast().map(c => c.id).filter(id => !A.hasFighter || A.hasFighter(id)).concat(['random']), i = ids.indexOf(me.who), who = ids[(i + (+b.dataset.pk) + ids.length) % ids.length];   // (your team)
         A.setCast(who === 'random' ? A.castId() : who);
         toHost({ t: 'pick', who, em: A.emerlLoadout() });
       });
@@ -979,7 +984,7 @@
   };
   function challengeForm(id) {
     if (!Net.online(id)) { toast(Net.nameOf(id) + ' isn\'t online.', 'bad'); return; }
-    const o = { mode: 'battle', arena: Math.floor(Math.random() * A.zones().length) };
+    const o = { mode: 'battle', arena: A.randomArena() };
     const body = document.createElement('div');
     const draw = () => {
       body.innerHTML = `

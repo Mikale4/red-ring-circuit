@@ -142,13 +142,13 @@
         [N, "High on the slopes, a line of badniks is carrying the shrines' rings away. The Egg Mobile floats along behind them."],
         ["knuckles", "Eggman! He tricked me so I'd keep you busy! ...Again! Stay out of it, Sonic. This is my mountain."],
       ] },
-    { title: "Prove It", kind: "battle", arena: "expressway", foes: [{ who: "shadow", lvl: 1 }],
+    { title: "Prove It", kind: "race", zone: "expressway", rival: "shadow",
       before: [
         [N, "The expressway out of the city, at sundown. Eggman's trucks lie stopped across the road, and Shadow stands among them."],
         ["sonic", "Hey, Shadow! You seen a bunch of red rings come through here?"],
         ["shadow", "I saw you. Running at the head of Eggman's convoy."],
         ["sonic", "Wasn't me. I've been up a mountain all afternoon."],
-        ["shadow", "Then prove it."],
+        ["shadow", "Then prove it. Race me to the end of the expressway."],
       ],
       after: [
         ["shadow", "...You're fast. But the one on the road was faster in a straight line. And it never once looked back."],
@@ -540,10 +540,11 @@
         ["amy", "Sonic! You came to save me! ...Well, I already saved me. But it's the thought that counts!"],
         ["amy", "It's my lucky charm, Sonic. If you want it, you'll have to win it! And if I win, you take me on a date."],
       ] },
-    { title: "A Date at Stake", kind: "battle", arena: "parlour", foes: [{ who: "sonic", lvl: 0 }],
+    { title: "A Date at Stake", kind: "race", zone: "parlour", rival: "sonic",
       before: [
         ["sonic", "Why does everything with you end in a date?"],
-        ["amy", "Because it's fate, silly! Ready, Sonic? And don't you dare go easy on me!"],
+        ["amy", "Because it's fate, silly! Race you through the house: first to the front door wins, and if it's me, it's a date!"],
+        ["amy", "And don't you dare go easy on me!"],
       ],
       after: [
         ["amy", "I won! I won! That means a date!"],

@@ -333,14 +333,14 @@
         ["silver", "Then... I need to see for myself."],
         ["sonic", "See what? Hey, Mighty! Long time no see!"],
       ] },
-    { title: "Old Friends", kind: "battle", arena: "canyon", foes: [{ who: "sonic", lvl: 1 }],
+    { title: "Old Friends", kind: "race", zone: "canyon", rival: "sonic",
       before: [
         ["mighty", "Sonic! I was just telling this kid you're a good guy."],
-        ["sonic", "I am a good guy! Hey, it's been ages. Want to see if you've still got it?"],
-        ["mighty", "A friendly spar? You're on!"],
+        ["sonic", "I am a good guy! Hey, it's been ages. Race you to the end of the canyon?"],
+        ["mighty", "A race? Now that I like. You're on!"],
       ],
       after: [
-        ["sonic", "Whoa! You've been working out!"],
+        ["sonic", "Whoa! Since when are you that fast?"],
         ["mighty", "All that walking. Hey, Sonic, Eggman's machine came through here, the one that looks like you. It went toward the mountains with a load of rings."],
         ["sonic", "Metal Sonic. Thanks, Mighty. Come on, Silver, let's go find out who your records are really about!"],
         [N, "Sonic and Silver race off. Mighty looks down at the river. It's running thin. The rubble from the blasting has dammed it."],
@@ -496,15 +496,15 @@
         ["silver", "In my time, nobody remembers you. I wonder what happens to you. ...No. That's not what I'm here for. Metal Sonic."],
         [N, "A message crackles through on the radio Sonic gave him: Tails. Metal Sonic is on the launch track, taking the last rings up to the stars."],
       ] },
-    { title: "The Launch Track", kind: "run", stage: "s-launch",
+    { title: "The Launch Track", kind: "race", zone: "stars", rival: "metal",
       before: [
-        [N, "The launch track runs from the mountains all the way up into the sky. Somewhere up there is the Star Engine."],
+        [N, "Up above the launch track, Metal Sonic is carrying the last case of rings around Comet Circuit, to the dock where Eggman's station waits."],
         ["silver", "This is it. The moment from the records. The last ring, going up."],
-        ["silver", "Not this time!"],
+        ["silver", "Not this time! I'll catch it before the dock!"],
       ],
       beats: [
         [0.15, "eggman", "Who's that? Another hedgehog?! How many of you ARE there?!"],
-        [0.55, "silver", "I can see it, at the top. Metal Sonic!"],
+        [0.55, "silver", "I can see it ahead. Metal Sonic!"],
         [0.92, "silver", "The dock! I made it!"],
       ],
       after: [
