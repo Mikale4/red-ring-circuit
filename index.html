@@ -28,10 +28,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 /* The modules, in order and with the same stamp: the voxel kit and the icons first, the game's
-   data next (stages, sprites, badniks, items, bosses, Emerl, the story), the game last. */
+   data next (stages, sprites, badniks, items, bosses, Emerl, the story), then the online shell
+   (accounts, the relay, rooms' fallback links, friends and messages, the lobby), the game last. */
 (function () {
   var mods = ["voxkit", "icons", "settings", "adventure-stages", "adventure-sprites", "adventure-badniks", "adventure-items",
-              "adventure-bosses", "adventure-emerl", "adventure-story", "adventure-story2", "adventure-story3", "adventure"];
+              "adventure-bosses", "adventure-emerl", "adventure-effects", "adventure-story", "adventure-story2", "adventure-story3",
+              "net/util", "net/auth", "net/net", "net/relay", "net/social", "adventure-online", "adventure"];
   for (var i = 0; i < mods.length; i++) document.write('<script src="' + mods[i] + '.js?v=' + V + '"><\/script>');
 })();
 </script>

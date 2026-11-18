@@ -237,7 +237,7 @@
        drill and wrecking ball reach furthest of all */
     cream:    { atk1: [22, 1.1, 1], atk2: [22, 1.1, 1.2], atk3: [22, 1.2, 1.6], heavy: [24, 1.35, 1], upper: [16, 1.0, 0.5],
                 dashatk: [12, 1.2, 0], airatk: [12, 1.1, 0], aim: [12, 1.2, 2] },
-    chaos:    { atk1: [28, 0.95, 2], atk2: [28, 1.0, 2.2], atk3: [26, 1.15, 3], heavy: [24, 1.3, 3], upper: [24, 1.0, 1],
+    chaos:    { atk1: [28, 0.95, 2], atk2: [28, 1.0, 2.2], atk3: [26, 1.15, 3], heavy: [24, 1.3, 3], upper: [24, 1.4, 1],
                 dashatk: [16, 1.1, 0], airatk: [20, 1.1, 0], aim: [20, 1.1, 2] },
     gamma:    { atk1: [34, 0.95, 2], atk2: [24, 1.0, 2.2], atk3: [30, 1.15, 3], heavy: [36, 1.35, 2.5], upper: [34, 1.0, 1],
                 dashatk: [26, 1.3, 0], airatk: [22, 1.1, 0], aim: [30, 1.2, 2] },
@@ -252,6 +252,7 @@
   };
   /* What Cheese does in each of Cream's blows: Chao Arch, Chao Winder, Chao Salom, Chao Tornado,
      Chao Upper (and Chao Dunk), Chao Dash (and Chao Circle) */
+  const CHAOS_WATER = { heavy: "fx.stab", upper: "fx.upper" };
   const CHEESE = { atk1: "fx.cheese1", atk2: "fx.cheese2", atk3: "fx.cheese3", heavy: "fx.cheese4", upper: "fx.cheese5", aim: "fx.cheese5",
                    dashatk: "fx.cheese6", airatk: "fx.cheese6" };
   const blow = (c, name) => { const b = (BLOWS[c.id] || {})[name] || BLOWS.base[name]; return { fps: b[0], reach: b[1], step: b[2] }; };
@@ -379,15 +380,18 @@
       trap:     { body: "trap", fps: 18, at: 6, trap: "chase", flies: true },
       airtrap:  { body: "airtrap", fps: 14, at: 1, trap: "chase", flies: true } },
     chaos: {
-      /* Chaos Shot, a ball of water that bursts; Chaos Crush, his arm along the ground (from the
-         air, down it: a column of water); Chaos Splash, a puddle that throws up tentacles */
+      /* Chaos Shot, a ball of water that bursts; Chaos Crush, his arm into the ground and three of
+         Double Stab's tentacles up out of it in a row, one after another (Sonic Battle's own account
+         of it); Chaos Splash, a puddle that throws up tentacles */
       shot:     { body: "shot", fps: 20, at: 4, fly: "fx.shot", speed: 9, life: 1.05, kn: [4.5, 8, 0.3], k: 1.15, trail: 0x9ad8ff,
                   muzzle: [0.7, 0.55], gfrom: 1, charge: 0x70c8ff, pow: { c: 0x9ad8ff, flash: 2, shake: 0.1 } },
       airshot:  { body: "airshot", fps: 20, at: 4, fly: "fx.shot", speed: 9, down: 0.5, life: 0.9, kn: [4, 7, 0.3], k: 1.15, trail: 0x9ad8ff,
                   muzzle: [0.7, 0.55], pow: { c: 0x9ad8ff, flash: 2, shake: 0.1 } },
-      power:    { body: "power", fps: 20, at: 4, area: "fx.power", ax: 2.0, ay: 0.75, w: 3.4, h: 1.7, k: 1.3,
+      power:    { body: "power", fps: 20, at: 3, row: [1.0, 2.0, 3.0], gap: 0.14, rowFx: "fx.stab", each: 0.6, w: 1.5, h: 2.0,
                   charge: 0x70c8ff, pow: { c: 0x9ad8ff, flash: 2.6, shake: 0.2, stop: 0.05 } },
-      airpower: { body: "airpower", fps: 18, at: 4, area: "fx.airpower", ax: 0.55, ay: -0.5, w: 1.3, h: 3.4, k: 1.1,
+      /* Air Chaos Crush: his arm straight down, a column of water to the ground -- drawn in his own
+         frames (Emerl's copy draws it on) */
+      airpower: { body: "airpower", fps: 16, at: 3, area: "fx.airpower", drawn: true, ax: 0.13, ay: -1.0, w: 1.0, h: 2.6, k: 1,
                   pow: { c: 0x9ad8ff, flash: 2.6, shake: 0.2, stop: 0.05 } },
       trap:     { body: "trap", fps: 14, at: 4, trap: "mine" },
       airtrap:  { body: "airtrap", fps: 16, at: 4, trap: "mine", toss: true } },
@@ -523,13 +527,13 @@
   function setFrame(mesh, name, i, face, x, y, mid, z, k) {
     k = k || 1;
     const who = mesh.userData.who, A = SHEETS[who], list = A.f[name] || A.f.idle;
-    const [fx, fy, fw, fh, cx] = list[clamp(i, 0, list.length - 1)];
+    const [fx, fy, fw, fh, cx, hang] = list[clamp(i, 0, list.length - 1)];          // (hang: how far it is drawn below the feet)
     let u0 = fx / A.w, u1 = (fx + fw) / A.w;
     if (face < 0) { const t = u0; u0 = u1; u1 = t; }
     const v1 = 1 - fy / A.h, v0 = 1 - (fy + fh) / A.h, uv = mesh.geometry.attributes.uv;
     uv.setXY(0, u0, v1); uv.setXY(1, u1, v1); uv.setXY(2, u0, v0); uv.setXY(3, u1, v0); uv.needsUpdate = true;
     mesh.scale.set(fw * PX * k, fh * PX * k, 1);
-    mesh.position.set(x + (fw / 2 - cx) * PX * k * face, mid ? y : y + fh * PX * k / 2, z == null ? 0.06 : z);
+    mesh.position.set(x + (fw / 2 - cx) * PX * k * face, mid ? y : y + (fh / 2 - (hang || 0)) * PX * k, z == null ? 0.06 : z);
   }
   /* A card in the cabinet's menu: the runner's Sonic Battle portrait, the one their sheet draws
      with a white outline, at twice size with crisp pixels, standing on the card's floor. */
@@ -568,6 +572,14 @@
     atk1: ["atk1"], atk2: ["atk2"], atk3: ["atk3"], heavy: ["heavy"], upper: ["upper"], dashatk: ["dashatk"], airatk: ["airatk"], aim: ["seek", "aim"],
     shot: ["sp.shot"], airshot: ["sp.airshot"], power: ["sp.power"], airpower: ["sp.airpower"], trap: ["sp.trap"], airtrap: ["sp.airtrap"] };
   if (EM) { SHEETS.emerl = Object.assign({ faceY: 14 }, EM.emerl); for (const k of EM_SRC) if (EM[k]) SHEETS["emerl." + k] = EM[k]; }
+  /* Sonic Battle's own effects, everyone's (adventure-effects.js, tools/pack-effects.py): the hit stars, the
+     guard's barrier and the blow it turns aside, the healing ring, a wall hit, the K.O. ring, a heavy
+     blow's and a dash's dust, the pursuit's sweep */
+  if (root.AdventureEffects) SHEETS.sbfx = root.AdventureEffects;
+  /* Chaos's water tentacle (Double Stab's, Chaos Crush's), drawn from its root at the left of each
+     frame where it comes up out of the ground, so it rises and swings over from one place */
+  if (SHEETS.chaos && SHEETS.chaos.f["fx.power"]) SHEETS.chaos.f["fx.stab"] = SHEETS.chaos.f["fx.power"].map(f => [f[0], f[1], f[2], f[3], 3]);
+  const SBFX = () => !!SHEETS.sbfx;
   /* every move he could learn: a slot of one of the eight's, with a name */
   const emerlAll = () => EM ? EM_SRC.flatMap(src => EM_SLOTS.map(([slot]) => src + "." + slot).filter(k => EM.names[k.split(".")[0]][k.split(".")[1]])) : [];
   function emerlSave() {
@@ -587,23 +599,27 @@
     return { src, slot, name: EM.names[src][slot], slotName: EM_SLOTS.find(s => s[0] === slot)[1] };
   }
   const EM_IMGS = {};
+  const emImgOk = k => { const im = EM_IMGS[k]; return !!(im && im.complete && im.naturalWidth); };
+  /* his nine pictures, on their way (each one in paints itself onto the sheets made so far) */
   function emerlImgs() {
     if (!EM) return false;
     let ok = true;
     for (const k of ["emerl"].concat(EM_SRC)) {
       const A = k === "emerl" ? EM.emerl : EM[k]; if (!A) continue;
-      const im = EM_IMGS[k] || (EM_IMGS[k] = Object.assign(new Image(), { src: A.url }));
-      if (!im.complete || !im.naturalWidth) ok = false;
+      let im = EM_IMGS[k];
+      if (!im) { im = EM_IMGS[k] = new Image(); im.onload = emerlRepaint; im.src = A.url; }
+      if (!emImgOk(k)) ok = false;
     }
     return ok;
   }
   /* The runner made of Emerl's loadout: his size; each slot's numbers from the runner it copies;
-     and his frames put together into one picture. Without the sheets loaded yet, his own. */
+     and his frames put together into one picture (painted as his pictures come in: he can be
+     made before they have, as the menu's runner or the title's at the start). */
   const EM_BUILT = {};
-  function emerlCast() {
-    const base = castOf("emerl"), lo = (saveData && emerlSave().loadout) || {};
+  function emerlCast(lo0) {
+    const base = castOf("emerl"), lo = lo0 || (saveData && emerlSave().loadout) || {};
     const from = {}; for (const [slot] of EM_SLOTS) from[slot] = lo[slot] || "emerl";
-    if (!emerlImgs()) for (const k in from) from[k] = "emerl";
+    emerlImgs();
     const key = "emerl#" + EM_SLOTS.map(([s]) => from[s].slice(0, 3)).join("");
     const c = Object.assign({}, base, { emerl: from, sheet: key, spinDash: false, climb: false, swims: false });
     const of = slot => from[slot] === "emerl" ? null : castOf(from[slot]);
@@ -634,12 +650,29 @@
     }
     let H = 64; while (H < y + sh + 1) H *= 2;
     cv.height = H;
-    const g = cv.getContext("2d"), table = {};
-    for (const [name, k, f, px, py] of place) {
-      g.drawImage(EM_IMGS[k], f[0], f[1], f[2], f[3], px, py, f[2], f[3]);
-      (table[name] = table[name] || []).push([px, py, f[2], f[3], f[4]]);
+    const table = {};
+    for (const [name, , f, px, py] of place) (table[name] = table[name] || []).push([px, py, f[2], f[3], f[4]]);
+    const S = { canvas: cv, url: EM.emerl.url, w: 512, h: H, f: table, place, todo: true };
+    emerlPaint(S);
+    return S;
+  }
+  /* the frames onto a sheet, from the pictures that are in (a frame of one still coming stays
+     blank till it does) */
+  function emerlPaint(S) {
+    const g = S.canvas.getContext("2d");
+    g.clearRect(0, 0, S.canvas.width, S.canvas.height);
+    let all = true;
+    for (const [, k, f, px, py] of S.place) { if (emImgOk(k)) g.drawImage(EM_IMGS[k], f[0], f[1], f[2], f[3], px, py, f[2], f[3]); else all = false; }
+    S.todo = !all;
+  }
+  /* a picture of his came in: the sheets still missing frames painted again, and their textures
+     (and the white of a struck fighter, made from the sheet) brought up to date */
+  function emerlRepaint() {
+    for (const key in EM_BUILT) {
+      const S = EM_BUILT[key]; if (!S.todo) continue;
+      emerlPaint(S);
+      const M = MATS[key]; if (M) { M.mat.map.needsUpdate = true; M.white = null; }
     }
-    return { canvas: cv, url: EM.emerl.url, w: 512, h: H, f: table };
   }
   /* A special of Emerl's: the move in that slot -- his own (Sonic's, as Sonic Battle gives him
      them) or the one he copied -- its data from the runner it is, its body his frames for it, timed
@@ -2819,7 +2852,9 @@
 
 
   // ---------------------------------------------------------------- the save
-  const KEY = () => "redringcircuit.save";
+  /* each player's own save (net/auth.js keeps the players); before anyone logs in, the one
+     from before there were players */
+  const KEY = () => root.Auth && Auth.id ? "redringcircuit.save." + Auth.id : "redringcircuit.save";
   /* The first time on a browser where the game was played as Post Parade's arcade cabinet
      (postparade.adventure.<trainer>, the same site), its record comes along: the fullest one. */
   function oldSave() {
@@ -2843,6 +2878,24 @@
     return s;
   }
   function save(s) { try { localStorage.setItem(KEY(), JSON.stringify(s)); } catch (e) {} }
+  /* a player's save; the first player made on this browser takes the progress made before
+     there were players, so nothing played is lost */
+  function loadAcct(id) {
+    let s = null;
+    try { s = JSON.parse(localStorage.getItem("redringcircuit.save." + id)); } catch (e) {}
+    if (!s) {
+      let claimed = null; try { claimed = localStorage.getItem("redringcircuit.claimed"); } catch (e) {}
+      if (!claimed) {
+        try { s = JSON.parse(localStorage.getItem("redringcircuit.save")); } catch (e) {}
+        if (!s) s = oldSave();
+        try { localStorage.setItem("redringcircuit.claimed", id); } catch (e) {}
+      }
+    }
+    s = s && typeof s === "object" ? s : {};
+    s.stages = s.stages || {}; s.cast = s.cast || "sonic";
+    try { localStorage.setItem("redringcircuit.save." + id, JSON.stringify(s)); } catch (e) {}
+    return s;
+  }
   const PAY = { clear: 60, shoe: 20, sRank: 40 };
 
   // ---------------------------------------------------------------- the running game
@@ -3034,8 +3087,8 @@
   }
 
   // ---------------------------------------------------------------- the runner
-  function makePlayer(c) {
-    if (c.id === "emerl" && !c.emerl) c = emerlCast();
+  function makePlayer(c, lo) {
+    if (c.id === "emerl" && !c.emerl) c = emerlCast(lo);
     sheetMats(c.sheet || c.id).mat.color.setHex(world.T.tint || 0xffffff);
     if (BADS) badMats().mat.color.setHex(world.T.tint || 0xffffff);        // the badniks in the same light
     if (ITEMS) sheetMats("items").mat.color.setHex(world.T.tint || 0xffffff);  // and the monitors
@@ -3618,6 +3671,7 @@
     p.vx = d * c.run * dashK(c);
     if (dashFrom(c) === "sonic" || dashFrom(c) === "tails") { p.vy = 4.5; p.ground = false; p.on = null; }    // Sonic Dash and Tails Hop are hops
     if (dashFrom(c) === "shadow" || c.dashInv) p.inv = Math.max(p.inv, p.st);                        // gone while he dashes; Chaos a puddle
+    if (battle && SBFX()) effect("sbfx", "dash", p.x - d * 0.35, p.y + 32 * PX, d, 24, true, "fx", 1);   // Sonic Battle's dash: dust thrown up behind
     SFX.dash(); emit("dash", { p });
   }
   function startClimb(p, wall) { p.state = "climb"; p.wall = wall; p.face = wall; p.vx = 0; p.vy = 0; p.curl = false; p.grabT = 0.14; SFX.grab(); }
@@ -3764,6 +3818,10 @@
       p.vy = near ? clamp(j.vy + (j.y - p.y) * 4, -1, 16) : Math.max(p.vy, 4);
       if (near) { p.face = sgn(j.x - p.x) || p.face; p.vx = clamp((j.x - p.face * 0.9 - p.x) * 5 + j.vx, -7, 7); }   // and in reach, along with them
     }
+    /* Chaos's Double Stab and Upper Chaos: his arm into the ground (the fourth frame), and the water
+       up out of it in front of him -- a tentacle that swings over, a fountain */
+    const water = bw === "chaos" && CHAOS_WATER[name];
+    if (water && framesOf("chaos", water)) effect("chaos", water, p.x + p.face * (p.c.w / 2 + b.reach * (name === "upper" ? 0.8 : 0.45)), p.y, p.face, name === "upper" ? 22 : 26, false, "fx", 1, 0, undefined, 3 / b.fps);
     /* Cream's blows are Cheese's: out in front of her, keeping time with her */
     if (p.mv.cheese) {
       const nm = CHEESE[name], up = name === "upper" ? 0.95 : 0.55;
@@ -3842,6 +3900,8 @@
     hitSpark(h.x, h.y, H.spark * k, col);
     flash(h.x, h.y, H.spark * 1.5 * k, col);
     if (fin && m.name === "heavy" && framesOf(srcOf(p, "heavy"), "fx.punch")) effect(srcOf(p, "heavy"), "fx.punch", h.x + p.face * 0.2, h.y, p.face, 20, true, "fx", 1.4);   // Mighty's Explosive Punch
+    if (battle && SBFX() && fin && (m.name === "heavy" || m.name === "dashatk")) effect("sbfx", "heavy", h.x + p.face * 0.5, h.y, p.face, 24, true, "fx", 1.1);   // the dust a heavy blow throws them through
+    if (battle && SBFX() && m.chase) effect("sbfx", "pursuit", h.x, h.y, p.face, 22, true, "fx", 1.1);                                     // the pursuit's sweep
     hitStop(H.stop * k * (battle ? 1 : 0.6)); shakeCam(H.shake * k);
     SFX.hit(); if (H.heavy && fin) SFX.impact();
     if (!battle) return;
@@ -4118,6 +4178,7 @@
     return new THREE.SpriteMaterial({ map: SPARK_TEX, color, alphaTest: 0.5, depthWrite: false, rotation: (Math.random() - 0.5) * 0.7 });
   }
   function hitSpark(x, y, size, color) {
+    if (SBFX()) effect("sbfx", size >= 1.35 ? "hhit" : "hit", x, y, 1, 30, true, "fx", clamp(size * 0.95, 0.7, 1.7));   // Sonic Battle's star
     const a = new THREE.Sprite(sparkMat(color)), b = new THREE.Sprite(sparkMat(0xffffff));
     b.material.rotation = a.material.rotation;
     a.position.set(x, y, 0.45); b.position.set(x, y, 0.47);
@@ -4149,9 +4210,21 @@
       shoot(who, { fx: s.lob, x: p.x + f * 0.5, y: p.y + p.hh + 0.5, vx: f * s.speed, vy: s.rise, g: 26, life: 3, loop: true, mid: true,
                    w: 0.9 * k, h: 0.9 * k, k, face: f, bursts: 1.8, trail: s.trail, land: s.land, bits: s.bits });
       SFX.shot();
+    } else if (s.row) {                                    // Chaos Crush: tentacles up out of the ground in a row, one after another
+      s.row.forEach((dx, i) => {
+        const ax = p.x + f * dx, wait = i * s.gap, t0 = {};
+        effect(who, s.rowFx, ax - f * 0.35, p.y, f, s.fxFps || 26, false, "fx", s.k || 1, 0, undefined, wait);
+        later(wait + 0.06, () => {
+          if (!world || p.ko || p.dead) return;
+          const a0 = actor; actor = p; tok(t0, Math.max(1, Math.round(spDmg(p, s) * s.each)));
+          if (strike(ax - s.w / 2, ax + s.w / 2, p.y - 0.2, p.y + s.h, { r: 11, cx: ax - f * 0.7, cy: p.y - 0.4 })) hitStop(0.04);
+          actor = a0;
+        });
+      });
+      SFX.boom();
     } else if (s.area) {
       const ax = p.x + f * s.ax, ay = p.y + s.ay;
-      effect(who, s.area, ax, ay, f, 22, true, "fx", k);
+      if (!(s.drawn && who === p.c.id)) effect(who, s.area, ax, ay, f, 22, true, "fx", k);   // (drawn: it is in his own frames)
       if (s.self && !p.c.emerl) p.hideT = framesOf(who, s.area).length / 22;
       tok(s, spDmg(p, s));
       if (strike(ax - s.w / 2, ax + s.w / 2, ay - s.h / 2, ay + s.h / 2, { r: 11, cx: ax - f * 0.6, cy: ay - 0.3 })) hitStop(0.05);
@@ -4255,12 +4328,18 @@
   /** A shot: a card of the runner's sheet that flies and hits what it meets. */
   function shoot(who, o) {
     const card = makeCard(who, o.ghost ? "ghost" : "fx"); world.group.add(card);
-    world.shots.push(Object.assign({ card, who, t: 0, life0: o.life, gone: false, owner: actor, dmg: fireDmg }, o));
+    world.shots.push(Object.assign({ card, who, t: 0, life0: o.life, gone: false, owner: actor, dmg: fireDmg, nid: ++shotNid }, o));
   }
   /** An effect that only shows: plays once where it is put. */
-  function effect(who, name, x, y, face, fps, mid, kind, k, from, follow) {
-    const card = makeCard(who, kind === "body" ? "body" : "fx"); world.group.add(card);
-    world.fx.push({ card, name, x, y, face, fps, mid, k, t: 0, from: from || 0, n: framesOf(who, name).length - (from || 0), follow });
+  function effect(who, name, x, y, face, fps, mid, kind, k, from, follow, wait) {
+    const card = makeCard(who, kind === "body" ? "body" : "fx"); world.group.add(card); card.visible = !(wait > 0);
+    world.fx.push({ card, name, x, y, face, fps, mid, k, t: -(wait || 0), from: from || 0, n: framesOf(who, name).length - (from || 0), follow });
+  }
+  /* something to do a moment from now, in the game's own time (a blow that lands as its water rises) */
+  function later(t, fn) { (world.later = world.later || []).push({ t, fn }); }
+  function stepLater(dt) {
+    const L = world.later; if (!L || !L.length) return;
+    for (const e of L.splice(0)) { e.t -= dt; if (e.t > 0) L.push(e); else e.fn(); }
   }
   function setTrap(p, s) {
     const live = world.traps.filter(t => !t.gone && mine(t, p));
@@ -4268,7 +4347,7 @@
     else if (live.length >= 2) boomTrap(live[0]);
     const tw = s.fxWho || p.c.id;                        // (whose trap it is: Emerl's copies look like their source's)
     const f = p.face, card = makeCard(tw, s.faint ? "faint" : "fx"), float = s.trap === "float"; world.group.add(card);
-    world.traps.push({ card, who: tw, owner: p, kind: s.trap, x: p.x + f * 0.7, y: p.y + (s.flies || float ? 1.0 : 0), vx: float ? f * 7 : s.toss ? f * (s.far || 3) : 0, vy: s.toss ? 2 : 0,
+    world.traps.push({ card, who: tw, owner: p, kind: s.trap, nid: ++shotNid, faint: !!s.faint, x: p.x + f * 0.7, y: p.y + (s.flies || float ? 1.0 : 0), vx: float ? f * 7 : s.toss ? f * (s.far || 3) : 0, vy: s.toss ? 2 : 0,
                        t: 0, life: s.trap === "orbit" ? 6 : 9, a: 0, flies: !!s.flies || float, grounded: !s.toss && !s.flies && !float && s.trap !== "orbit", gone: false, face: f });
     SFX.set();
   }
@@ -4297,9 +4376,9 @@
     for (const e of world.enemies) if (e.alive && !e.hidden) { const d = Math.hypot(e.x - x, e.y + e.h / 2 - y); if (d < bd) { bd = d; best = e; } }
     return best;
   }
-  function stepShots(dt) {
+  function stepShots(dt, look) {
     const w = world;
-    for (const s of w.shots) {
+    for (const s of look ? [] : w.shots) {
       if (s.gone) continue;
       actor = s.owner || null; tok(s, s.dmg || 8, s.kn ? 1 : 0.85);
       s.t += dt; s.life -= dt;
@@ -4372,12 +4451,12 @@
     for (const e of w.fx) {
       if (e.gone) continue;
       e.t += dt;
-      if (e.follow) { e.x = e.follow.p.x + e.face * e.follow.ox; e.y = e.follow.p.y + e.follow.oy; }
+      if (e.follow && e.t >= 0) { e.x = e.follow.p.x + e.face * e.follow.ox; e.y = e.follow.p.y + e.follow.oy; }
       if (Math.floor(e.t * e.fps) >= e.n) { e.gone = true; w.group.remove(e.card); e.card.geometry.dispose(); }
     }
     if (w.fx.length > 30) w.fx = w.fx.filter(e => !e.gone);
     const p = player;
-    for (const t of w.traps) {
+    for (const t of look ? [] : w.traps) {
       if (t.gone) continue;
       t.t += dt; t.life -= dt;
       if (t.kind === "orbit") {                            // Roaming Chaos keeps to Shadow
@@ -4635,6 +4714,7 @@
   // ---------------------------------------------------------------- everything else that moves
   function worldStep(dt) {
     const w = world, p = player;
+    if (!(NP.on && !NP.host && battle)) stepLater(dt);                 // (an online guest's world only shows the host's)
     if (w.boss && (mode === "play" || mode === "goal")) stepBoss(dt);
     for (const q of w.plats) {
       const k = Math.sin(w.t * 0.9 + q.ph) * q.range;
@@ -4666,8 +4746,8 @@
       if (e.t === "balloon" && e.back > 0) { e.back -= dt; if (e.back <= 0) { e.back = 0; e.m.visible = true; } }
       else if (e.t === "bumper") e.cd = Math.max(0, e.cd - dt);
     }
-    // shots, effects and traps
-    stepShots(dt);
+    // shots, effects and traps (on an online guest's screen, the host's: only the effects move on here)
+    stepShots(dt, NP.on && !NP.host && !!battle);
     // loose rings, bouncing, and the animals let out of the badniks
     for (const e of w.ents) {
       if (e.gone) continue;
@@ -4746,9 +4826,9 @@
 
   // ---------------------------------------------------------------- the picture
   let camX = 0, camY = 0, shake = 0, stopT = 0, slowT = 0, punch = null;
-  const hitStop = s => { stopT = Math.max(stopT, s); };
+  let hitStop = s => { stopT = Math.max(stopT, s); };
   /* a smash: the world runs at a third of its speed for a moment after the freeze */
-  const slowMo = s => { slowT = Math.max(slowT, s); };
+  let slowMo = s => { slowT = Math.max(slowT, s); };
   /** In a one-on-one battle, the camera leans in on a big hit: toward (x, y), closer the bigger
       `k` (1 the most), tilting a little, and eases back over `life` seconds. (With three or four
       fighters it keeps still, framing them all.) */
@@ -4757,7 +4837,7 @@
      deep in one, a parry or a burst in a tight spot -- and then not again for a while (`force`, a
      KO, goes anyway); held inside the arena's walls, so a corner doesn't throw it about. */
   let camCool = 0;
-  const camPunch = (x, y, k, life, force) => {
+  let camPunch = (x, y, k, life, force) => {
     if (!battle || battle.fs.length !== 2) return;
     if (punch && punch.t < punch.life && k <= punch.k) return;          // one on now, as big or bigger
     if (camCool > 0 && !force) return;                                  // too soon after the last
@@ -4767,7 +4847,7 @@
   };
   /* a tight spot: low on health (on their last life, in Survival) */
   const clutch = q => !!q && q.hp <= q.hpMax * 0.25;
-  const shakeCam = s => { if (!root.Settings || Settings.get("shake") !== false) shake = Math.max(shake, s); };   // Options can turn it off
+  let shakeCam = s => { if (!root.Settings || Settings.get("shake") !== false) shake = Math.max(shake, s); };   // Options can turn it off
   const CAM_D = 17;
   function snapCamera() { if (!player) return; camX = player.x + 2; camY = Math.max(6.1, player.y + 2.1); }
   const EGG_FLAME = [2, 3, 1, 2, 3, 2, 1, 3, 2, 0, 3, 1, 2, 3, 3, 1, 2, 1, 3, 2, 0, 2, 3, 1];   // big and middling mostly, now and then a gutter
@@ -4868,13 +4948,17 @@
     if (id === "eggman" && /^(idle|run|start|land|fly)$/.test(name)) {
       if (name === "start") name = "run"; else if (name === "land") name = "idle";
       const seq = name === "fly" ? EGG_JETS : EGG_FLAME, n = count(name);
-      pick = () => seq[Math.floor(world.t * 30) % seq.length] % n;
+      pick = () => seq[((Math.floor(world.t * 30) % seq.length) + seq.length) % seq.length] % n;
     }
     const key = name + "|" + p.state;
     if (a.key !== key) { a.key = key; a.t = 0; } else a.t += dt;
     const i = pick ? pick(a.t) : frameAt(count(name), a.t, fps, loop);
+    p._rf = [name, i, face];
     const lift = c.lift && !p.dead && !p.ko ? c.lift + Math.sin(world.t * 3.4) * 0.05 : 0;          // Eggman's Egg Mobile, hovering
-    setFrame(p.spr, name, i, face, p.x, p.y + lift);
+    /* his jets in the air: the Egg Mobile stays put and only the flames flicker (the frames are
+       drawn from the jets' tips, which are longer in some than others) */
+    const jets = id === "eggman" && /^(fly|jump|fall)$/.test(name) ? -((framesOf(id, name)[i] || [0, 0, 0, 36])[3] - 36) * PX : 0;
+    setFrame(p.spr, name, i, face, p.x, p.y + lift + jets);
     /* struck: white for an instant, shaking through the freeze-frame */
     const wm = p.whiteT > 0 ? whiteMat(p.spr.userData.who) : null;
     p.whiteT = Math.max(0, (p.whiteT || 0) - dt);
@@ -4933,7 +5017,7 @@
       const tick = Math.floor(s.t * 30) + s.seed;
       s.card.visible = !(s.t > 0.07 && tick % 6 === 0);                                          // a dropped frame now and then
     }
-    for (const e of w.fx) if (!e.gone) setFrame(e.card, e.name, e.from + Math.floor(e.t * e.fps), e.face, e.x, e.y, e.mid, e.mid ? 0.25 : 0.04, e.k);
+    for (const e of w.fx) if (!e.gone) { e.card.visible = e.t >= 0; if (e.t >= 0) setFrame(e.card, e.name, e.from + Math.floor(e.t * e.fps), e.face, e.x, e.y, e.mid, e.mid ? 0.25 : 0.04, e.k); }
     for (const t of w.traps) if (!t.gone) {
       const n = framesOf(t.who, "fx.trap").length, k = Math.floor(t.t * 8);
       let name = "fx.trap", i = t.who === "amy" ? Math.min(k, n - 1) : t.who === "rouge" ? (k < 3 ? k : 3 + (k - 3) % (n - 3)) : k % n;
@@ -4956,7 +5040,7 @@
     if (battle) {                                          // everyone in the fight, each with their own hands
       for (const f of battle.fs) { input = f.inp; drawRunner(f, dt); drawDust(f, dt); drawAura(f, dt); }
       input = INPUT0;
-    } else { drawRunner(p, dt); drawDust(p, dt); drawAura(p, dt); }
+    } else { drawRunner(p, dt); drawDust(p, dt); drawAura(p, dt); if (NP.on && NP.ghosts.size) npDrawGhosts(dt); }
     drawCards();
     for (const f of battle ? battle.fs : [p]) {
       if (f.out || f.ko) continue;
@@ -5005,7 +5089,7 @@
     const aspect = R.domElement.width / Math.max(1, R.domElement.height);
     /* a tall phone screen backs the camera off until twelve metres of the stage fit across */
     let D = clamp(12.5 / (2 * Math.tan(17 * PI / 180) * aspect), CAM_D, 42);
-    if (!battle && mode === "title" && demo) D *= 2;              // the title's demo: far off, behind the strip
+    if (!battle && mode === "title" && demo) D = Math.max(D, Math.min(D * 2, 36));   // the title's demo: far off, behind the strip (an upright phone is far off already)
     if (battle) D = battleView(aspect, dt);              // a battle frames everyone in it
     else {
       const halfW = Math.tan(17 * PI / 180) * D * aspect, halfH = Math.tan(17 * PI / 180) * D;
@@ -5014,6 +5098,7 @@
       w.viewHalfW = halfW;
       if (w.boss && w.boss.lock) tx = bossCamX(w.boss, halfW);           // a boss's arena: the camera holds on it
       let ty = clamp(p.y + 2.1, p.y < 3.5 ? 3.8 : 6.1, H - 3.2);             // lower when she is down in the water
+      if (mode === "title" && demo) ty = p.y + 0.6 - demoBand(dt) * halfH;   // the demo's runner: in the open, between the logo and the strip
       if (D > CAM_D) ty = Math.max(ty, halfH - 3);
       camX = lerp(camX, tx, 1 - Math.exp(-dt * 3.6));
       camY = lerp(camY, ty, 1 - Math.exp(-dt * (p.ground ? 4 : 1.8)));
@@ -5611,6 +5696,7 @@
     };
     save(saveData);
     if (earned && root.Stable && Stable.grant) Stable.grant(earned, "adventure");
+    if (NP.on && NP.race) { npFinished(time); return; }              // an online race: home, and wait for the others
     setTimeout(() => results({ time, best, grade, carrots: p.carrots, total: world.total, shoes: p.shoes, shoesAll: shoes, falls: p.falls, earned, par }), 1700);
   }
   function goalStep(p) { if (p.ground && Math.abs(p.vx) < 0.5) p.face = 1; }
@@ -5633,6 +5719,10 @@
                  " ": "J", z: "Z", Z: "Z", x: "X", X: "X", c: "C", C: "C" };
   function onKey(e, down) {
     if (!host) return;
+    const tg = e.target;
+    if (tg && (tg.tagName === "INPUT" || tg.tagName === "TEXTAREA" || tg.isContentEditable)) return;   // typing: a name, a password, a chat line
+    const dlg = host.querySelector(".ao-modal");
+    if (dlg) { if (down && e.key === "Escape") { const x = dlg.querySelector("[data-x]"); if (x) x.click(); } return; }
     if (rebind) { if (down) takeRebind(e); e.preventDefault(); return; }   // Options: the next key pressed is the new one
     const k = e.key, duo = !!(battle && battle.duo);
     const b = KEYS[k];
@@ -5759,20 +5849,29 @@
   // ---------------------------------------------------------------- the loop
   function frame(now) {
     raf = requestAnimationFrame(frame);
-    const dt = Math.min(0.1, (now - (last || now)) / 1000); last = now;
+    const dt = Math.max(0, Math.min(0.1, (now - (last || now)) / 1000)); last = now;
     if (!world || !player) return;
     resize();
     if (mode === "play" || mode === "goal") {
-      if (!paused) {
+      if (!paused && NP.on && !NP.host && battle) npGuestTick(dt);      // an online guest: the host's fight, mirrored
+      else if (!paused) {
         if (stopT > 0) { stopT = Math.max(0, stopT - dt); acc = 0; }     // a freeze-frame: the world holds still
         else { acc += dt * (slowT > 0 ? 0.33 : 1); slowT = Math.max(0, slowT - dt); }   // and after a smash, slow motion
         const h = 1 / 120;
         let n = 0;
         while (acc >= h && n < 14 && (mode === "play" || mode === "goal")) {
           if (battle) battleTick(h);
-          else { readInput(); step(h); worldStep(h); input.jp = input.zp = input.xp = input.cp = 0; input.dash = 0; }
+          else {
+            readInput();
+            if (npHold()) { const I = INPUT0; I.L = I.R = I.U = I.D = I.J = I.Z = I.X = I.C = 0; I.jp = I.zp = I.xp = I.cp = 0; I.dash = 0; }   // (an online race: nobody moves till Go)
+            step(h); worldStep(h); input.jp = input.zp = input.xp = input.cp = 0; input.dash = 0;
+          }
           acc -= h; n++;
         }
+        if (NP.on && NP.host && battle) npHostSend(dt);
+      }
+      if (!paused && NP.on && NP.race) npRaceTick(dt);
+      if (!paused) {
         if (mode === "play" || mode === "goal") { if (battle) battleHud(); else { hud(); storyBeats(dt); } }
       }
     } else if (GLIDE[mode]) {
@@ -5788,6 +5887,7 @@
       player.state = "run"; player.vx = 0;
     }
     if (!paused) draw(dt);
+    if (NP.on && NP.ghosts.size) npTags();
   }
   function resize() {
     const box = host.querySelector(".adv-3d");
@@ -5810,7 +5910,7 @@
      dummy that does as it is told, and never ends. */
 
   /* the screens where nobody runs: the stage goes by behind them on its own */
-  const GLIDE = { title: 1, main: 1, setup: 1, options: 1, story: 1, scene: 1 };
+  const GLIDE = { title: 1, main: 1, setup: 1, options: 1, story: 1, scene: 1, lobby: 1, room: 1, friends: 1, msgs: 1, tourney: 1 };
 
   /* whether a and b are on opposite sides: everyone for themselves, or by team */
   const rivals = (a, b) => !!a && !!b && a !== b && (!battle || !battle.teams || a.team !== b.team);
@@ -5847,7 +5947,7 @@
   const BURST_MAX = 100;
   const SLOT_C = ["#e8403a", "#3a7ae0", "#e8b020", "#3aa04a"], TEAM_C = ["#e8403a", "#3a7ae0"], TEAM_N = ["Red", "Blue"];
   const tagCol = f => battle && battle.teams ? TEAM_C[f.team] : SLOT_C[f.slot];
-  const tagText = f => f.ctl === "p1" ? "1P" : f.ctl === "p2" ? "2P" : "CPU";
+  const tagText = f => f.netName && f.ctl !== "p1" ? esc(f.netName) : f.ctl === "p1" ? "1P" : f.ctl === "p2" ? "2P" : "CPU";
 
   /** A fighter is hit. Unless their guard is up (the shield takes it: a clink, a push back),
       the damage comes off their health and they are knocked away -- a jab barely moves them,
@@ -5874,7 +5974,9 @@
       if (parry) { parried(q, by); emit("parry", { q, by }); return false; }
       emit("block", { q, by });
       q.vx = away * 3.5;
-      hitSpark(q.x - away * 0.35, q.y + q.hh * 0.55, 0.85, 0xbfe8ff); SFX.grab(); hitStop(0.03);
+      if (SBFX()) effect("sbfx", "guardhit", q.x - away * 0.45, q.y + q.hh * 0.55, -away, 26, true, "fx", clamp(q.hh, 1, 1.6));   // turned aside on the barrier
+      else hitSpark(q.x - away * 0.35, q.y + q.hh * 0.55, 0.85, 0xbfe8ff);
+      SFX.grab(); hitStop(0.03);
       return false;
     }
     const stunned = q.state === "hurt" || down, n = stunned ? q.cmb.n + 1 : 1, wasUp = stunned && q.juggle && !q.ground;
@@ -5941,6 +6043,7 @@
     p.juggle = true; p.st = Math.min(1.4, airTime(p)) + 0.08;
     const x = p.x + d * p.c.w / 2, y = p.y + p.hh * 0.5;
     impact(x, y, { c: 0xffffff, flash: 2.4, shake: 0.24 }); burst(x, y, [0xd8d0c0, 0xffffff, 0xa8a090], 16, 6);
+    if (SBFX()) effect("sbfx", "wall", x, y, -d, 22, true, "fx", 1.2);
     hitStop(0.09); if (p.cmb.n >= 6) camPunch(x, y, 0.6, 0.8); SFX.impact(); SFX.stomp();
     emit("wall", { q: p });
   }
@@ -6023,10 +6126,33 @@
                  true, 0.06 + Math.sin(a) * hr, 0.34 + 0.08 * Math.sin(a));
       });
     }
-    const on = (f.guardT > 0 || (f.shield && !ITEMS)) && !f.ko && !f.out && !f.dead;
+    const up = !f.ko && !f.out && !f.dead, sb = SBFX();
+    /* guarding: Sonic Battle's barrier, a swirl that opens into a ring round them and fades, over the
+       shield's half second (the plain glow without the sheet, and for Metal's Black Shield) */
+    const guard = f.guardT > 0 && up;
+    f.gT = guard ? (f.gOn ? (f.gT || 0) + dt : 0) : 0; f.gOn = guard;
+    if (sb && !f.gCard) { f.gCard = makeCard("sbfx", "fx"); world.group.add(f.gCard); }
+    if (f.gCard) {
+      f.gCard.visible = guard;
+      if (guard) {
+        const L = framesOf("sbfx", "guard").length, i = Math.min(L - 1, Math.floor(f.gT / Math.max(0.2, f.guard0 || 0.5) * L));
+        setFrame(f.gCard, "guard", i, f.face, f.x, f.y + f.hh * 0.5 + (f.c.lift || 0), true, 0.35, Math.max(1, f.hh * 0.95 + 0.1));
+      }
+    }
+    const on = ((guard && !sb) || (f.shield && !ITEMS)) && up;
     f.aura.visible = on;
     if (on) { const k = 2.4 + Math.sin(world.t * 30) * 0.08; f.aura.scale.set(k, k, 1); f.aura.position.set(f.x, f.y + f.hh * 0.5 + (f.c.lift || 0), 0.35); }
-    if (f.healing && Math.random() < dt * 16) world.parts.list.push({ x: f.x + (Math.random() - 0.5) * 0.9, y: f.y + 0.2, z: 0.3, vx: 0, vy: 4 + Math.random() * 2, vz: 0,
+    /* healing: the green ring, round them flat, rising from their feet up over them and again */
+    const heal = f.healing && up;
+    if (sb && !f.hCard) { f.hCard = makeCard("sbfx", "fx"); world.group.add(f.hCard); }
+    if (f.hCard) {
+      f.hCard.visible = heal;
+      if (heal) {
+        const r = (world.t * 1.25) % 1;
+        setFrame(f.hCard, "heal", Math.floor(world.t * 16) % framesOf("sbfx", "heal").length, 1, f.x, f.y + 0.05 + r * f.hh * 0.85 + (f.c.lift || 0), true, 0.38, Math.max(1, f.c.w * 1.7));
+      }
+    }
+    if (heal && !sb && Math.random() < dt * 16) world.parts.list.push({ x: f.x + (Math.random() - 0.5) * 0.9, y: f.y + 0.2, z: 0.3, vx: 0, vy: 4 + Math.random() * 2, vz: 0,
       life: 0.45, s: 0.07, c: Math.random() < 0.55 ? 0x7ae08a : 0xffffff });
   }
 
@@ -6035,6 +6161,7 @@
   function koFighter(q, by) {
     const B = battle;
     q.ko = true; q.koT = 2.2; q.hp = 0; q.state = "run"; q.guardT = 0; q.healing = false; q.juggle = false;
+    if (SBFX()) effect("sbfx", "ko", q.x, q.y + q.hh * 0.5, 1, 22, true, "fx", 1.6);
     q.vy = Math.max(q.vy, 9); q.vx = (sgn(q.x - (by ? by.x : q.x)) || -q.face) * 5; q.ground = false; q.on = null;
     hitStop(0.22); shakeCam(0.3);
     const last = B.cfg.rule === "stock" && q.lives <= 1 && B.fs.filter(f => !f.elim && f !== q && rivals(f, q)).length > 0 && B.fs.filter(f => !f.elim && f !== q && !rivals(f, q)).length === 0;
@@ -6190,10 +6317,11 @@
     const W = world.W, xs = spawnXs(W);
     const fs = cfg.slots.map((s, i) => {
       const who = s.who === "random" ? CAST[Math.floor(Math.random() * CAST.length)].id : s.who;   // Random: anyone, new each fight
-      const f = makePlayer(castOf(who)), x = xs[i];
+      const f = makePlayer(castOf(who), s.em), x = xs[i];
       return Object.assign(f, { x, y: floorAt(x), face: x < W / 2 ? 1 : -1, slot: i, ctl: s.ctl, lvl: s.lvl == null ? 1 : s.lvl, team: cfg.teams ? s.team : i,
         inp: newInput(), hits: new WeakSet(), hpMax: hpOf(f.c, cfg.hp), hp: hpOf(f.c, cfg.hp), score: 0, lives: cfg.rule === "stock" ? cfg.goal : 0, kos: 0, downs: 0, dealt: 0,
-        landed: 0, blocked: 0, cmb: { n: 0, dmg: 0 }, sinceHit: 9, burst: BURST_MAX, callT: 0, ai: aiNew(s), alive: true, h: f.hh, guardT: 0, guardCd: 0, check: { x, y: 6 } });
+        landed: 0, blocked: 0, cmb: { n: 0, dmg: 0 }, sinceHit: 9, burst: BURST_MAX, callT: 0, ai: aiNew(s), alive: true, h: f.hh, guardT: 0, guardCd: 0, check: { x, y: 6 },
+        net: s.net || null, netName: s.net ? s.name || null : null });
     });
     const humans = fs.filter(f => f.ctl !== "cpu");
     battle = { cfg, fs, live: false, over: false, intro: cfg.kind === "training" ? 0.6 : 1.7, clock: cfg.time || 0, duo: fs.some(f => f.ctl === "p2"),
@@ -6238,6 +6366,7 @@
       if (f.callT > 0) f.callT -= h;
       if (f.out) continue;
       if (f.ctl === "cpu") aiThink(f, h);
+      else if (f.ctl === "net") npInput(f, B.live && !B.over);
       else if (B.live && !B.over) readInput(f.inp, f.ctl === "p2" ? 1 : 0);
       else { const I = f.inp; I.L = I.R = I.U = I.D = I.J = I.Z = I.X = I.C = 0; }
       if (B.cfg.kind === "training" && !TUT && f.sinceHit > 1.6 && f.hp < f.hpMax) f.hp = Math.min(f.hpMax, f.hp + 0.4 * f.hpMax * h);   // health comes back, between strings (the tutorial keeps its own)
@@ -6727,7 +6856,7 @@
   }
 
   // ---------------------------------------------------------------- the main menu
-  const runnerId = () => storyRun ? storyRun.ch.who : castId;
+  const runnerId = () => NP.on && NP.who ? NP.who : storyRun ? storyRun.ch.who : castId;
   /* the menus glide over one of the stages, never an arena */
   function ensureStageWorld() { if (!world || world.demo || world.def !== actDef(stageIdx, actIdx)) { demo = null; load3d(stageIdx); } }
   function screenOn(m) {
@@ -6743,6 +6872,7 @@
     return host.querySelector(".adv-ov");
   }
   function mainMenu() {
+    if (root.AdventureOnline && root.Auth && !Auth.user) { title(); return; }   // (log in first)
     storyRun = null;
     const ov = screenOn("main");
     ensureStageWorld();
@@ -6753,12 +6883,16 @@
       ["exhibition", "flag", "Free Exhibition", "Any runner in any zone you've opened, Act 1 or Act 2 and its boss: for time, rings and Red Star Rings",
         `${stages().filter((st, i) => cleared(i)).length}/${stages().length}`],
       ["battle", "trophy", "Battle", "Up to four fighters with health, players or CPUs, in any runner's arena", ""],
+      ["tourney", "crown", "Tournament", "A knock-out bracket of 8 or 16: you against CPUs, match by match, to the final", ""],
+      ["online", "comet", "Online Lobby", "Rooms for battles, races, story co-op and tournaments; friends, messages and chat",
+        root.Net && Net.state === "up" ? `${Net.players.size} online` : ""],
       ["training", "dumbbell", "Training", "The tutorial, lesson by lesson; and a dummy that does as it's told", saveData.tutorial && saveData.tutorial.done ? "" : "New"],
       ["options", "gear", "Options", "Music, sound, screen shake and the two-player keys", ""],
       ["exit", "door", "Exit", "Back to the hall", ""],
     ].filter(it => it[0] !== "exit" || (opts0 && opts0.onExit));
     ov.innerHTML = `
       <div class="adv-main pop">
+        <div class="ao-topbar"></div>
         <div class="adv-brand">
           <div class="adv-kicker">SONIC &amp; FRIENDS</div>
           <div class="adv-logo">RED RING CIRCUIT</div>
@@ -6773,7 +6907,9 @@
         </div>
         <button hidden data-back id="advMMBack"></button>
       </div>`;
-    const go = { story: storyMenu, exhibition: () => { load3d(stageIdx); menu(); }, battle: () => battleSetup(true), training: () => trainingMenu(), options: () => optionsScreen(true), exit: () => exit() };
+    const go = { story: storyMenu, exhibition: () => { load3d(stageIdx); menu(); }, battle: () => battleSetup(true), training: () => trainingMenu(), options: () => optionsScreen(true), exit: () => exit(),
+                 tourney: () => tourSetup(), online: () => { if (root.AdventureOnline) { AdventureOnline._from = "lobby"; AdventureOnline.lobby(); } } };
+    if (root.AdventureOnline) { AdventureOnline._from = "menu"; AdventureOnline.topbar(ov.querySelector(".ao-topbar")); }
     ov.querySelectorAll("[data-mm]").forEach(b => b.onclick = () => go[b.dataset.mm]());
     ov.querySelector("#advMMBack").onclick = () => title();
     autoFocus();
@@ -7323,6 +7459,8 @@
   /* the end of a match: who won, and everyone's numbers on the board */
   function battleOver() {
     const B = battle;
+    if (B.cfg.net) return npBattleOver(B);
+    if (B.cfg.tour) return tourBattleOver(B);
     if (B.cfg.kind === "story") return storyBattleOver(B);
     mode = "results"; bgm("competition-results");
     host.querySelector(".adv-hud").classList.remove("on");
@@ -7765,7 +7903,7 @@
 
   /* the stage up now: a story chapter's own, or the Act picked on the stage select */
   const storyStages = () => (root.AdventureStages && AdventureStages.STORY) || [];
-  const curDef = () => (storyRun && storyRun.def) || actDef(stageIdx, actIdx);
+  const curDef = () => (NP.on && NP.def) || (storyRun && storyRun.def) || actDef(stageIdx, actIdx);
   function load3d(i, a) { stageIdx = i; if (a != null) actIdx = a; actIdx = clamp(actIdx, 0, nActs(i) - 1); loadDef(actDef(i, actIdx)); }
   function loadDef(def) {
     disposeWorld();
@@ -7780,7 +7918,7 @@
 
   /* The title screen: behind it, a demo -- one of the cast, at random, playing a zone's first
      Act, at random, to its goal post, then another, round and round -- seen from far off, under a
-     haze, so it stays behind; the logo; Press Enter; and along the bottom a strip of checkered soil
+     haze, so it stays behind; the logo; the login (or Start, once in); and along the bottom a strip of checkered soil
      under grass where up to four of the cast at a time come on, at random, to do something of their own. */
   let glideX = 12, parade = null;
   function title() {
@@ -7798,16 +7936,16 @@
           <div class="adv-kicker">SONIC &amp; FRIENDS</div>
           <div class="adv-logo">RED RING CIRCUIT</div>
         </div>
-        <div class="adv-press">${TOUCH ? "Tap Start" : "Press Enter"}</div>
-        <div class="adv-tgo">
-          <button class="btn lg" id="advTStart" data-enter>${ico("flag")}Start</button>
-          ${opts0 && opts0.onExit ? `<button class="btn ghost" id="advTBack" data-back>${ico("back")}Back to the hall</button>` : ""}
-        </div>
+        <div class="adv-tgo"></div>
+        ${opts0 && opts0.onExit ? `<button class="btn ghost" id="advTBack" data-back>${ico("back")}Back to the hall</button>` : ""}
       </div>
       <canvas class="adv-parade"></canvas>
       <div class="adv-legal">A fan-made game, not affiliated with SEGA. Sonic and his friends, rivals and Dr. Eggman belong to SEGA.</div>`;
     parade = { cv: ov.querySelector(".adv-parade"), t: 0 };
-    ov.querySelector("#advTStart").onclick = () => mainMenu();
+    /* log in, or a new player (adventure-online.js); without it, just Start */
+    const tgo = ov.querySelector(".adv-tgo");
+    if (root.AdventureOnline && root.Auth) AdventureOnline.titlePanel(tgo, () => mainMenu());
+    else { tgo.innerHTML = `<button class="btn lg" id="advTStart" data-enter>${ico("flag")}Start</button>`; tgo.querySelector("#advTStart").onclick = () => mainMenu(); }
     if (ov.querySelector("#advTBack")) ov.querySelector("#advTBack").onclick = () => exit();
     autoFocus();
   }
@@ -7827,6 +7965,23 @@
     const box = host.querySelector(".adv-3d");
     if (box && R.domElement.parentNode !== box) box.appendChild(R.domElement);
     demo = { i, id, t: 0, acc: 0, best: player.x, still: 0, hold: 0, jt: 0, airUsed: false, done: 0, safe: { x: player.x, y: player.y }, inp: newInput() };
+  }
+  /* where on the screen the demo's runner goes (-1 the bottom, 1 the top): the middle of the open
+     band under the logo and Start, over the heads of the strip's cast -- measured off the page now
+     and then, so nothing on the title ever covers it */
+  function demoBand(dt) {
+    const D = demo;
+    if (D.band != null && (D.bandT -= dt) > 0) return D.band;
+    D.bandT = 0.5; D.band = -0.35;
+    const box = host.querySelector(".adv-3d"), r0 = box && box.getBoundingClientRect();
+    const t = host.querySelector(".adv-title"), cv = host.querySelector(".adv-parade");
+    if (r0 && r0.height && t && cv) {
+      const k = (root.innerHeight || 800) < 600 ? 1.5 : 2;
+      const top = t.getBoundingClientRect().bottom + 8, bot = cv.getBoundingClientRect().bottom - 18 * k - 45 * k;
+      const mid = bot > top ? (top + bot) / 2 : top + 24;
+      D.band = clamp(1 - 2 * (mid - r0.top) / r0.height, -0.75, 0.2);
+    }
+    return D.band;
   }
   /* back on the road, `dist` metres or more on from x: the nearest standing place to the height it was at */
   function demoWarp(p, x, dist) {
@@ -7930,7 +8085,9 @@
     a.y = 0;
     switch (a.act) {
       case "walk": go(sp * 0.75, "walk", 9); return !gone();
-      case "fly": go(sp * 1.5, "fly", 12); a.y = a.alt + Math.sin(a.t * 3) * 4; return !gone();
+      /* flying by: Eggman on his Egg Mobile's side booster (its jets below are for going up, not
+         along), the others in their flight */
+      case "fly": go(sp * 1.5, a.id === "eggman" ? "run" : "fly", 12); a.y = a.alt + Math.sin(a.t * 2.2) * 3; return !gone();
       case "glide":
         if (a.phase === "in") { go(sp * 1.9, "glide", 10); a.y = Math.max(0, a.alt + 10 - a.pt * 7); if (past() || a.y <= 0) to("drop"); return true; }
         if (a.phase === "drop") { a.y = Math.max(0, (a.y || 0) - a.pt * 120); a.x += a.dir * sp * 0.5 * dt; a.name = "fall"; a.fps = 10; a.loop = true; if (a.y <= 0) to("off"); return true; }
@@ -7991,9 +8148,12 @@
       const L = A.f[a.name] || A.f.idle, n = L.length;
       let i = a.loop ? Math.floor(a.pt * a.fps) % n : Math.min(n - 1, Math.floor((a.pt - (a.name === "pose" ? a.pose0 || 0 : 0)) * a.fps));
       if (a.id === "eggman" && (a.name === "run" || a.name === "idle" || a.name === "dash")) i = EGG_FLAME[Math.floor(t * 30) % EGG_FLAME.length] % n;   // his booster, flickering
+      if (a.id === "eggman" && a.name === "fly") i = EGG_JETS[Math.floor(t * 30) % EGG_JETS.length] % n;                                   // his jets, flickering
       const fr = L[i], c = castOf(a.id);
       const lift = c.lift ? Math.round(c.lift / PX * k * 0.6 + Math.sin(t * 3.4) * 2) : 0;
-      const X = Math.round(a.x), Y = Math.round(feet - a.y - lift);
+      /* (his flying frames are drawn from the jets' tips: the Egg Mobile kept level, only the flames change) */
+      const jets = a.id === "eggman" && /^(fly|jump|fall)$/.test(a.name) ? Math.round((fr[3] - 36) * k) : 0;
+      const X = Math.round(a.x), Y = Math.round(feet - a.y - lift + jets);
       g.fillStyle = "rgba(10,30,14,.35)"; g.beginPath(); g.ellipse(X, feet + 1, fr[2] * k * 0.3 * Math.max(0.4, 1 - a.y / 120), 3.5, 0, 0, PI * 2); g.fill();
       g.save(); g.translate(X, 0); g.scale(a.dir, 1);
       g.drawImage(img, fr[0], fr[1], fr[2], fr[3], -Math.round(fr[4] * k), Y - fr[3] * k, fr[2] * k, fr[3] * k);
@@ -8169,6 +8329,7 @@
 
   function togglePause() {
     if (mode !== "play") return;
+    if (NP.on) { npPause(); return; }                     // online: the match can't stop for one player
     paused = !paused;
     const ov = host.querySelector(".adv-ov");
     if (!paused) { ov.innerHTML = ""; last = 0; return; }
@@ -8222,6 +8383,710 @@
     if (go("#advSCont")) go("#advSCont").onclick = () => storyAfter();
   }
 
+  // ---------------------------------------------------------------- online: netplay
+  /* Every online match is run by the room host's game (adventure-online.js holds the room).
+     A BATTLE: the guests send their buttons (thirty times a second, presses counted so none is
+     lost); the host plays the fight with them as their fighters' hands, and twenty times a second
+     sends back all a guest needs to draw it -- each fighter's state, the shots and traps, the
+     clock -- and the hits, sparks, sounds, captions and camera moves since the last time, which
+     the guest plays again on its own screen. A guest's game simulates nothing in a battle. If a
+     guest leaves, a CPU takes their fighter; if the host leaves, the match is over.
+     A RACE (an exhibition, or a story chapter's run): everyone plays their own copy of the Act,
+     sending where they are ten times a second, and sees the others as ghosts with their names
+     over them; the host starts the count and keeps the finish order.
+     STORY co-op: everyone sees the chapter's scene, then a battle with the guests fighting
+     beside the hero (the host), or a race through the chapter's stage; then the scene after.
+     A TOURNAMENT: the bracket is the host's; its players' matches are online battles that
+     everyone else in the room watches, and matches between CPUs are settled at once. */
+  const NP = { on: false, host: false, room: null, plan: null, me: null, kind: null, ev: [], snapT: 0, inT: 0, seq: 0,
+               remote: new Map(), cnt: null, sent: null, ghosts: new Map(), gT: 0, race: null, story: null, who: null, em: null, def: null, myInp: null };
+  let npDepth = 0, shotNid = 0;
+  /* the host's effects, sounds and camera moves, noted (once: not the ones they set off themselves) */
+  const npWrap = (k, f, map) => function (...a) {
+    if (NP.on && NP.host && battle && !npDepth) NP.ev.push([k, map ? map(a) : a]);
+    npDepth++; try { return f.apply(this, a); } finally { npDepth--; }
+  };
+  function npInstall() {
+    if (npInstall.done) return; npInstall.done = true;
+    burst = npWrap("burst", burst); impact = npWrap("impact", impact); flash = npWrap("flash", flash); ring = npWrap("ring", ring);
+    hitSpark = npWrap("hitSpark", hitSpark); hitStop = npWrap("hitStop", hitStop); slowMo = npWrap("slowMo", slowMo);
+    shakeCam = npWrap("shakeCam", shakeCam); camPunch = npWrap("camPunch", camPunch); caption = npWrap("caption", caption);
+    effect = npWrap("effect", effect, a => { const b = a.slice(0, 11); if (b[10] && b[10].p) b[10] = { s: b[10].p.slot, ox: b[10].ox, oy: b[10].oy }; return b; });
+    call = npWrap("call", call, a => [a[0] ? a[0].slot : -1, a[1]]);
+    for (const k of Object.keys(SFX)) if (typeof SFX[k] === "function") SFX[k] = npWrap("sfx." + k, SFX[k]);
+  }
+  function npReplay(ev) {
+    for (const [k, a] of ev) {
+      try {
+        if (k.startsWith("sfx.")) { const f = SFX[k.slice(4)]; if (f) f(...a); continue; }
+        switch (k) {
+          case "burst": burst(...a); break;
+          case "impact": impact(...a); break;
+          case "flash": flash(...a); break;
+          case "ring": ring(...a); break;
+          case "hitSpark": hitSpark(...a); break;
+          case "hitStop": hitStop(...a); break;
+          case "slowMo": slowMo(...a); break;
+          case "shakeCam": shakeCam(...a); break;
+          case "camPunch": camPunch(...a); break;
+          case "caption": caption(...a); break;
+          case "call": { const f = battle && battle.fs[a[0]]; if (f) call(f, a[1]); break; }
+          case "effect": {
+            const b = a.slice();
+            if (b[10] && b[10].s != null) { const f = battle && battle.fs[b[10].s]; b[10] = f ? { p: f, ox: b[10].ox, oy: b[10].oy } : undefined; }
+            effect(...b); break;
+          }
+        }
+      } catch (e) { /* (one bad note mustn't stop the rest) */ }
+    }
+  }
+  const resolveWho = w => w === "random" || !CAST.some(c => c.id === w) ? CAST[Math.floor(Math.random() * CAST.length)].id : w;
+  const randomArena = () => Math.floor(Math.random() * stages().length);
+  /* the match a room's host starts: everything everyone's game needs to set it up the same */
+  function npPlan(R, hostId) {
+    const mem = R.members.map(m => ({ id: m.id, name: m.name, who: resolveWho(m.who), em: m.em || null, team: m.team || 0, r: m.r || 1000, uid: m.uid }));
+    if (R.mode === "race") return { kind: "race", zone: clamp(R.zone | 0, 0, stages().length - 1), mem };
+    if (R.mode === "story") {
+      const ep = epOf(R.ep); if (!ep) return { err: "Pick an episode first." };
+      return { kind: "story", ep: R.ep, ch: clamp(R.ch | 0, 0, ep.chapters.length - 1), mem, hero: hostId };
+    }
+    if (R.mode === "tourney") return { kind: "tourney", T: tourMake({ size: R.size, lvl: R.tlvl, goal: R.tgoal, arena: R.tarena, online: true,
+      humans: mem.map(m => ({ name: m.name, who: m.who, em: m.em, net: m.id, uid: m.uid, r: m.r })) }) };
+    const slots = mem.map(m => ({ who: m.who, net: m.id, em: m.em, name: m.name, team: m.team, r: m.r }));
+    const used = new Set(slots.map(s => s.who));
+    for (let k = 0; k < (R.cpu | 0) && slots.length < 4; k++) {
+      let pool = CAST.filter(c => !used.has(c.id)); if (!pool.length) pool = CAST;
+      const who = pool[Math.floor(Math.random() * pool.length)].id; used.add(who);
+      const t0 = slots.filter(s => s.team === 0).length;
+      slots.push({ who, ctl: "cpu", lvl: R.lvl, team: t0 <= slots.length - t0 ? 0 : 1 });
+    }
+    if (slots.length < 2) return { err: "A battle needs two fighters: set CPUs to 1 or more." };
+    if (R.teams && new Set(slots.map(s => s.team)).size < 2) return { err: "Red vs Blue needs someone on each side." };
+    return { kind: "battle", cfg: { kind: "battle", net: true, slots, teams: !!R.teams, arena: R.arena, rule: R.rule, goal: R.goal, time: R.time, hp: R.hp } };
+  }
+  function npStart(isHost, room, plan, me) {
+    npInstall();
+    npClear();
+    Object.assign(NP, { on: true, host: isHost, room, plan, me, kind: plan.kind, ev: [], snapT: 0, inT: 0, seq: 0, remote: new Map(), race: null, story: null,
+      who: null, em: null, def: null, cnt: { jp: 0, zp: 0, xp: 0, cp: 0, dl: 0, dr: 0 }, sent: null, lastSnap: null, spectator: false });
+    paused = false; storyRun = null; talk = null;
+    if (plan.kind === "battle") npBattle(plan.cfg);
+    else if (plan.kind === "race") npRace(plan, null);
+    else if (plan.kind === "story") npStory(plan);
+    else if (plan.kind === "tourney") { TOUR = plan.T; TOUR.me = null; tourBracket(); }
+    if (root.Online) Online.setPresence();
+  }
+  /* a battle: on the host, its guests' fighters steered by what they send; on a guest, a mirror */
+  function npBattle(cfg) {
+    const c = Object.assign({}, cfg, { slots: cfg.slots.map(s => Object.assign({}, s, { ctl: s.net ? (s.net === NP.me ? "p1" : "net") : "cpu" })) });
+    NP.cnt = { jp: 0, zp: 0, xp: 0, cp: 0, dl: 0, dr: 0 }; NP.remote = new Map(); NP.lastSnap = null; NP.sent = null; NP.ev = [];
+    startBattle(c);
+    for (const f of battle.fs) {
+      const s = c.slots[f.slot];
+      f.net = s.net || null; f.netName = s.name || null; f.netR = s.r || 1000; f._used = { jp: 0, zp: 0, xp: 0, cp: 0, dl: 0, dr: 0 };
+    }
+    NP.spectator = !battle.fs.some(f => f.net === NP.me);
+    battle.lead = battle.fs.find(f => f.net === NP.me) || battle.fs[0]; player = battle.lead;
+  }
+  /* the host: a guest's buttons into their fighter's hands, a press at a time */
+  function npInput(f, live) {
+    const I = f.inp, R = NP.remote.get(f.net), D = f._used;
+    I.dash = 0;
+    if (!R || !live) { I.L = I.R = I.U = I.D = I.J = I.Z = I.X = I.C = 0; I.jp = I.zp = I.xp = I.cp = 0; return; }
+    const h = R.h | 0, c = R.c || [];
+    I.L = h & 1 ? 1 : 0; I.R = h & 2 ? 1 : 0; I.U = h & 4 ? 1 : 0; I.D = h & 8 ? 1 : 0; I.J = h & 16 ? 1 : 0; I.Z = h & 32 ? 1 : 0; I.X = h & 64 ? 1 : 0; I.C = h & 128 ? 1 : 0;
+    const take = (k, i) => { if ((c[i] | 0) > D[k]) { D[k]++; return 1; } return 0; };
+    I.jp = take("jp", 0); I.zp = take("zp", 1); I.xp = take("xp", 2); I.cp = take("cp", 3);
+    if (take("dl", 4)) I.dash = -1; else if (take("dr", 5)) I.dash = 1;
+  }
+  /* a guest: its own buttons, to the host */
+  function npSendInput(dt) {
+    const I = NP.myInp || (NP.myInp = newInput()), C = NP.cnt;
+    readInput(I, 0);
+    if (I.jp) C.jp++; if (I.zp) C.zp++; if (I.xp) C.xp++; if (I.cp) C.cp++; if (I.dash < 0) C.dl++; if (I.dash > 0) C.dr++;
+    const h = I.L | I.R << 1 | I.U << 2 | I.D << 3 | I.J << 4 | I.Z << 5 | I.X << 6 | I.C << 7;
+    const key = h + ":" + C.jp + ":" + C.zp + ":" + C.xp + ":" + C.cp + ":" + C.dl + ":" + C.dr;
+    NP.inT += dt;
+    if (key !== NP.sent || NP.inT > 0.2) { NP.sent = key; NP.inT = 0; Online.toHost({ t: "np.in", h, c: [C.jp, C.zp, C.xp, C.cp, C.dl, C.dr] }); }
+  }
+  /* what each fighter's picture needs, and the HUD (numbers to three places) */
+  const NPF = ["x", "y", "vx", "vy", "face", "ground", "state", "curl", "rev", "hp", "hpMax", "burst", "lives", "kos", "score", "downs", "dealt", "landed", "ko", "koT", "out", "elim",
+    "whiteT", "hideT", "inv", "wallT", "floorT", "smashT", "spike", "juggle", "guardT", "healing", "flyLeft", "dive", "launchT", "dblT", "floatT", "balT", "catchT", "landT",
+    "sinceHit", "star", "shield", "hh", "team", "callT", "callTx", "callN", "st", "dead"];
+  const NPF_DEF = { state: "run", callTx: "", face: 1 };
+  const r3 = v => typeof v === "number" ? Math.round(v * 1000) / 1000 : v;
+  function npSerF(f) {
+    const o = {};
+    for (const k of NPF) { const v = f[k]; if (v !== undefined && v !== null && v !== 0 && v !== false && v !== "") o[k] = r3(v); }
+    if (f.mv) o.mv = { name: f.mv.name, t: r3(f.mv.t), fps: f.mv.fps, air: f.mv.air ? 1 : 0, chase: f.mv.chase ? 1 : 0 };
+    if (f.sp) o.sp = { body: f.sp.body, t: r3(f.sp.t), fps: f.sp.fps, windup: f.sp.windup || 0, spin: r3(f.sp.spin || 0), shield: f.sp.shield ? 1 : 0, kind: f.sp.kind, air: f.sp.air ? 1 : 0 };
+    if (f.tor) o.tor = { body: f.tor.body, t: r3(f.tor.t), fps: f.tor.fps, from: f.tor.from, to: f.tor.to };
+    if (f.er) o.er = { body: f.er.body, t: r3(f.er.t), fps: f.er.fps, from: f.er.from, to: f.er.to };
+    o.cmb = { n: f.cmb.n, dmg: Math.round(f.cmb.dmg) };
+    const I = f.inp; o.ib = I.L | I.R << 1 | I.J << 4;
+    return o;
+  }
+  const npSerS = s => [s.nid, s.who, s.fx, r3(s.x), r3(s.y), s.face, r3(s.t), r3(s.life), r3(s.life0), s.loop ? 1 : 0, s.mid ? 1 : 0, s.k || 0, s.ghost || 0, s.range || 0, s.trail || 0, r3(s.vx || 0), r3(s.vy || 0)];
+  const npSerT = t => [t.nid, t.who, t.kind, r3(t.x), r3(t.y), t.face, r3(t.t), r3(t.life), t.grounded ? 1 : 0, t.flies ? 1 : 0, r3(t.landT || 0), t.faint ? 1 : 0];
+  function npHostSend(dt) {
+    const B = battle; if (!B || !NP.on || !NP.host) return;
+    NP.snapT += dt; if (NP.snapT < 0.05) return; NP.snapT = 0;
+    const w = world;
+    Online.toAll({ t: "np.s", q: ++NP.seq, bt: r3(B.t), c: r3(B.clock), lv: B.live ? 1 : 0, ov: B.over ? 1 : 0, in: r3(B.intro), w: B.winner == null ? null : B.winner,
+      f: B.fs.map(npSerF), s: w.shots.filter(s => !s.gone).map(npSerS), r: w.traps.filter(t => !t.gone).map(npSerT), e: NP.ev }, true);
+    NP.ev = [];
+  }
+  function npApplySnap(d) {
+    const B = battle; if (!B || !world) return;
+    if (NP.lastSnap && d.q <= NP.lastSnap.q) return;
+    NP.lastSnap = d; NP.snapAt = performance.now();
+    B.clock = d.c; B.live = !!d.lv; B.intro = d.in;
+    if (d.ov && !B.over) { B.over = true; B.winner = d.w; }
+    d.f.forEach((o, i) => {
+      const f = B.fs[i]; if (!f) return;
+      for (const k of NPF) if (k !== "x" && k !== "y") f[k] = o[k] !== undefined ? o[k] : NPF_DEF[k] !== undefined ? NPF_DEF[k] : 0;
+      f._tx = o.x || 0; f._ty = o.y || 0; f._tvx = o.vx || 0; f._tvy = o.vy || 0;
+      if (!f._snapped) { f.x = f._tx; f.y = f._ty; f._snapped = true; }
+      f.mv = o.mv || null; f.sp = o.sp || null; f.tor = o.tor || null; f.er = o.er || null; f.cmb = o.cmb || { n: 0, dmg: 0 };
+      const ib = o.ib | 0; f.inp.L = ib & 1 ? 1 : 0; f.inp.R = ib & 2 ? 1 : 0; f.inp.J = ib & 16 ? 1 : 0;
+      f.alive = !f.ko && !f.out; f.hh = f.hh || f.c.h;
+    });
+    npMirror(world.shots, d.s, a => ({ nid: a[0], who: a[1], fx: a[2], x: a[3], y: a[4], face: a[5], t: a[6], life: a[7], life0: a[8], loop: !!a[9], mid: !!a[10],
+      k: a[11] || undefined, ghost: a[12] || undefined, range: a[13] || undefined, trail: a[14] || undefined, vx: a[15], vy: a[16] }), s => makeCard(s.who, s.ghost ? "ghost" : "fx"));
+    npMirror(world.traps, d.r, a => ({ nid: a[0], who: a[1], kind: a[2], x: a[3], y: a[4], face: a[5], t: a[6], life: a[7], grounded: !!a[8], flies: !!a[9], landT: a[10], faint: !!a[11] }),
+      t => makeCard(t.who, t.faint ? "faint" : "fx"));
+    npReplay(d.e || []);
+  }
+  function npMirror(list, rows, mk, card) {
+    const seen = new Set();
+    for (const a of rows || []) {
+      const o = mk(a); seen.add(o.nid);
+      const x = list.find(z => z.nid === o.nid && !z.gone);
+      if (!x) { const n = Object.assign(o, { gone: false, seed: null }); n.card = card(n); world.group.add(n.card); list.push(n); }
+      else Object.assign(x, o);
+    }
+    for (const x of list) if (!x.gone && x.nid != null && !seen.has(x.nid)) { x.gone = true; world.group.remove(x.card); x.card.geometry.dispose(); }
+    for (let i = list.length - 1; i >= 0; i--) if (list[i].gone) list.splice(i, 1);
+  }
+  /* a guest's battle frame: its buttons out, the fighters eased toward where the host has them
+     (a little ahead, by their speed, for the time since), the moves' clocks running on */
+  function npGuestTick(dt) {
+    const B = battle, w = world;
+    w.t += dt; B.t += dt;
+    stopT = Math.max(0, stopT - dt); slowT = Math.max(0, slowT - dt);
+    if (!NP.spectator && B.live && !B.over) npSendInput(dt);
+    const k = Math.min(1, dt * 16), ahead = Math.min(0.1, (performance.now() - (NP.snapAt || 0)) / 1000);
+    for (const f of B.fs) {
+      if (f._tx == null) continue;
+      const tx = f._tx + f._tvx * ahead, ty = Math.max(f.ground ? f._ty : -9, f._ty + f._tvy * ahead);
+      if (Math.abs(tx - f.x) > 3 || Math.abs(ty - f.y) > 3) { f.x = tx; f.y = ty; } else { f.x += (tx - f.x) * k; f.y += (ty - f.y) * k; }
+      if (f.mv) f.mv.t += dt; if (f.sp) f.sp.t += dt; if (f.tor) f.tor.t += dt; if (f.er) f.er.t += dt;
+    }
+    for (const s of w.shots) if (!s.gone) { s.x += (s.vx || 0) * dt; s.y += (s.vy || 0) * dt; s.t += dt; }
+    for (const t of w.traps) if (!t.gone) t.t += dt;
+    worldStep(dt);
+  }
+  /* the end: the host's numbers for everyone, and the results */
+  function npBattleOver(B) {
+    if (NP.host) Online.toAll({ t: "np.end", w: B.winner == null ? null : B.winner,
+      f: B.fs.map(f => ({ score: f.score, kos: f.kos, downs: f.downs, dealt: Math.round(f.dealt), lives: f.lives, team: f.team, hp: Math.round(f.hp) })) }, true);
+    npEndOf(B);
+  }
+  function npEndOf(B) {
+    if (B.cfg.tour) return tourBattleOver(B);
+    if (B.cfg.story) return npStoryBattleOver(B);
+    npResults(B);
+  }
+  /* "GuestB wins" (the player, not the character, when one person won it) */
+  function npWinLine(B) {
+    const w = B.fs.filter(f => f.team === B.winner);
+    return !B.teams && w.length === 1 && w[0].netName ? w[0].netName + " wins" : winnerLine(B.winner).replace(/!$/, "");
+  }
+  function npResults(B) {
+    mode = "results"; bgm("competition-results");
+    host.querySelector(".adv-hud").classList.remove("on");
+    const me = B.fs.find(f => f.net === NP.me);
+    let rec = null;
+    if (me && root.Auth && Auth.user) {
+      const rivals = B.fs.filter(f => f.team !== me.team && f.net);
+      rec = Auth.record({ kind: "battle", won: B.winner === me.team, kos: me.kos, who: me.c.id, online: true, oppR: rivals.length ? rivals.reduce((t, f) => t + f.netR, 0) / rivals.length : null });
+    }
+    const order = B.fs.slice().sort((a, b) => (b.team === B.winner) - (a.team === B.winner) || b.score - a.score || b.lives - a.lives || b.dealt - a.dealt);
+    const ov = host.querySelector(".adv-ov");
+    ov.innerHTML = `
+      <div class="panel adv-small adv-bres pop">
+        <div class="panel-hd gold">${ico("trophy")}${B.winner == null ? "A draw" : esc(npWinLine(B))}</div>
+        <div class="adv-board">
+          <div class="adv-row adv-bhd"><span></span><em>KOs</em><em>Down</em><em>Damage</em></div>
+          ${order.map(f => `
+            <div class="adv-row adv-frow ${f.team === B.winner ? "win" : ""}">
+              <span><canvas width="44" height="40" data-face="${f.c.id}"></canvas><b>${esc(f.netName || f.c.name)}</b><i style="--tc:${tagCol(f)}">${f.net ? esc(f.c.name) : tagText(f)}</i></span>
+              <b class="num">${f.kos}</b><b class="num">${f.downs}</b><b class="num">${Math.round(f.dealt)}</b>
+            </div>`).join("")}
+        </div>
+        ${rec ? `<p class="adv-note">+${rec.xp} XP${rec.delta != null ? ` · rating ${rec.delta >= 0 ? "+" : ""}${rec.delta} (${rec.rating})` : ""}${rec.up ? ` · level ${rec.lv}!` : ""}</p>` : ""}
+        <div class="adv-btns"><button class="btn" id="npBack" data-focus data-enter>${ico("back")}Back to the room</button></div>
+      </div>`;
+    ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 1));
+    ov.querySelector("#npBack").onclick = () => npBackToRoom();
+    setTimeout(autoFocus, 0);
+  }
+  function npClear() {
+    for (const g of NP.ghosts.values()) { if (world) world.group.remove(g.spr); }
+    NP.ghosts.clear();
+    const t = host && host.querySelector(".np-tags"); if (t) t.remove();
+    const p = host && host.querySelector(".np-pause"); if (p) p.remove();
+  }
+  function npBackToRoom() {
+    if (NP.race) clearTimeout(NP.race.timer);
+    NP.on = false; npClear(); endBattle(); storyRun = null; paused = false; NP.race = null; NP.story = null;
+    if (NP.host && root.Online) Online.matchEnded();
+    if (root.AdventureOnline) AdventureOnline.backToRoom();
+  }
+  /* out of it (the room gone, or left) */
+  function npStop() {
+    if (!NP.on) return;
+    if (NP.race) clearTimeout(NP.race.timer);
+    NP.on = false; npClear(); endBattle(); storyRun = null; paused = false; NP.race = null; NP.story = null;
+    if (TOUR && TOUR.online) TOUR = null;
+  }
+  /* a fighter's name tags again (a player left and a CPU took over) */
+  function retag(f) {
+    const h = host.querySelector(".adv-hud"); if (!h) return;
+    const a = h.querySelector(`.adv-fc[data-i="${battle.fs.indexOf(f)}"] .adv-fc-nm i`), t = h.querySelectorAll(".adv-tags:not(.np-tags) .adv-tag")[battle.fs.indexOf(f)];
+    if (a) a.innerHTML = tagText(f); if (t) t.innerHTML = tagText(f);
+  }
+  function npMemberLeft(id, name) {
+    if (!NP.on) return;
+    if (battle) { const f = battle.fs.find(x => x.net === id); if (f) { f.net = null; f.ctl = "cpu"; f.netName = (f.netName || f.c.name) + " (CPU)"; caption(name + " left: a CPU takes over"); retag(f); } }
+    const g = NP.ghosts.get(id); if (g) { world.group.remove(g.spr); NP.ghosts.delete(id); }
+    if (NP.race && NP.host) npRaceCheck();
+    if (NP.story && NP.host && NP.story.stage === "before") npStoryCheck();
+    if (TOUR && TOUR.online) TOUR.ents.forEach(e => { if (e.net === id) { e.net = null; e.cpu = true; e.lvl = 1; e.name += " (CPU)"; } });
+  }
+  function npChatLine(c) { if (root.AdventureOnline) AdventureOnline.toast((c.sys ? "" : c.n + ": ") + (c.sys || c.x), "msg", 3600); }
+  function npHostGot(id, d) {
+    if (!NP.on) return;
+    switch (d.t) {
+      case "np.in": NP.remote.set(id, d); break;
+      case "np.g": Online.toAll(Object.assign({}, d, { id }), true); npGhost(id, d); break;
+      case "np.fin": npRaceFin(id, +d.time || 0); break;
+      case "np.ok": if (NP.story) { NP.story.ok.add(id); npStoryCheck(); } break;
+    }
+  }
+  function npGuestGot(d) {
+    if (!NP.on && d.t !== "np.tour") return;
+    switch (d.t) {
+      case "np.s": npApplySnap(d); break;
+      case "np.end": {
+        const B = battle; if (!B) break;
+        d.f.forEach((o, i) => { const f = B.fs[i]; if (f) Object.assign(f, o); });
+        B.over = true; B.winner = d.w; npEndOf(B); break;
+      }
+      case "np.g": npGhost(d.id, d); break;
+      case "np.go": npRaceGo(); break;
+      case "np.fn": npRaceNote(d.id, d.time); break;
+      case "np.rr": npRaceResults(d.res); break;
+      case "np.sgo": npStoryGo(d); break;
+      case "np.tour": if (NP.on) { TOUR = d.T; tourBracket(); } break;
+      case "np.tm": if (NP.on) { TOUR = d.T; npBattle(d.cfg); } break;
+    }
+  }
+  /* the pause menu, online: the match goes on behind it */
+  function npPause() {
+    let p = host.querySelector(".np-pause");
+    if (p) { p.remove(); return; }
+    p = document.createElement("div"); p.className = "np-pause";
+    p.innerHTML = `<div class="panel adv-small pop"><div class="panel-hd">${ico("info")}Online match</div><p class="adv-note">The match goes on while this is open.</p>
+      <div class="adv-btns"><button class="btn" data-k="res">${ico("next")}Keep playing</button><button class="btn ghost" data-k="out">${ico("door")}Leave the room</button></div></div>`;
+    host.append(p);
+    p.querySelector('[data-k="res"]').onclick = () => p.remove();
+    p.querySelector('[data-k="out"]').onclick = () => { p.remove(); if (root.Online) Online.leave(); };
+  }
+
+  /* ---- a race: everyone their own copy, the others as ghosts */
+  function npRace(plan, story) {
+    const meM = plan.mem.find(m => m.id === NP.me) || plan.mem[0];
+    NP.who = story && NP.host ? story.ch.who : meM.who; NP.em = meM.em;
+    NP.def = story ? storyDef(story.ch) : actDef(plan.zone, 0);
+    NP.race = { fin: new Map(), go: false, count: 0, story, mine: null, done: false, timer: null, said: -1 };
+    play();
+    world.played = true; world.t = 0;
+    caption("Get ready…", true);
+    if (NP.host) setTimeout(() => { if (NP.on && NP.race && !NP.race.go) { Online.toAll({ t: "np.go" }, true); npRaceGo(); } }, 1600);
+  }
+  function npRaceGo() { const R = NP.race; if (!R || R.go) return; R.go = true; R.count = 3.4; R.said = 4; }
+  /* the count (nobody moves till Go), and where you are, ten times a second */
+  function npRaceTick(dt) {
+    const R = NP.race; if (!R) return;
+    if (R.go && R.count > 0) {
+      R.count -= dt;
+      const n = Math.ceil(R.count - 0.4);
+      if (n !== R.said) { R.said = n; if (n > 0) { caption(String(n), true); SFX.blip ? SFX.blip() : SFX.pop(); } else { caption("Go!"); SFX.dash(); world.t = 0; } }
+    }
+    NP.gT += dt;
+    if (NP.gT >= 0.1 && player && R.go) {
+      NP.gT = 0;
+      const p = player, d = { t: "np.g", x: r3(p.x), y: r3(p.y), rf: p._rf || ["idle", 0, 1], fin: R.mine != null ? 1 : 0 };
+      if (NP.host) { Online.toAll(Object.assign({ id: NP.me }, d), true); } else Online.toHost(d);
+    }
+  }
+  const npHold = () => !!(NP.on && NP.race && (!NP.race.go || NP.race.count > 0.4));
+  function npGhost(id, d) {
+    if (id === NP.me || !world || !NP.on) return;
+    let g = NP.ghosts.get(id);
+    if (!g) {
+      const mem = (NP.plan.mem || []).find(m => m.id === id); if (!mem) return;
+      const hero = NP.race && NP.race.story && id === NP.plan.hero;
+      const c = hero ? castOf(NP.race.story.ch.who) : mem.who === "emerl" ? emerlCast(mem.em) : castOf(mem.who);
+      const sheet = c.sheet || c.id;
+      const spr = makeCard(sheet, "ghost"); world.group.add(spr);
+      g = { id, name: mem.name, sheet, spr, x: +d.x || 0, y: +d.y || 0, tx: +d.x || 0, ty: +d.y || 0, rf: d.rf, fin: false };
+      NP.ghosts.set(id, g);
+    }
+    g.tx = +d.x || 0; g.ty = +d.y || 0; g.rf = Array.isArray(d.rf) ? d.rf : g.rf; g.fin = !!d.fin;
+  }
+  function npDrawGhosts(dt) {
+    for (const g of NP.ghosts.values()) {
+      const k = Math.min(1, dt * 12);
+      g.x += (g.tx - g.x) * k; g.y += (g.ty - g.y) * k;
+      if (Math.abs(g.tx - g.x) > 6 || Math.abs(g.ty - g.y) > 6) { g.x = g.tx; g.y = g.ty; }
+      const rf = g.rf || ["idle", 0, 1], L = framesOf(g.sheet, rf[0]) || framesOf(g.sheet, "idle");
+      g.spr.visible = !!L;
+      if (L) setFrame(g.spr, framesOf(g.sheet, rf[0]) ? rf[0] : "idle", Math.min(rf[1] | 0, L.length - 1), rf[2] || 1, g.x, g.y);
+    }
+  }
+  /* their names over the ghosts */
+  function npTags() {
+    if (!NP.ghosts.size || !camera) return;
+    let box = host.querySelector(".np-tags");
+    if (!box) { box = document.createElement("div"); box.className = "np-tags adv-tags"; host.append(box); }
+    const b = host.querySelector(".adv-3d"), W = b.clientWidth, Hh = b.clientHeight;
+    camera.updateMatrixWorld();
+    for (const g of NP.ghosts.values()) {
+      let el = box.querySelector(`[data-g="${g.id}"]`);
+      if (!el) { el = document.createElement("span"); el.className = "adv-tag np-gtag"; el.dataset.g = g.id; el.textContent = g.name; box.append(el); }
+      TV.set(g.x, g.y + 1.45, 0).project(camera);
+      const sx = Math.round((TV.x + 1) / 2 * W), sy = Math.round((1 - TV.y) / 2 * Hh), off = TV.z > 1 || sx < -40 || sx > W + 40;
+      el.style.display = off ? "none" : "";
+      el.style.transform = `translate(${sx}px,${sy}px) translate(-50%,-100%)`;
+      el.classList.toggle("fin", g.fin);
+    }
+  }
+  /* home: your time to the host; a wait for the others */
+  function npFinished(time) {
+    const R = NP.race; if (!R || R.mine != null) return;
+    R.mine = time;
+    if (NP.host) npRaceFin(NP.me, time); else Online.toHost({ t: "np.fin", time });
+    setTimeout(() => { if (NP.on && NP.race && !NP.race.done) npRaceWait(); }, 1800);
+  }
+  function npRaceFin(id, time) {
+    const R = NP.race; if (!R || R.done || R.fin.has(id)) return;
+    R.fin.set(id, time);
+    Online.toAll({ t: "np.fn", id, time }, true); npRaceNote(id, time);
+    npRaceCheck();
+  }
+  function npRaceCheck() {
+    const R = NP.race; if (!R || R.done) return;
+    const here = NP.plan.mem.filter(m => NP.room.members.some(x => x.id === m.id) || m.id === NP.me);
+    if (here.every(m => R.fin.has(m.id))) npRaceDone();
+    else if (R.fin.size && !R.timer) R.timer = setTimeout(npRaceDone, R.story ? 30000 : 45000);
+  }
+  function npRaceDone() {
+    const R = NP.race; if (!R || R.done) return; clearTimeout(R.timer);
+    const res = NP.plan.mem.map(m => ({ id: m.id, name: m.name, who: m.who, time: R.fin.has(m.id) ? R.fin.get(m.id) : null }))
+      .sort((a, b) => (a.time == null) - (b.time == null) || (a.time || 0) - (b.time || 0));
+    Online.toAll({ t: "np.rr", res }, true); npRaceResults(res);
+  }
+  function npRaceNote(id, time) {
+    const R = NP.race; if (!R) return; R.fin.set(id, time);
+    const g = NP.ghosts.get(id); if (g) g.fin = true;
+    if (id !== NP.me) { const m = NP.plan.mem.find(x => x.id === id); if (m) caption(m.name + " is home: " + fmt(time)); }
+    if (R.mine != null && !R.done) npRaceWait();
+  }
+  function npRaceWait() {
+    const R = NP.race; if (!R || R.done || mode === "results") return;
+    const ov = host.querySelector(".adv-ov");
+    const rows = NP.plan.mem.map(m => ({ m, t: R.fin.get(m.id) })).sort((a, b) => (a.t == null) - (b.t == null) || (a.t || 0) - (b.t || 0));
+    ov.innerHTML = `
+      <div class="panel adv-small pop np-wait">
+        <div class="panel-hd gold">${ico("flag")}${R.story ? "You made it" : "Finished: " + fmt(R.mine)}</div>
+        <div class="np-rlist">${rows.map((r, i) => `<p class="${r.m.id === NP.me ? "me" : ""}"><em>${r.t != null ? i + 1 : "-"}</em><b>${esc(r.m.name)}</b><span>${r.t != null ? fmt(r.t) : "running…"}</span></p>`).join("")}</div>
+        <p class="adv-note">Waiting for the others to get home.</p>
+      </div>`;
+  }
+  function npRaceResults(res) {
+    const R = NP.race; if (!R) return;
+    R.done = true; clearTimeout(R.timer);
+    if (R.story) { npStoryAfter(true); return; }
+    mode = "results"; bgm("competition-results");
+    host.querySelector(".adv-hud").classList.remove("on");
+    const place = res.findIndex(r => r.id === NP.me), won = place === 0 && res[0].time != null;
+    const rec = root.Auth && Auth.user ? Auth.record({ kind: "race", won, online: true }) : null;
+    const ov = host.querySelector(".adv-ov");
+    ov.innerHTML = `
+      <div class="panel adv-small adv-bres pop">
+        <div class="panel-hd gold">${ico("trophy")}${res[0] && res[0].time != null ? esc(res[0].name) + " wins the race" : "Nobody finished"}</div>
+        <div class="np-rlist big">${res.map((r, i) => `<p class="${r.id === NP.me ? "me" : ""}"><em>${r.time != null ? i + 1 : "-"}</em><canvas width="44" height="40" data-face="${esc(r.who)}"></canvas><b>${esc(r.name)}</b><span>${r.time != null ? fmt(r.time) : "didn't finish"}</span></p>`).join("")}</div>
+        ${rec ? `<p class="adv-note">+${rec.xp} XP${rec.up ? ` · level ${rec.lv}!` : ""}</p>` : ""}
+        <div class="adv-btns"><button class="btn" id="npBack" data-focus data-enter>${ico("back")}Back to the room</button></div>
+      </div>`;
+    ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 1));
+    ov.querySelector("#npBack").onclick = () => npBackToRoom();
+    setTimeout(autoFocus, 0);
+  }
+
+  /* ---- story co-op: the scene, then a battle beside the hero or a race through the stage */
+  function npStory(plan) {
+    const ep = epOf(plan.ep), ch = chOf(ep, plan.ch);
+    NP.story = { plan, ep, ch, ok: new Set(), stage: "before" };
+    storyRun = { who: ep.who, ep, i: plan.ch, ch, net: true };
+    if (ch.kind === "run") { storyRun.def = storyDef(ch); loadDef(storyRun.def); glideX = 12; camX = 15; }
+    else { disposeWorld(); world = buildWorld(arenaDef(stageAt(ch.arena))); player = makePlayer(castOf(ch.who)); glideX = world.W / 2; snapCamera(); }
+    music();
+    playScene(ch.before, () => npStoryOk());
+  }
+  function npStoryOk() {
+    const S = NP.story; if (!S || S.stage !== "before") return;
+    if (NP.host) { S.ok.add(NP.me); npStoryCheck(); } else Online.toHost({ t: "np.ok" });
+    if (S.stage === "before") {
+      const ov = screenOn("scene");
+      ov.innerHTML = `<div class="panel adv-small pop ao-wait"><div class="ao-spin"></div><p>Waiting for the others to finish the scene…</p></div>`;
+    }
+  }
+  function npStoryCheck() {
+    const S = NP.story; if (!S || S.stage !== "before" || !NP.host) return;
+    const here = NP.plan.mem.filter(m => NP.room.members.some(x => x.id === m.id));
+    if (!here.every(m => S.ok.has(m.id))) { if (!S.timer) S.timer = setTimeout(() => { if (NP.story === S && S.stage === "before") { here.forEach(m => S.ok.add(m.id)); npStoryCheck(); } }, 40000); return; }
+    clearTimeout(S.timer);
+    const ch = S.ch, d = { t: "np.sgo" };
+    if (ch.kind === "battle") {
+      const P = NP.plan, slots = [];
+      slots.push({ who: ch.who, net: P.hero, name: (P.mem.find(m => m.id === P.hero) || {}).name, team: 0 });
+      for (const m of P.mem) if (m.id !== P.hero && NP.room.members.some(x => x.id === m.id) && slots.length < 4 - ch.foes.length) slots.push({ who: m.who, net: m.id, em: m.em, name: m.name, team: 0 });
+      for (const a of ch.allies || []) if (slots.length < 4 - ch.foes.length) slots.push({ who: a, ctl: "cpu", lvl: 1, team: 0 });
+      for (const f of ch.foes) if (slots.length < 4) slots.push({ who: f.who, ctl: "cpu", lvl: f.lvl == null ? 1 : f.lvl, team: 1 });
+      d.cfg = { kind: "battle", net: true, story: true, slots, teams: true, arena: stageAt(ch.arena), rule: "stock", goal: 1, time: 0, hp: 300 };
+    } else d.run = 1;
+    Online.toAll(d, true); npStoryGo(d);
+  }
+  function npStoryGo(d) {
+    const S = NP.story; if (!S) return;
+    S.stage = "action";
+    if (d.cfg) npBattle(d.cfg);
+    else npRace(NP.plan, S);
+  }
+  function npStoryBattleOver(B) { npStoryAfter(B.winner === 0); }
+  /* the scene after (a win), the chapter cleared for everyone who was there, and back to the room */
+  function npStoryAfter(won) {
+    const S = NP.story; if (!S) return;
+    S.stage = "after";
+    endBattle();
+    if (!won) {
+      mode = "results"; host.querySelector(".adv-hud").classList.remove("on");
+      const ov = host.querySelector(".adv-ov");
+      ov.innerHTML = `<div class="panel adv-small pop"><div class="panel-hd">${ico("info")}Beaten</div><p class="adv-note">The chapter wasn't cleared. The host can start it again from the room.</p>
+        <div class="adv-btns"><button class="btn" id="npBack" data-focus data-enter>${ico("back")}Back to the room</button></div></div>`;
+      ov.querySelector("#npBack").onclick = () => npBackToRoom(); setTimeout(autoFocus, 0); return;
+    }
+    if (world && world.def.arena) glideX = world.W / 2;
+    else if (world) { glideX = Math.max(12, Math.min(world.W - 31, (world.goal ? world.goal.x : world.W) - 22)); camX = glideX + 3; }
+    playScene(S.ch.after, () => {
+      saveData.story = saveData.story || {};
+      const eps = saveData.story.eps = saveData.story.eps || {};
+      eps[S.ep.who] = Math.max(eps[S.ep.who] || 0, S.plan.ch + 1); save(saveData);
+      const ov = screenOn("story");
+      ov.innerHTML = `<div class="panel adv-small pop"><div class="panel-hd gold">${ico("check")}Chapter ${S.plan.ch + 1}: ${esc(S.ch.title)}</div>
+        <p class="adv-note">Cleared together. It counts in ${esc(poss(castOf(S.ep.who).name))} episode on your save too.</p>
+        <div class="adv-btns"><button class="btn" id="npBack" data-focus data-enter>${ico("back")}Back to the room</button></div></div>`;
+      ov.querySelector("#npBack").onclick = () => npBackToRoom(); autoFocus();
+    });
+  }
+
+  // ---------------------------------------------------------------- the tournament
+  /* A bracket of 8 or 16, knock-out, one battle a match (Survival: the lives a match the setup
+     says, three minutes). The players are spread through the bracket so they meet as late as
+     they can; CPUs fill the other places, with fighters nobody took and levels around the one
+     set. A match between two CPUs is settled at once (their levels and a little luck) -- or
+     watched, offline, if you like. Online, the room's host runs the bracket: its players'
+     matches are online battles everyone in the room watches. */
+  let TOUR = null;
+  const ROUND_N = (n, r) => { const left = n >> r; return left === 2 ? "Final" : left === 4 ? "Semi-finals" : left === 8 ? "Quarter-finals" : "Round of " + left; };
+  /* the places the players go: bit-reversed, so the first two are in opposite halves */
+  const seedOrder = n => { const b = Math.log2(n); return Array.from({ length: n }, (_, i) => { let r = 0; for (let k = 0; k < b; k++) if (i & (1 << k)) r |= 1 << (b - 1 - k); return r; }); };
+  function tourMake(o) {
+    const size = o.size === 16 ? 16 : 8;
+    const humans = o.humans.slice(0, size).map(h => Object.assign({ cpu: false }, h));
+    const used = new Set(humans.map(e => e.who)), cpus = [];
+    while (humans.length + cpus.length < size) {
+      let pool = CAST.filter(c => !used.has(c.id)); if (!pool.length) pool = CAST;
+      const c = pool[Math.floor(Math.random() * pool.length)]; used.add(c.id);
+      const lv = clamp((o.lvl == null ? 1 : o.lvl) + (Math.random() < 0.3 ? (Math.random() < 0.5 ? -1 : 1) : 0), 0, 2);
+      cpus.push({ cpu: true, who: c.id, name: c.name, lvl: lv });
+    }
+    /* (sixteen places and fourteen runners: a second of one is "2") */
+    const seen = {}; for (const e of humans.concat(cpus)) if (e.cpu) { seen[e.name] = (seen[e.name] || 0) + 1; if (seen[e.name] > 1) e.name += " " + seen[e.name]; }
+    U.shuffle(cpus);
+    const order = seedOrder(size), ents = new Array(size);
+    humans.forEach((h, i) => { ents[order[i]] = h; });
+    for (let i = 0; i < size; i++) if (!ents[i]) ents[i] = cpus.pop();
+    const rounds = []; let n = size / 2;
+    rounds.push(Array.from({ length: n }, (_, k) => ({ a: 2 * k, b: 2 * k + 1, w: null })));
+    while (n > 1) { n /= 2; rounds.push(Array.from({ length: n }, () => ({ a: null, b: null, w: null }))); }
+    return { size, goal: o.goal || 2, arena: o.arena == null ? -1 : o.arena, lvl: o.lvl == null ? 1 : o.lvl, online: !!o.online, ents, rounds, r: 0, done: false, champ: null, recd: false };
+  }
+  /* the next match to play (rounds done carry their winners on) */
+  function tourNext() {
+    const T = TOUR;
+    for (let guard = 0; guard < 8; guard++) {
+      const R = T.rounds[T.r]; if (!R) return null;
+      const N2 = T.rounds[T.r + 1];
+      if (N2) R.forEach((x, k) => { if (x.w == null) return; const nm = N2[k >> 1]; if (k % 2 === 0) nm.a = x.w; else nm.b = x.w; });   // a winner moves on at once
+      const m = R.find(x => x.w == null);
+      if (m) return m;
+      if (!N2) { T.done = true; T.champ = R[0].w; return null; }
+      T.r++;
+    }
+    return null;
+  }
+  const isMine = e => !!e && (TOUR.online ? e.net === NP.me : !!e.me);
+  /* two CPUs: the higher level mostly wins, now and then not */
+  function tourSim(m) {
+    const T = TOUR, A2 = T.ents[m.a], B2 = T.ents[m.b];
+    const s = e => e.lvl * 1.1 + (HP_K[e.who] || 1) * 0.6 + Math.random() * 1.6;
+    m.w = s(A2) >= s(B2) ? m.a : m.b; m.sim = true;
+  }
+  function tourCfg(m) {
+    const T = TOUR, ea = T.ents[m.a], eb = T.ents[m.b];
+    const slot = e => e.cpu ? { who: e.who, ctl: "cpu", lvl: e.lvl } : T.online ? { who: e.who, net: e.net, em: e.em, name: e.name, r: e.r } : { who: e.who, ctl: "p1", em: e.em };
+    return { kind: "battle", tour: true, net: T.online, slots: [slot(ea), slot(eb)], teams: false, arena: T.arena < 0 ? randomArena() : T.arena, rule: "stock", goal: T.goal, time: 180, hp: 200 };
+  }
+  /* play (or settle) the next match */
+  function tourGo(watch) {
+    const T = TOUR, m = tourNext();
+    if (!m) { tourBracket(); return; }
+    const ea = T.ents[m.a], eb = T.ents[m.b];
+    if (ea.cpu && eb.cpu && !watch) { tourSim(m); tourAfter(); return; }
+    T.cur = m;
+    const cfg = tourCfg(m);
+    if (T.online) { Online.toAll({ t: "np.tm", T, cfg }, true); npBattle(cfg); }
+    else startBattle(cfg);
+  }
+  /* a match is over: its winner on, then the bracket (and, online, to everyone) */
+  function tourBattleOver(B) {
+    const T = TOUR, m = T && T.cur; if (!T || !m) { mode = "results"; return; }
+    let w = B.winner;
+    if (w == null) { const [fa, fb] = B.fs; w = fa.lives * 1000 + fa.hp > fb.lives * 1000 + fb.hp ? 0 : 1; }
+    if (!T.online || NP.host) { m.w = w === 0 ? m.a : m.b; T.cur = null; }
+    endBattle();
+    tourAfter();
+  }
+  function tourAfter() {
+    const T = TOUR;
+    tourNext();
+    if (T.online && NP.host) Online.toAll({ t: "np.tour", T }, true);
+    tourBracket();
+  }
+  /* your tournament, once you're out or it's over: the record */
+  function tourRecord() {
+    const T = TOUR; if (!T || T.recd || !root.Auth || !Auth.user) return null;
+    const mine = T.ents.findIndex(isMine); if (mine < 0) return null;
+    const out = T.rounds.some(R => R.some(m => m.w != null && (m.a === mine || m.b === mine) && m.w !== mine));
+    if (!out && !T.done) return null;
+    T.recd = true;
+    const wins = T.rounds.reduce((n, R) => n + R.filter(m => m.w === mine).length, 0);
+    return Auth.record({ kind: "tourney", rounds: wins, champ: T.champ === mine, online: T.online });
+  }
+  /* the bracket */
+  function tourBracket() {
+    const T = TOUR; if (!T) { mainMenu(); return; }
+    const ov = screenOn("tourney");
+    if (!world || world.def.arena) ensureStageWorld();
+    const next = tourNext(), rec = tourRecord();
+    const mine = T.ents.findIndex(isMine);
+    const canRun = !T.online || NP.host;
+    const ent = (i, m) => {
+      if (i == null) return `<div class="tr-e tbd"><span>-</span></div>`;
+      const e = T.ents[i], lost = m.w != null && m.w !== i, won = m.w === i;
+      return `<div class="tr-e ${lost ? "lost" : ""} ${won ? "won" : ""} ${i === mine ? "me" : ""}"><canvas width="32" height="29" data-face="${esc(e.who)}"></canvas><span>${esc(e.name)}${e.cpu ? "" : `<i>${T.online ? "Player" : "You"}</i>`}</span>${won ? ico("check") : ""}</div>`;
+    };
+    const champ = T.done ? T.ents[T.champ] : null;
+    ov.innerHTML = `
+      <div class="ao-page pop tr-page">
+        <div class="ao-head">
+          <button class="btn ghost" data-quit data-back>${ico("back")}${T.online ? "Leave the room" : "Quit"}</button>
+          <h2>${ico("crown")}Tournament · ${T.size}</h2>
+          <span class="ao-net">${T.done ? "Over" : esc(ROUND_N(T.size, T.r))} · ${T.goal} ${T.goal === 1 ? "life" : "lives"} a match</span>
+        </div>
+        <div class="panel tr-wrap"><div class="tr-bracket">${T.rounds.map((R, r) => `
+          <div class="tr-col"><h4>${esc(ROUND_N(T.size, r))}</h4><div class="tr-ms">${R.map(m => `<div class="tr-m ${m === next ? "cur" : ""} ${m.sim ? "sim" : ""}">${ent(m.a, m)}${ent(m.b, m)}</div>`).join("")}</div></div>`).join("")}
+          <div class="tr-col tr-champ"><h4>Champion</h4><div class="tr-ms">${champ ? `<div class="tr-m won"><canvas width="66" height="54" data-face="${esc(champ.who)}"></canvas><b>${esc(champ.name)}</b></div>` : `<div class="tr-m tbd">${ico("crown")}</div>`}</div></div>
+        </div></div>
+        <div class="panel tr-bar">
+          ${T.done ? `<p class="tr-msg">${ico("crown")}${isMine(champ) ? "You win the tournament!" : `<b>${esc(champ.name)}</b> wins the tournament${champ.cpu ? "." : "!"}`}${rec ? ` +${rec.xp} XP` : ""}</p>
+              <div class="adv-btns">${T.online ? `<button class="btn" data-room data-focus>${ico("back")}Back to the room</button>` : `<button class="btn" data-again data-focus>${ico("flag")}New tournament</button><button class="btn ghost" data-menu>Main menu</button>`}</div>`
+            : next ? (() => {
+              const a = T.ents[next.a], b = T.ents[next.b], cpuOnly = a.cpu && b.cpu, inIt = isMine(a) || isMine(b);
+              return `<p class="tr-msg">${esc(ROUND_N(T.size, T.r))}: <b>${esc(a.name)}</b> vs <b>${esc(b.name)}</b>${cpuOnly ? " (CPUs)" : ""}${rec ? ` · you're out: +${rec.xp} XP` : ""}</p>
+                <div class="adv-btns">${canRun ? `<button class="btn lg" data-go data-focus>${ico(inIt ? "flag" : "next")}${inIt ? "Play your match" : cpuOnly ? "Settle it" : "Start the match"}</button>
+                  ${cpuOnly ? `<button class="btn ghost" data-watch>${ico("eye")}Watch it</button><button class="btn ghost" data-skip>Settle every CPU match</button>` : ""}` : `<p class="adv-note">Waiting for the host…</p>`}</div>`;
+            })() : ""}
+        </div>
+      </div>`;
+    ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 1));
+    const q = s => ov.querySelector(s);
+    q("[data-quit]").onclick = () => {
+      if (T.online) { if (root.Online) Online.leave(); return; }
+      if (T.done) { TOUR = null; mainMenu(); return; }
+      if (root.AdventureOnline) AdventureOnline.modal({ title: "Quit the tournament?", icon: "door", body: `<p class="adv-note">The bracket is lost.</p>`, buttons: [["Quit", () => { TOUR = null; mainMenu(); }, ""], ["Stay", null, "ghost"]] });
+      else { TOUR = null; mainMenu(); }
+    };
+    if (q("[data-go]")) q("[data-go]").onclick = () => tourGo(false);
+    if (q("[data-watch]")) q("[data-watch]").onclick = () => tourGo(true);
+    if (q("[data-skip]")) q("[data-skip]").onclick = () => {
+      for (let n = tourNext(); n && T.ents[n.a].cpu && T.ents[n.b].cpu; n = tourNext()) tourSim(n);
+      tourAfter();
+    };
+    if (q("[data-again]")) q("[data-again]").onclick = () => tourSetup();
+    if (q("[data-menu]")) q("[data-menu]").onclick = () => { TOUR = null; mainMenu(); };
+    if (q("[data-room]")) q("[data-room]").onclick = () => npBackToRoom();
+    const cur = ov.querySelector(".tr-m.cur"); if (cur) cur.scrollIntoView({ block: "nearest", inline: "center" });
+    autoFocus();
+  }
+  /* the offline tournament's setup */
+  let tourSet = null;
+  function tourSetup() {
+    tourSet = tourSet || { size: 8, lvl: 1, goal: 2, arena: -1 };
+    const ov = screenOn("tourney"), t = tourSet, zs = stages();
+    const segs = (k, opts) => `<div class="seg adv-seg">${opts.map(([v, l]) => `<button data-t="${k}" data-v="${v}" class="${String(t[k]) === String(v) ? "sel" : ""}">${l}</button>`).join("")}</div>`;
+    ov.innerHTML = `
+      <div class="adv-menu pop">
+        <div class="panel adv-panel">
+          <div class="panel-hd">${ico("crown")}Tournament</div>
+          <p class="adv-note">A knock-out bracket: you and CPUs, one battle a match, the winner on to the next round.</p>
+          <div class="setrow"><div class="setlab"><b>Places</b></div>${segs("size", [[8, "8"], [16, "16"]])}</div>
+          <div class="setrow"><div class="setlab"><b>CPUs</b><i>Around this level, a little either side.</i></div>${segs("lvl", [[0, "Easy"], [1, "Normal"], [2, "Hard"]])}</div>
+          <div class="setrow"><div class="setlab"><b>Lives a match</b></div>${segs("goal", [[1, "1"], [2, "2"], [3, "3"]])}</div>
+          <div class="setrow"><div class="setlab"><b>Arena</b></div><div class="adv-pick"><button class="adv-arr" data-ar="-1">${ico("back")}</button><b>${t.arena < 0 ? "A new one every match" : esc(zs[t.arena].name)}</b><button class="adv-arr" data-ar="1">${ico("next")}</button></div></div>
+          <div class="setrow"><div class="setlab"><b>Your fighter</b></div><div class="adv-pick"><button class="adv-arr" data-pk="-1">${ico("back")}</button><canvas width="44" height="40" data-face="${castId}"></canvas><b>${esc(castOf(castId).name)}</b><button class="adv-arr" data-pk="1">${ico("next")}</button></div></div>
+          <div class="adv-go">
+            <button class="btn lg" data-go data-focus data-enter>${ico("flag")}Start the tournament</button>
+            <button class="btn ghost" data-back>${ico("back")}Main menu</button>
+          </div>
+        </div>
+      </div>`;
+    ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 1));
+    ov.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { t[b.dataset.t] = +b.dataset.v; tourSetup(); });
+    ov.querySelectorAll("[data-ar]").forEach(b => b.onclick = () => { const n = zs.length + 1; t.arena = ((t.arena + 1 + (+b.dataset.ar)) % n + n) % n - 1; tourSetup(); });
+    ov.querySelectorAll("[data-pk]").forEach(b => b.onclick = () => { const i = CAST.findIndex(c => c.id === castId); castId = CAST[(i + (+b.dataset.pk) + CAST.length) % CAST.length].id; saveData.cast = castId; save(saveData); tourSetup(); });
+    ov.querySelector("[data-go]").onclick = () => {
+      TOUR = tourMake({ size: t.size, lvl: t.lvl, goal: t.goal, arena: t.arena, online: false, humans: [{ name: root.Auth && Auth.user ? Auth.name : "You", who: castId, me: true }] });
+      tourBracket();
+    };
+    ov.querySelector("[data-back]").onclick = () => mainMenu();
+    autoFocus();
+  }
+
   // ---------------------------------------------------------------- open / close
   function open(el, opts) {
     close();
@@ -8245,11 +9110,36 @@
     el.innerHTML = `<div class="adv"><div class="adv-3d"></div><div class="adv-hud"></div><div class="adv-ov"></div></div>`;
     host = el.querySelector(".adv");
     host.addEventListener("pointerdown", () => { kbUsed = false; if (kbFocus) kbFocus.classList.remove("kb"); kbFocus = null; });
+    if (root.AdventureOnline) { AdventureOnline.init(onlineApi()); AdventureOnline.resume(); }
     load3d(stageIdx);
     title(); music();
     addEventListener("keydown", kd); addEventListener("keyup", ku);
     raf = requestAnimationFrame(frame);
     return true;
+  }
+  /* what adventure-online.js may use */
+  function onlineApi() {
+    return {
+      host: () => host, screen: m => screenOn(m), mainMenu: () => mainMenu(), title: () => title(), ico, autoFocus: () => autoFocus(), where: () => mode,
+      paintAll: el => el.querySelectorAll("canvas[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 1)),
+      cast: () => CAST.map(c => ({ id: c.id, name: c.name })), castName: id => id === "random" ? "Random" : (CAST.find(c => c.id === id) || { name: String(id) }).name,
+      validWho: w => w === "random" || CAST.some(c => c.id === w) ? w : "sonic",
+      castId: () => castId, setCast: id => { if (!CAST.some(c => c.id === id)) return; castId = id; if (saveData) { saveData.cast = id; save(saveData); } },
+      emerlLoadout: () => (saveData && saveData.emerl && saveData.emerl.loadout) || null,
+      zones: () => stages().map((z, i) => ({ i, id: z.id, name: z.name })),
+      eps: () => EPS().map(e => ({ who: e.who, name: castOf(e.who).name, title: e.title, chapters: e.chapters.map(c => c.title) })),
+      epDone: who => epDone(who),
+      onLogin: id => {
+        saveData = loadAcct(id);
+        castId = CAST.some(c => c.id === saveData.cast) ? saveData.cast : "sonic";
+        const list = stages(); stageIdx = 0;
+        for (let i = list.length - 1; i >= 0; i--) if (unlocked(i)) { stageIdx = i; break; }
+        if (cleared(stageIdx) && stageIdx + 1 < list.length && unlocked(stageIdx + 1)) stageIdx++;
+        actIdx = firstAct(stageIdx);
+      },
+      onLogout: () => { npStop(); TOUR = null; saveData = load(); title(); },
+      np: { start: npStart, plan: npPlan, hostGot: npHostGot, guestGot: npGuestGot, stop: npStop, memberLeft: npMemberLeft, active: () => NP.on, chatLine: npChatLine },
+    };
   }
   function exit() {
     const cb = opts0 && opts0.onExit;
@@ -8273,7 +9163,7 @@
   root.Adventure = { ok: true, open, close, CAST, THEMES,
     _debug: { get world() { return world; }, get player() { return player; }, step: (s, n) => { for (let k = 0; k < (n || 1); k++) { readInput(); step(s); worldStep(s); input.jp = input.zp = input.xp = input.cp = 0; } },
               play: (i, id, a) => { if (id) castId = id; if (i != null) stageIdx = i; actIdx = a || 0; play(); }, draw: dt => draw(dt || 1 / 60), input: INPUT0, keys, touch, parse,
-              get battle() { return battle; }, get punch() { return punch; }, get demo() { return demo; }, demoTick: (secs, h) => { for (let t = 0; t < secs && demo; t += h || 0.05) demoTick(h || 0.05); }, title, get mode() { return mode; }, get talk() { return talk; }, startBattle, mainMenu, storyMenu, storyEpisode, playChapter, battleSetup, get storyRun() { return storyRun; }, EPS,
+              get battle() { return battle; }, get punch() { return punch; }, get np() { return NP; }, get tour() { return TOUR; }, frame: t => frame(t), tourSetup, tourMake, tourBracket, tourGo, get demo() { return demo; }, demoTick: (secs, h) => { for (let t = 0; t < secs && demo; t += h || 0.05) demoTick(h || 0.05); }, title, get mode() { return mode; }, get talk() { return talk; }, startBattle, mainMenu, storyMenu, storyEpisode, playChapter, battleSetup, get storyRun() { return storyRun; }, EPS,
               trainingSetup, optionsScreen, arenaDef, emerlLearn, emerlSkills, emerlCast, get saveData() { return saveData; },
               bossWeak: () => world && world.boss && BRAIN[world.boss.key].weak(world.boss),
               get tut() { return TUT; }, tutorialStart, trainingMenu, tutLessons: () => tutLessons().map(l => l.id),
