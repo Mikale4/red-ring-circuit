@@ -3061,7 +3061,8 @@
       scene.add(w.snow);
     }
     shoeN = 0;
-    if (w.arena && def.boss && def.last && BSH && BOSS[def.boss]) w.boss = newBoss(def.boss, w);   // Eggman, waiting in his arena
+    if (w.arena && rivalAt(def)) w.rival = newRival(w);                                        // a story chapter's: one of the cast waiting instead
+    else if (w.arena && def.boss && def.last && BSH && BOSS[def.boss]) w.boss = newBoss(def.boss, w);   // Eggman, waiting in his arena
     return w;
   }
 
@@ -4716,6 +4717,7 @@
     const w = world, p = player;
     if (!(NP.on && !NP.host && battle)) stepLater(dt);                 // (an online guest's world only shows the host's)
     if (w.boss && (mode === "play" || mode === "goal")) stepBoss(dt);
+    if (w.rival && mode === "play") stepRival(dt);
     for (const q of w.plats) {
       const k = Math.sin(w.t * 0.9 + q.ph) * q.range;
       const nx = q.t === "M" ? q.x0 + k : q.x0, ny = q.t === "V" ? q.y0 + k : q.y0;
@@ -4966,7 +4968,7 @@
     if (stopT > 0 && p.state === "hurt" && p.sinceHit < 0.02) { p.spr.position.x += (Math.random() - 0.5) * 0.14; p.spr.position.y += (Math.random() - 0.5) * 0.06; }
     /* KO'd: down a while, then flickering, then gone (till they come back in from above) */
     const koGone = p.ko && battle && (p.koT < 0.12 || (p.koT < 1.1 && Math.sin(world.t * 38) > 0));
-    p.spr.visible = (!GLIDE[mode] || (mode === "title" && !!demo)) && !p.out && !koGone && !(p.hideT > 0) && !(p.inv > 0 && !p.dead && !p.ko && p.state !== "dash" && p.state !== "teleport" && !(p.sp && p.sp.shield) && Math.sin(world.t * 40) > 0.4);
+    p.spr.visible = (!GLIDE[mode] || (mode === "title" && !!demo) || (mode === "scene" && world.rival && world.rival.lock)) && !p.out && !koGone && !(p.hideT > 0) && !(p.inv > 0 && !p.dead && !p.ko && p.state !== "dash" && p.state !== "teleport" && !(p.sp && p.sp.shield) && Math.sin(world.t * 40) > 0.4);
   }
   /* The dust behind a rev: Sonic Advance's spray, looping faster and swelling as the rev
      builds (each tap of Space kicks it up), at the runner's heels, trailing away from them. */
@@ -5097,6 +5099,7 @@
       let tx = clamp(p.x + lead, halfW - 0.5, w.W - halfW + 0.5);
       w.viewHalfW = halfW;
       if (w.boss && w.boss.lock) tx = bossCamX(w.boss, halfW);           // a boss's arena: the camera holds on it
+      if (w.rival && w.rival.lock) tx = clamp((w.rival.x + p.x) / 2, w.rival.a0 + halfW - 1, w.rival.a1 - halfW + 1);   // a meeting: on the two of them
       let ty = clamp(p.y + 2.1, p.y < 3.5 ? 3.8 : 6.1, H - 3.2);             // lower when she is down in the water
       if (mode === "title" && demo) ty = p.y + 0.6 - demoBand(dt) * halfH;   // the demo's runner: in the open, between the logo and the strip
       if (D > CAM_D) ty = Math.max(ty, halfH - 3);
@@ -5129,6 +5132,7 @@
     sun.target.position.set(camX, camY - 2, 0);
     if (battle) placeTags();
     if (w.boss) drawBoss();
+    if (w.rival) drawRival();
     R.render(scene, camera);
   }
 
@@ -5863,7 +5867,7 @@
           if (battle) battleTick(h);
           else {
             readInput();
-            if (npHold()) { const I = INPUT0; I.L = I.R = I.U = I.D = I.J = I.Z = I.X = I.C = 0; I.jp = I.zp = I.xp = I.cp = 0; I.dash = 0; }   // (an online race: nobody moves till Go)
+            if (npHold() || rivalHold()) { const I = INPUT0; I.L = I.R = I.U = I.D = I.J = I.Z = I.X = I.C = 0; I.jp = I.zp = I.xp = I.cp = 0; I.dash = 0; }   // (an online race: nobody moves till Go)
             step(h); worldStep(h); input.jp = input.zp = input.xp = input.cp = 0; input.dash = 0;
           }
           acc -= h; n++;
@@ -7618,8 +7622,9 @@
   // ---------------------------------------------------------------- story
   /* The story: The Red Star Rings, told as an episode for each of the cast, the way Sonic
      Battle tells its story (adventure-story.js and its two parts). An episode is chapters, each a
-     scene of talk, then a stage to run (the story's own, or a zone's Act 1) or a battle to win as
-     the episode's own runner, then the talk after. Every episode is open from the start; in one,
+     scene of talk, then a stage to run (the story's own, or a zone's Act 1), a zone to go through
+     (its Act 1 and Act 2, and at the end its boss or one of the cast, and a fight) or a battle to
+     win, as the episode's own runner, then the talk after. Every episode is open from the start; in one,
      clearing a chapter opens the next, and a cleared one can be played again. In Emerl's, a
      battle won teaches him moves of the one he beat (a chapter's `teach`), and nowhere else. */
   const EPS = () => (root.AdventureStory && AdventureStory.EPISODES) || [];
@@ -7632,6 +7637,11 @@
   function chapterLine(ch) {
     const who = castOf(ch.who).name;
     if (ch.kind === "run") { const d = storyDef(ch); return `${who}: ${d.name}${d.actN ? " Act " + d.actN : ""}`; }
+    if (ch.kind === "zone") {
+      const z = stages()[stageAt(ch.zone)], with_ = (ch.allies || []).map(a => castOf(a).name);
+      return `${who}: ${z.name}, Acts 1 and 2, then ${ch.foes ? ch.foes.map(f => castOf(f.who).name).join(" & ") + (with_.length ? " (with " + with_.join(" & ") + ")" : "")
+        : "Eggman's " + (BOSS[z.boss] ? BOSS[z.boss].name : "robot")}`;
+    }
     const foes = ch.foes.map(f => castOf(f.who).name).join(" & "), with_ = (ch.allies || []).map(a => castOf(a).name);
     return `${[who].concat(with_).join(" & ")} against ${foes}, at ${stages()[stageAt(ch.arena)].name}`;
   }
@@ -7684,13 +7694,13 @@
             ${list.map((ch, i) => { const open = i <= done; return `
               <button class="adv-st ${i === next ? "on" : ""} ${open ? "" : "locked"}" data-ch="${i}" data-k="ch-${i}" ${open ? "" : "disabled"}>
                 <span class="adv-n">${i + 1}</span>
-                <canvas class="adv-st-who" width="36" height="38" data-face="${ch.kind === "battle" ? ch.foes[0].who : ch.who}"></canvas>
+                <canvas class="adv-st-who" width="36" height="38" data-face="${ch.foes ? ch.foes[0].who : ch.who}"></canvas>
                 <span class="adv-st-tx"><b>${esc(ch.title)}</b><i>${esc(chapterLine(ch))}</i></span>
-                <span class="adv-chk">${!open ? `${ico("lock")}Locked` : i < done ? `${ico("check")}Cleared` : ch.kind === "battle" ? "Battle" : "Stage"}</span>
+                <span class="adv-chk">${!open ? `${ico("lock")}Locked` : i < done ? `${ico("check")}Cleared` : ch.kind === "battle" ? "Battle" : ch.kind === "zone" ? "Zone" : "Stage"}</span>
               </button>`; }).join("")}
           </div>
           <div class="adv-go">
-            <button class="btn lg" id="advCont" data-enter data-focus data-k="cont">${ico("book")}${done >= list.length ? `Play chapter ${list.length} again` : done ? `Go on: chapter ${next + 1}` : "Begin the episode"}</button>
+            <button class="btn lg" id="advCont" data-enter data-focus data-k="cont">${ico("book")}${done >= list.length ? `Play chapter ${list.length} again` : done ? `Go on: chapter ${next + 1}${atLine(who, next)}` : "Begin the episode" + atLine(who, next)}</button>
             ${who === "emerl" ? `<button class="btn ghost" id="advEpSkill" data-k="skill">Emerl's Skills</button>` : ""}
             <button class="btn ghost" id="advSBack" data-back data-k="back">${ico("back")}Episodes</button>
           </div>
@@ -7708,6 +7718,7 @@
     const ep = epOf(who), ch = chOf(ep, i); if (!ch) return;
     endBattle();
     storyRun = { who, ep, i, ch };
+    if (ch.kind === "zone") { playZone(ch); return; }
     if (ch.kind === "run") { storyRun.def = storyDef(ch); loadDef(storyRun.def); glideX = 12; camX = 15; }
     else { disposeWorld(); world = buildWorld(arenaDef(stageAt(ch.arena))); player = makePlayer(castOf(ch.who)); glideX = world.W / 2; snapCamera(); }
     music();
@@ -7716,25 +7727,116 @@
   function storyAction() {
     const ch = storyRun.ch;
     if (ch.kind === "run") { play(); return; }
+    storyFight(ch);
+  }
+  /* a chapter's battle: in its arena (a zone chapter's, that zone's) */
+  function storyFight(ch) {
     const slots = [{ who: ch.who, ctl: "p1", team: 0 }].concat((ch.allies || []).map(a => ({ who: a, ctl: "cpu", lvl: 1, team: 0 })),
                   ch.foes.map(f => ({ who: f.who, ctl: "cpu", lvl: f.lvl == null ? 1 : f.lvl, team: 1 })));
-    startBattle({ kind: "story", slots, teams: true, arena: stageAt(ch.arena), rule: "stock", goal: 1, time: 0, hp: 300 });
+    startBattle({ kind: "story", slots, teams: true, arena: stageAt(ch.arena || ch.zone), rule: "stock", goal: 1, time: 0, hp: 300 });
   }
   /* a run's stage: one of the story's own, or a zone's first Act (no boss) */
   const storyDef = ch => storyStages().find(s => s.id === ch.stage) || actDef(stageAt(ch.stage), 0);
+  /* A zone chapter (`kind: "zone"`): the zone's Act 1, the talk between (`mid`), its Act 2 (its own
+     `beats2`), and at Act 2's end its boss -- Eggman's robot -- or, with `foes`, one of the cast
+     waiting in the boss's arena: the screen shuts as it does for a boss, they drop in, a word
+     (`meet`), and the stage gives way to the fight, in that zone's own arena. How far it got is
+     kept (`story.at`): with Act 1 cleared it goes on at Act 2; at the fight, at the fight. */
+  const isZone = ch => !!ch && ch.kind === "zone";
+  const rivalOf = ch => isZone(ch) && ch.foes && ch.foes.length ? ch.foes[0].who : null;
+  const storyAtOf = (who, i) => { const a = saveData.story && saveData.story.at; return a && a.who === who && a.i === i ? a.act : 0; };
+  const atLine = (who, i) => { const a = storyAtOf(who, i); return a >= 2 ? " (the fight)" : a >= 1 ? " (Act 2)" : ""; };
+  function zoneAct(a) {
+    const R = storyRun;
+    R.act = a; R.def = actDef(stageAt(R.ch.zone), a); R.said = {};
+    loadDef(R.def); glideX = 12; camX = 15;
+  }
+  function storyAt(act) {
+    const R = storyRun; if (!R || R.net) return;
+    saveData.story = saveData.story || {};
+    saveData.story.at = act ? { who: R.who, i: R.i, act } : null; save(saveData);
+  }
+  function playZone(ch) {
+    const R = storyRun, from = storyAtOf(R.who, R.i);
+    if (from >= 2 && rivalOf(ch)) { zoneAct(1); R.meetNow = true; music(); play(); return; }     // back at the fight
+    if (from >= 1) { zoneAct(1); music(); playScene(ch.mid, () => play()); return; }             // back at Act 2
+    zoneAct(0); music(); playScene(ch.before, () => play());
+  }
+  /* Act 1 cleared: the talk between, and on into Act 2 */
+  function zoneNext() {
+    storyAt(1);
+    zoneAct(1); music();
+    playScene(storyRun.ch.mid, () => play());
+  }
+  const rivalAt = def => !!(storyRun && rivalOf(storyRun.ch) && def && def.last && def.zone && def.zone.id === storyRun.ch.zone);
+  function newRival(w) {
+    const x0 = w.arena.x0, a0 = x0 + 11, a1 = a0 + BOSS_W;
+    return { who: rivalOf(storyRun.ch), C: { chase: false }, x0, a0, a1, camX: (a0 + a1) / 2, gy: w.arena.y, state: "wait", t: 0, lock: false,
+             x: a1 - 4, y: w.arena.y + 10, vy: 0, landed: false, card: null };
+  }
+  /* (while they drop in, nobody moves) */
+  const rivalHold = () => !!(world && world.rival && world.rival.state === "in" && mode === "play");
+  function stepRival(dt) {
+    const r = world.rival, p = player; if (!r || !p || battle) return;
+    if (r.state === "wait") {
+      if (storyRun && storyRun.meetNow) { storyRun.meetNow = false; p.x = r.a0 + 2.5; p.y = r.gy; p.vx = p.vy = 0; p.ground = true; snapCamera(); }
+      if (p.dead || p.x <= r.a0 + 1.5) return;
+      if (NP.on && NP.race) { r.state = "done"; finish(p); return; }       // story co-op: home here; the fight comes when everyone is
+      r.state = "in"; r.t = 0; r.lock = true; r.landed = false;
+      r.x = clamp(p.x + 5, r.a0 + 4, r.a1 - 3); r.y = r.gy + 10; r.vy = 0;
+      r.card = makeCard(r.who); world.group.add(r.card);
+      storyAt(2); SFX.bossIn(); hudToast(castOf(r.who).name);
+      return;
+    }
+    if (r.lock) { const L = r.a0 + 0.5, Rx = r.a1 - 0.5; if (p.x < L) { p.x = L; if (p.vx < 0) p.vx = 0; } if (p.x > Rx) { p.x = Rx; if (p.vx > 0) p.vx = 0; } }
+    if (r.state === "in") {
+      r.t += dt;
+      if (!r.landed) {
+        r.vy -= GRAV * dt; r.y += r.vy * dt;
+        if (r.y <= r.gy) { r.y = r.gy; r.landed = true; shakeCam(0.12); SFX.impact(); burst(r.x, r.gy + 0.2, [0xd8d0c0, 0xffffff, 0xa8a090], 14, 5); }
+      }
+      if (r.landed && r.t > 1.1 && p.ground) { r.state = "talk"; rivalMeet(); }
+    }
+  }
+  function drawRival() {
+    const r = world.rival; if (!r || !r.card || battle) return;
+    const n = (framesOf(r.who, "idle") || [0]).length, c = castOf(r.who);
+    setFrame(r.card, "idle", Math.floor(world.t * 7) % n, player && player.x < r.x ? -1 : 1, r.x, r.y + (c.lift && r.landed ? c.lift : 0));
+  }
+  /* face to face: the camera holds on the arena through the talk; then VS, and the fight */
+  function rivalMeet() {
+    const r = world.rival, p = player;
+    p.face = r.x > p.x ? 1 : -1; p.vx = 0; p.state = "run";
+    glideX = r.camX - 3; camX = r.camX;
+    playScene(storyRun.ch.meet, () => rivalVs());
+  }
+  function rivalVs() {
+    const R = storyRun, ch = R.ch;
+    showVs(ch, () => { if (storyRun === R && mode === "scene") storyFight(ch); });
+  }
+  /* the VS card: the hero and the one they meet, a moment, then on (`then`) */
+  function showVs(ch, then) {
+    const ov = screenOn("scene");
+    ov.innerHTML = `<div class="adv-vs"><canvas width="176" height="144" data-face="${ch.who}"></canvas><b>VS</b><canvas width="176" height="144" data-face="${ch.foes[0].who}"></canvas></div>`;
+    ov.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 2));
+    SFX.dash();
+    setTimeout(then, 1150);
+  }
   /* A word from someone mid-run: a chapter's `beats` are [how far along (0 to 1), who, words];
      each comes once a run, in a speech box up top, while the running goes on. */
   function storyBeats(dt) {
-    const R = storyRun; if (!R || !R.ch.beats || !world || !world.goal || paused || mode !== "play") return;
+    const R = storyRun, BT = R && (R.act === 1 ? R.ch.beats2 : R.ch.beats);
+    const end = world && (world.goal ? world.goal.x : world.arena ? world.arena.x0 + 11 : 0);
+    if (!R || !BT || !world || !end || paused || mode !== "play") return;
     const el = host.querySelector(".adv-comm"); if (!el) return;
     R.said = R.said || {};
     R.commT = Math.max(0, (R.commT || 0) - dt);
     if (R.commT <= 0) el.classList.remove("on");
     if (R.commT > 0.4 || world.t < 2.4) return;
-    const at = player.x / world.goal.x;
-    const k = R.ch.beats.findIndex((b, n) => !R.said[n] && at >= b[0]);
+    const at = player.x / end;
+    const k = BT.findIndex((b, n) => !R.said[n] && at >= b[0]);
     if (k < 0) return;
-    const [, who, text] = R.ch.beats[k];
+    const [, who, text] = BT[k];
     R.said[k] = true;
     paintCard(el.querySelector("canvas"), who);
     el.style.setProperty("--tc", "#" + (HIT_C[who] || 0x4a9dff).toString(16).padStart(6, "0"));
@@ -7780,7 +7882,9 @@
     const R = storyRun, ep = R.ep, i = R.i;
     saveData.story = saveData.story || {};
     const eps = saveData.story.eps = saveData.story.eps || {};
-    eps[R.who] = Math.max(eps[R.who] || 0, i + 1); saveData.story.last = R.who; save(saveData);
+    eps[R.who] = Math.max(eps[R.who] || 0, i + 1); saveData.story.last = R.who;
+    if (saveData.story.at && saveData.story.at.who === R.who && saveData.story.at.i === i) saveData.story.at = null;
+    save(saveData);
     const n = ep.chapters.length, next = i + 1 < n ? i + 1 : -1, nch = next >= 0 ? chOf(ep, next) : null, all = epsCleared();
     const ov = screenOn("story");
     const skills = !R.got ? "" : R.got.length ? R.got.map(g => `
@@ -8045,6 +8149,7 @@
   /* the camera goes along the stage's low road on its own; nobody is there to see */
   function titleGlide(dt) {
     const p = player, w = world;
+    if (w.rival && w.rival.lock) return;                 // (a meeting at an Act's end: everyone stays put through the talk)
     if (w.def.arena) glideX = w.W / 2 + Math.sin(w.t * 0.22) * (w.W / 2 - 12);         // an arena: to and fro across it
     else {
       glideX += dt * 4.2;
@@ -8292,7 +8397,7 @@
       </div>
       <div class="adv-toast"></div>
       <div class="adv-name"><b>${esc(st.name)}</b>${st.actN ? `<em class="num">Act ${st.actN}</em>` : ""}<i>${esc(st.sub)}</i></div>
-      ${storyRun && storyRun.ch.beats ? `<div class="adv-comm"><canvas width="88" height="72"></canvas><div><b></b><span></span></div></div>` : ""}
+      ${storyRun && (storyRun.ch.beats || storyRun.ch.beats2) ? `<div class="adv-comm"><canvas width="88" height="72"></canvas><div><b></b><span></span></div></div>` : ""}
       ${TOUCH ? padHtml() : ""}`;
     hudEl.querySelector(".adv-pause").onclick = () => togglePause();
     wirePad(hudEl);
@@ -8368,7 +8473,8 @@
         </div>
         ${r.earned && root.Stable ? `<div class="adv-pay">${ico("carrot")}<b class="num">+${r.earned}</b> carrots to your stable</div>` : ""}
         <div class="adv-btns">
-          ${storyRun ? `<button class="btn" id="advSCont" data-focus>${ico("book")}Go on with the story</button>`
+          ${storyRun ? (isZone(storyRun.ch) && storyRun.act === 0 ? `<button class="btn" id="advSAct" data-focus>${ico("next")}Go on: Act 2</button>`
+            : `<button class="btn" id="advSCont" data-focus>${ico("book")}Go on with the story</button>`)
             : next >= 0 ? `<button class="btn" id="advNext">${ico("next")}Next: ${esc(list[next].name)} Act ${nextAct + 1}</button>` : `<button class="btn" id="advMenu">${ico("flag")}All thirteen zones cleared</button>`}
           <button class="btn ghost" id="advAgain">Run it again</button>
           <button class="btn ghost" id="advSel" data-back>${ico("back")}${storyRun ? "Story" : "Stage select"}</button>
@@ -8381,6 +8487,7 @@
     go("#advAgain").onclick = () => play();
     go("#advSel").onclick = () => { if (storyRun) { storyMenu(); return; } if (next >= 0) { stageIdx = next; actIdx = nextAct; } load3d(stageIdx); menu(); };
     if (go("#advSCont")) go("#advSCont").onclick = () => storyAfter();
+    if (go("#advSAct")) go("#advSAct").onclick = () => zoneNext();
   }
 
   // ---------------------------------------------------------------- online: netplay
@@ -8708,7 +8815,7 @@
   function npRace(plan, story) {
     const meM = plan.mem.find(m => m.id === NP.me) || plan.mem[0];
     NP.who = story && NP.host ? story.ch.who : meM.who; NP.em = meM.em;
-    NP.def = story ? storyDef(story.ch) : actDef(plan.zone, 0);
+    NP.def = story ? (story.ch.kind === "zone" ? actDef(stageAt(story.ch.zone), story.act || 0) : storyDef(story.ch)) : actDef(plan.zone, 0);
     NP.race = { fin: new Map(), go: false, count: 0, story, mine: null, done: false, timer: null, said: -1 };
     play();
     world.played = true; world.t = 0;
@@ -8818,7 +8925,7 @@
   function npRaceResults(res) {
     const R = NP.race; if (!R) return;
     R.done = true; clearTimeout(R.timer);
-    if (R.story) { npStoryAfter(true); return; }
+    if (R.story) { npStoryRaced(R.story); return; }
     mode = "results"; bgm("competition-results");
     host.querySelector(".adv-hud").classList.remove("on");
     const place = res.findIndex(r => r.id === NP.me), won = place === 0 && res[0].time != null;
@@ -8842,41 +8949,62 @@
     NP.story = { plan, ep, ch, ok: new Set(), stage: "before" };
     storyRun = { who: ep.who, ep, i: plan.ch, ch, net: true };
     if (ch.kind === "run") { storyRun.def = storyDef(ch); loadDef(storyRun.def); glideX = 12; camX = 15; }
+    else if (ch.kind === "zone") { NP.story.act = storyRun.act = 0; storyRun.def = actDef(stageAt(ch.zone), 0); loadDef(storyRun.def); glideX = 12; camX = 15; }
     else { disposeWorld(); world = buildWorld(arenaDef(stageAt(ch.arena))); player = makePlayer(castOf(ch.who)); glideX = world.W / 2; snapCamera(); }
     music();
     playScene(ch.before, () => npStoryOk());
   }
+  const NP_GATE = { before: 1, mid: 1, meet: 1 };            // (the talk everyone sees before the story goes on)
   function npStoryOk() {
-    const S = NP.story; if (!S || S.stage !== "before") return;
+    const S = NP.story; if (!S || !NP_GATE[S.stage]) return;
     if (NP.host) { S.ok.add(NP.me); npStoryCheck(); } else Online.toHost({ t: "np.ok" });
-    if (S.stage === "before") {
+    if (NP_GATE[S.stage]) {
       const ov = screenOn("scene");
       ov.innerHTML = `<div class="panel adv-small pop ao-wait"><div class="ao-spin"></div><p>Waiting for the others to finish the scene…</p></div>`;
     }
   }
   function npStoryCheck() {
-    const S = NP.story; if (!S || S.stage !== "before" || !NP.host) return;
+    const S = NP.story; if (!S || !NP_GATE[S.stage] || !NP.host) return;
     const here = NP.plan.mem.filter(m => NP.room.members.some(x => x.id === m.id));
-    if (!here.every(m => S.ok.has(m.id))) { if (!S.timer) S.timer = setTimeout(() => { if (NP.story === S && S.stage === "before") { here.forEach(m => S.ok.add(m.id)); npStoryCheck(); } }, 40000); return; }
-    clearTimeout(S.timer);
+    if (!here.every(m => S.ok.has(m.id))) { if (!S.timer) S.timer = setTimeout(() => { S.timer = null; if (NP.story === S && NP_GATE[S.stage]) { here.forEach(m => S.ok.add(m.id)); npStoryCheck(); } }, 40000); return; }
+    clearTimeout(S.timer); S.timer = null;
     const ch = S.ch, d = { t: "np.sgo" };
-    if (ch.kind === "battle") {
+    if (ch.kind === "battle" || S.stage === "meet") {
       const P = NP.plan, slots = [];
       slots.push({ who: ch.who, net: P.hero, name: (P.mem.find(m => m.id === P.hero) || {}).name, team: 0 });
       for (const m of P.mem) if (m.id !== P.hero && NP.room.members.some(x => x.id === m.id) && slots.length < 4 - ch.foes.length) slots.push({ who: m.who, net: m.id, em: m.em, name: m.name, team: 0 });
       for (const a of ch.allies || []) if (slots.length < 4 - ch.foes.length) slots.push({ who: a, ctl: "cpu", lvl: 1, team: 0 });
       for (const f of ch.foes) if (slots.length < 4) slots.push({ who: f.who, ctl: "cpu", lvl: f.lvl == null ? 1 : f.lvl, team: 1 });
-      d.cfg = { kind: "battle", net: true, story: true, slots, teams: true, arena: stageAt(ch.arena), rule: "stock", goal: 1, time: 0, hp: 300 };
-    } else d.run = 1;
+      d.cfg = { kind: "battle", net: true, story: true, slots, teams: true, arena: stageAt(ch.arena || ch.zone), rule: "stock", goal: 1, time: 0, hp: 300 };
+    } else { d.run = 1; if (ch.kind === "zone") d.act = S.stage === "mid" ? 1 : 0; }
     Online.toAll(d, true); npStoryGo(d);
   }
   function npStoryGo(d) {
     const S = NP.story; if (!S) return;
-    S.stage = "action";
-    if (d.cfg) npBattle(d.cfg);
-    else npRace(NP.plan, S);
+    const vs = d.cfg && S.stage === "meet";
+    S.stage = "action"; S.ok = new Set();
+    if (vs) showVs(S.ch, () => { if (NP.story === S && NP.on) npBattle(d.cfg); });   // (the meeting at an Act's end: VS, then the fight)
+    else if (d.cfg) npBattle(d.cfg);
+    else { if (d.act != null) S.act = storyRun.act = d.act; npRace(NP.plan, S); }
   }
   function npStoryBattleOver(B) { npStoryAfter(B.winner === 0); }
+  /* everyone home: a zone chapter goes on -- the talk between and Act 2; at Act 2's end, the one
+     waiting there (they drop in, the talk, and the fight) -- or it is over */
+  function npStoryRaced(S) {
+    if (isZone(S.ch) && !(S.act > 0)) return npStoryGate("mid", S.ch.mid);
+    if (rivalOf(S.ch)) {
+      const r = world && world.rival;
+      if (r && !r.card) { r.card = makeCard(r.who); world.group.add(r.card); r.x = r.a1 - 4; r.y = r.gy; r.landed = true; r.lock = true; glideX = r.camX - 3; camX = r.camX; }
+      return npStoryGate("meet", S.ch.meet);
+    }
+    npStoryAfter(true);
+  }
+  function npStoryGate(stage, lines) {
+    const S = NP.story; if (!S) return;
+    S.stage = stage; S.ok = new Set();
+    host.querySelector(".adv-hud").classList.remove("on");
+    playScene(lines, () => npStoryOk());
+  }
   /* the scene after (a win), the chapter cleared for everyone who was there, and back to the room */
   function npStoryAfter(won) {
     const S = NP.story; if (!S) return;

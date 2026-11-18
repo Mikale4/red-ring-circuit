@@ -10,7 +10,7 @@
   // ==================================================================== Rouge
   S.EPISODES.push({ who: "rouge", title: "Jewel Thief", blurb: "The world's greatest treasure hunter takes a government job: find out who's buying up the rings. Keeping a few is just a bonus.",
   chapters: [
-    { title: "Night Shift", kind: "run", stage: "club",
+    { title: "Night Shift", kind: "zone", zone: "club",
       before: [
         [N, "The city's club street, after dark. Rouge leans on the bar of her own club, reading a message from her employers."],
         ["rouge", "\"Red Star Rings falling all over the world. Someone is collecting them. Find out who.\" Hmm. Treasure AND a paycheck? Don't mind if I do."],
@@ -26,7 +26,7 @@
         ["rouge", "The tracks lead north, up the mountain. Guardian Peak. Knuckles' mountain."],
         ["rouge", "Oh, he's going to be SO happy to see me."],
       ] },
-    { title: "Summit Heist", kind: "run", stage: "peak",
+    { title: "Finders Keepers", kind: "zone", zone: "peak", foes: [{ who: "knuckles", lvl: 1 }],
       before: [
         [N, "Guardian Peak, in the afternoon. On the lower slopes, Knuckles and Sonic are busy hitting each other, while Eggman's badniks slip past them up the mountain."],
         ["rouge", "Boys. Always fighting over the wrong thing. While they're busy, I'll take a look at the top shrine myself."],
@@ -36,13 +36,13 @@
         [0.6, "eggman", "Rouge?! What is SHE doing here? Badniks, those rings are mine!"],
         [0.92, "rouge", "The top shrine. And look at that: seven of them. Nobody will miss just one."],
       ],
-      after: [
-        [N, "Rouge lifts one ring from the shrine. It's warm, and it hums. Then a shadow falls over her."],
+      mid: [
+        [N, "Rouge lifts one ring from the shrine. It's warm, and it hums. Then, from far down the mountain, an angry shout."],
+        ["rouge", "Knuckles. He must be done with Sonic. Time to find the rest of these before he finds me."],
+      ],
+      meet: [
         ["knuckles", "ROUGE! Put that back!"],
         ["rouge", "Knuckles! Done fighting Sonic already? You must be exhausted, sweetie. Sit down. Rest."],
-      ] },
-    { title: "Finders Keepers", kind: "battle", arena: "peak", foes: [{ who: "knuckles", lvl: 1 }],
-      before: [
         ["knuckles", "My people have guarded those rings for a thousand years!"],
         ["rouge", "And they've done a lovely job. Now it's my turn."],
       ],
@@ -79,9 +79,13 @@
         ["rouge", "And I'm a treasure hunter. Not a heartless one."],
         [N, "Her communicator beeps. A ring has turned up at Petal Hall Museum, on display, and so have a lot of Eggman's badniks."],
       ] },
-    { title: "Museum Piece", kind: "battle", arena: "museum", foes: [{ who: "cream", lvl: 1 }],
+    { title: "Museum Piece", kind: "zone", zone: "museum", foes: [{ who: "cream", lvl: 1 }],
       before: [
-        [N, "Petal Hall Museum. The badniks are scrap already. A little rabbit and her Chao are standing guard over the ring's display case."],
+        [N, "Petal Hall Museum, after hours: marble floors, dinosaur skeletons, and a lot of Eggman's badniks between Rouge and one little ring on display."],
+        ["rouge", "A museum job. Now this is my kind of night."],
+      ],
+      meet: [
+        [N, "At the ring's display case, the badniks are scrap already. A little rabbit and her Chao are standing guard over it."],
         ["cream", "Excuse me, miss. Please don't take the star ring. The robots wanted it too."],
         ["rouge", "Lady. I like this kid. Now, sweetie, be a dear and step aside."],
         ["cream", "I'm sorry, miss, but I can't. Cheese! Let's do our best!"],
@@ -94,7 +98,7 @@
         [N, "As the last badnik flees, Rouge flicks a tiny tracker onto its back."],
         ["rouge", "Run home to Daddy Eggman, little robot. I'll be right behind you."],
       ] },
-    { title: "Tailing the Convoy", kind: "run", stage: "expressway",
+    { title: "Tailing the Convoy", kind: "zone", zone: "expressway",
       before: [
         [N, "The tracker leads out of the city to the expressway, where Eggman's trucks are gathering into a convoy."],
         ["rouge", "Every ring Eggman's dug up, heading the same way. Under the mountains, I'd bet."],
@@ -156,12 +160,18 @@
         [0.9, "shadow", "The lead truck. I'll stop it here."],
       ],
       after: [
-        [N, "The trucks lie stopped across the road. But the blue runner at the head of the convoy is gone, and the crates with it."],
+        [N, "The trucks lie stopped across the road. But the blue runner at the head of the convoy is gone, and the crates with it: away down the expressway, toward the sunset."],
+        ["shadow", "Sonic. ...Or something that runs like him. Either way, it won't get far."],
+      ] },
+    { title: "Prove It", kind: "zone", zone: "expressway", foes: [{ who: "sonic", lvl: 1 }],
+      before: [
+        [N, "Sundown Expressway, the road out of the city: barriers, ramps, a broken bridge, and a blue streak far ahead."],
+        ["shadow", "Running from me only makes it worse."],
+      ],
+      meet: [
+        [N, "At the end of the road, a blue hedgehog is waiting, leaning on a barrier."],
         ["sonic", "Hey, Shadow! You seen a bunch of red rings come through here?"],
         ["shadow", "I saw you. Running at the head of Eggman's convoy."],
-      ] },
-    { title: "Prove It", kind: "battle", arena: "expressway", foes: [{ who: "sonic", lvl: 1 }],
-      before: [
         ["sonic", "Wasn't me. I've been up a mountain all afternoon."],
         ["shadow", "Then prove it."],
         ["sonic", "Fine! You always do this the hard way."],
@@ -172,7 +182,7 @@
         ["sonic", "Faster than me? Now I'm offended."],
         ["shadow", "It was a machine. Metal Sonic. And it was heading for Redstone Canyon."],
       ] },
-    { title: "Redstone Trail", kind: "run", stage: "canyon",
+    { title: "Questions First", kind: "zone", zone: "canyon", foes: [{ who: "silver", lvl: 1 }],
       before: [
         [N, "Redstone Canyon. Scorch marks from Metal Sonic's jets run along the cliffs, and Eggman's blasting has shaken the whole canyon."],
         ["shadow", "It's leaving a trail a child could follow. It wants to be chased."],
@@ -182,13 +192,14 @@
         [0.6, "shadow", "Badniks. Placed to slow me down. Pointless."],
         [0.9, "shadow", "Someone's ahead. That isn't Metal."],
       ],
-      after: [
+      mid: [
+        [N, "High over the canyon, something glows cyan for a moment, and is gone."],
+        ["shadow", "...Someone else is here. Someone who doesn't belong in this time."],
+      ],
+      meet: [
         [N, "A silver hedgehog drops out of the air in front of Shadow, glowing cyan."],
         ["silver", "Shadow?! In this time... Are you working with the blue hedgehog? The one who brings the last ring?"],
         ["shadow", "Silver. You never did learn to ask your questions before throwing things."],
-      ] },
-    { title: "Questions First", kind: "battle", arena: "canyon", foes: [{ who: "silver", lvl: 1 }],
-      before: [
         ["silver", "I won't let my future happen. Not even if you're in the way!"],
         ["shadow", "Then show me how far you're willing to go."],
       ],
@@ -214,7 +225,7 @@
         ["shadow", "Choose well, Gizoid. The Doctor will want you to choose him."],
         [N, "His communicator crackles. It's Tails: Metal Sonic is on the launch track, taking the rings to Eggman's station."],
       ] },
-    { title: "Among the Stars", kind: "run", stage: "stars",
+    { title: "Imitation", kind: "zone", zone: "stars", foes: [{ who: "metal", lvl: 2 }],
       before: [
         [N, "Shadow doesn't take the track. A flash of Chaos Control, and he's already among the stars, on the girders below the Egg Orbital, where Metal Sonic must pass."],
         ["shadow", "I'll meet it at the top."],
@@ -224,12 +235,13 @@
         [0.6, "eggman", "Shadow?! How did he get up here?! Stop him!"],
         [0.9, "shadow", "There. The docking track."],
       ],
-      after: [
+      mid: [
+        [N, "Far ahead on the track, a silver-blue streak, with a case of rings under its arm."],
+        ["shadow", "There you are."],
+      ],
+      meet: [
         [N, "Metal Sonic lands on the track in front of him, with a case of rings, and turns. Its eyes burn red."],
         ["shadow", "A copy of Sonic. Built to beat the original. I wonder how you'll do against me."],
-      ] },
-    { title: "Imitation", kind: "battle", arena: "stars", foes: [{ who: "metal", lvl: 2 }],
-      before: [
         ["metal", "(Metal Sonic drops into a crouch. Its jet flares.)"],
         ["shadow", "Come, then."],
       ],
@@ -319,7 +331,7 @@
         ["rouge", "Fine, fine. Keep your little ring. I only wanted to know who's buying them, anyway."],
         ["cream", "Miss Amy, one of the robots got away with another ring. It flew off toward the forest, where the Chao live."],
       ] },
-    { title: "The Chao Garden", kind: "run", stage: "springs",
+    { title: "Mr. Chaos", kind: "zone", zone: "springs", foes: [{ who: "chaos", lvl: 0 }],
       before: [
         [N, "Moonwell Springs, in the forest, where the wild Chao live. Eggman's robots have set pumps in the pools, and the water is going down."],
         ["cream", "Cheese, they're draining the Chao's home! That's so mean!"],
@@ -329,13 +341,14 @@
         [0.6, "cream", "The pumps are up ahead. We have to turn them off!"],
         [0.92, "cream", "The biggest pool. That's where the ring must be."],
       ],
-      after: [
+      mid: [
+        [N, "The first of Eggman's pumps stops. But there are more of them further in, and the Chao are crying."],
+        ["cream", "Don't worry, little ones! Cheese and I will stop them all!"],
+      ],
+      meet: [
         [N, "The pumps stop. And out of the deepest pool rises a figure made of living water, its eyes glowing green."],
         ["cream", "Oh! Hello. Are you... Mr. Chaos? The one who looks after the Chao?"],
         [N, "Chaos doesn't answer. It has seen too many of Eggman's machines today, and it doesn't know this one yet."],
-      ] },
-    { title: "Mr. Chaos", kind: "battle", arena: "springs", foes: [{ who: "chaos", lvl: 0 }],
-      before: [
         ["cream", "We're not with Mr. Eggman! We're here to help!"],
         ["cream", "...It isn't listening, Cheese. We'll have to show it."],
       ],
@@ -345,9 +358,13 @@
         [N, "Chaos sinks back into the pool, with the ring still at the bottom of it. The Chao will be safe there."],
         ["cream", "Goodbye, Mr. Chaos! Take good care of them!"],
       ] },
-    { title: "A New Friend", kind: "battle", arena: "seabreeze", foes: [{ who: "emerl", lvl: 0 }],
+    { title: "A New Friend", kind: "zone", zone: "seabreeze", foes: [{ who: "emerl", lvl: 0 }],
       before: [
-        [N, "Seabreeze Cape, on the way home. A little machine is sitting on the cliffs, watching the sea."],
+        [N, "Seabreeze Cape, on the way home: sea wind, white cliffs, and robots still digging everywhere."],
+        ["cream", "Mr. Sonic said the cape was lovely. It would be, without all these robots!"],
+      ],
+      meet: [
+        [N, "At the top of the cliffs, a little machine is sitting all alone, watching the sea."],
         ["cream", "Hello! My name is Cream, and this is Cheese. What's your name?"],
         ["emerl", "...Emerl. Sonic said. Emerl."],
         ["cream", "That's a lovely name! Would you like to play with us?"],
@@ -361,7 +378,7 @@
         ["amy", "Cream! Come quick! Eggman's taken the rings to his base under the mountains, and I'm going in!"],
         ["cream", "I have to go, Emerl. Let's play again soon! Goodbye!"],
       ] },
-    { title: "Iron Hold", kind: "run", stage: "depot",
+    { title: "Please Let Her Go", kind: "zone", zone: "depot", foes: [{ who: "gamma", lvl: 1 }],
       before: [
         [N, "Iron Hold Depot, under the mountains. Amy went in an hour ago. She hasn't come out."],
         ["cream", "Miss Amy must be in trouble. Cheese, we have to find her!"],
@@ -371,14 +388,15 @@
         [0.6, "eggman", "Another one?! Are all of Sonic's friends this stubborn?"],
         [0.92, "cream", "I can hear her! She's behind that door!"],
       ],
-      after: [
+      mid: [
+        [N, "Through a grating, far below: a row of cells by the vault, and someone pink in one of them."],
+        ["cream", "Miss Amy! Hold on, we're coming!"],
+      ],
+      meet: [
         [N, "Amy is behind bars in a cell by the vault. A robot stands guard over her."],
         ["amy", "Cream?! What are you doing here? It's dangerous!"],
         ["gamma", "Unit Chaos Gamma. Another intruder. You will be detained."],
         ["cream", "Excuse me, Mr. Gamma. Please let Miss Amy go."],
-      ] },
-    { title: "Please Let Her Go", kind: "battle", arena: "depot", foes: [{ who: "gamma", lvl: 1 }],
-      before: [
         ["gamma", "Request denied. Assignment: guard the prisoner."],
         ["cream", "Then I'm sorry, Mr. Gamma. Cheese!"],
       ],
@@ -411,7 +429,7 @@
   // ==================================================================== Chaos
   S.EPISODES.push({ who: "chaos", title: "Still Water", blurb: "The spirit of the water never speaks. When Eggman drains the Chao's home, it doesn't need to.",
   chapters: [
-    { title: "The Pools", kind: "run", stage: "springs",
+    { title: "The Pools", kind: "zone", zone: "springs",
       before: [
         [N, "Moonwell Springs, in the forest. A thousand years ago, a Red Star Ring fell into the deepest pool here, and Chaos has kept it there, deep and quiet, ever since, among the Chao."],
         [N, "This morning, Eggman's robots came. They set pumps in the pools, and the water began to go down."],
@@ -475,11 +493,15 @@
         [0.92, "chaos", "(The dam of rubble across the river. Chaos crashes through it.)"],
       ],
       after: [
-        [N, "The river runs free again, back toward the springs. But on the canyon floor, someone has been watching Chaos tear up Eggman's site: a red and black armadillo, with his fists up."],
-        ["mighty", "Hold it right there! I don't know what you are, but I've watched you smashing up this whole canyon!"],
+        [N, "The river runs free again, back toward the springs. Chaos goes along with it, down through Redstone Canyon, where Eggman's machines are still at work."],
       ] },
-    { title: "The Traveller", kind: "battle", arena: "canyon", foes: [{ who: "mighty", lvl: 1 }],
+    { title: "The Traveller", kind: "zone", zone: "canyon", foes: [{ who: "mighty", lvl: 1 }],
       before: [
+        [N, "Redstone Canyon: red rock in bands, cactus and sand. On the canyon floor, someone has been watching Chaos tear up Eggman's site."],
+      ],
+      meet: [
+        [N, "A red and black armadillo blocks the way, with his fists up."],
+        ["mighty", "Hold it right there! I don't know what you are, but I've watched you smashing up this whole canyon!"],
         ["mighty", "This canyon's been here a lot longer than both of us. I'm not letting anyone wreck it!"],
         [N, "Chaos and Mighty want the very same thing. Neither of them knows it yet."],
       ],
@@ -499,11 +521,15 @@
         [0.92, "chaos", "(The vault. And something in front of it.)"],
       ],
       after: [
+        [N, "Under the mountain, the trail of spilled water leads into Iron Hold Depot. Somewhere inside it, Chaos can feel one of its Chao's eggs."],
+      ] },
+    { title: "Gamma", kind: "zone", zone: "depot", foes: [{ who: "gamma", lvl: 1 }],
+      before: [
+        [N, "Belts, crates and robots everywhere. Chaos flows on through all of it, toward the vault."],
+      ],
+      meet: [
         [N, "A robot stands guard before the vault. On a shelf behind it sits a single Chao egg, in a glass case marked \"Specimen\"."],
         ["gamma", "Unit Chaos Gamma. Unknown life form detected. Engaging."],
-      ] },
-    { title: "Gamma", kind: "battle", arena: "depot", foes: [{ who: "gamma", lvl: 1 }],
-      before: [
         ["gamma", "Assignment: guard the vault. Query: you are made of water. My weapons may be ineffective."],
         [N, "Chaos doesn't answer. It never does."],
       ],
@@ -530,7 +556,7 @@
   // ==================================================================== Chaos Gamma
   S.EPISODES.push({ who: "gamma", title: "New Assignment", blurb: "Chaos Gamma was built to guard Eggman's vault and obey. Three intruders later, it begins to ask questions.",
   chapters: [
-    { title: "Calibration", kind: "run", stage: "depot",
+    { title: "Calibration", kind: "zone", zone: "depot", foes: [{ who: "tails", lvl: 1 }],
       before: [
         [N, "Iron Hold Depot, under the mountains. A new robot stands on the test floor: Chaos Gamma, built from the plans of an old E-100 series unit."],
         ["eggman", "Chaos Gamma! Your assignment: guard my vault, and every Red Star Ring that goes into it! But first, a little test run."],
@@ -542,13 +568,12 @@
         [0.55, "gamma", "Query: the targets are Doctor Robotnik's own units. Why destroy them?"],
         [0.92, "eggman", "Because I SAID so! That's why!"],
       ],
-      after: [
+      mid: [
         ["eggman", "Excellent! Excellent! Faster than E-102, stronger than E-102, and none of his annoying ideas!"],
         ["gamma", "Query: what were E-102's ideas?"],
         ["eggman", "Never you mind! To your post!"],
-      ] },
-    { title: "The Small Unit", kind: "battle", arena: "depot", foes: [{ who: "tails", lvl: 1 }],
-      before: [
+      ],
+      meet: [
         [N, "An intruder at the gate. A small fox with two tails and a scanner."],
         ["tails", "Built on E-102 Gamma's design... I've read your schematics! You don't have to do this!"],
         ["gamma", "Assignment: guard. Engaging."],

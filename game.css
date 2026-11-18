@@ -756,3 +756,16 @@
    out of reach); one that fits stays in the middle */
 .adv-ov:has(> .ao-page),.adv-ov:has(> .adv-main),.adv-ov:has(> .adv-title){align-items:flex-start}
 .adv-ov > .ao-page,.adv-ov > .adv-main,.adv-ov > .adv-title{margin-block:auto}
+
+/* a story chapter's meeting at the end of an Act: the two of them on a band, VS between, and the fight */
+.adv-vs{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;
+  gap:clamp(10px,4vw,44px);padding:12px 16px;background:var(--sx-navy);border-block:4px solid var(--sx-ink);
+  box-shadow:inset 0 4px 0 var(--sx-blue),inset 0 -4px 0 var(--sx-red);pointer-events:none;animation:advVsIn .3s ease-out both}
+.adv-vs canvas{width:clamp(96px,22vw,176px);height:auto;image-rendering:pixelated;animation:advVsL .35s ease-out both}
+.adv-vs canvas:last-child{transform:scaleX(-1);animation-name:advVsR}
+.adv-vs b{font:900 italic clamp(48px,10vw,96px)/1 var(--sx-big);color:var(--sx-yel);-webkit-text-stroke:8px var(--sx-ink);paint-order:stroke fill;
+  animation:advVsB .4s .1s ease-out both}
+@keyframes advVsIn{from{transform:translateY(-50%) scaleY(0)}to{transform:translateY(-50%) scaleY(1)}}
+@keyframes advVsL{from{translate:-60vw 0}to{translate:0 0}}
+@keyframes advVsR{from{translate:60vw 0}to{translate:0 0}}
+@keyframes advVsB{from{scale:2.4;opacity:0}to{scale:1;opacity:1}}

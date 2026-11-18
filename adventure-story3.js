@@ -27,12 +27,18 @@
         [0.94, "eggman", "The dig rig! And there's... a blue blur heading this way. Of course there is."],
       ],
       after: [
+        [N, "Up on the clifftop, a blue hedgehog is watching the dig, with a Red Star Ring on his finger. He waves. Then he's gone, along the cape."],
+        ["eggman", "SONIC! With MY ring! Badniks, keep digging! I'll deal with him myself!"],
+      ] },
+    { title: "That Hedgehog", kind: "zone", zone: "seabreeze", foes: [{ who: "sonic", lvl: 1 }],
+      before: [
+        [N, "Seabreeze Cape. Eggman gives chase in his brand-new Egg Mobile, over the clifftops and the coves."],
+        ["eggman", "Come back here, you thieving hedgehog! Every ring on this cape belongs to the Eggman Empire!"],
+      ],
+      meet: [
         ["sonic", "Morning, Eggman! Digging for something?"],
         ["eggman", "Sonic! Not today, hedgehog! Today I have a brand-new Egg Mobile and a VERY bad temper!"],
         ["sonic", "So, just a normal day, then."],
-      ] },
-    { title: "That Hedgehog", kind: "battle", arena: "seabreeze", foes: [{ who: "sonic", lvl: 1 }],
-      before: [
         ["eggman", "Get a load of THIS!"],
         ["sonic", "Show me what you've got, Egghead!"],
       ],
@@ -42,7 +48,7 @@
         [N, "Sonic tosses something shiny high in the air. Eggman lunges for it. It's a pebble. When he looks back, Sonic is gone, ring and all."],
         ["eggman", "THAT HEDGEHOG! ...No matter. There are rings all over this world, and I know exactly where the next batch is: Guardian Peak!"],
       ] },
-    { title: "The Mountain", kind: "run", stage: "peak",
+    { title: "Lovely Weather", kind: "zone", zone: "peak", foes: [{ who: "knuckles", lvl: 1 }],
       before: [
         [N, "Guardian Peak. Seven Red Star Rings rest in the old shrine at the top, guarded by Knuckles the Echidna."],
         ["eggman", "Knuckles is strong. But he believes anything you tell him with a straight face. A simple plan: I tell him Sonic is coming to steal the rings..."],
@@ -53,13 +59,13 @@
         [0.55, "eggman", "There they go, fighting each other. Like clockwork! Hohoho!"],
         [0.92, "eggman", "The shrine. Seven rings. Badniks, pack them up!"],
       ],
-      after: [
-        [N, "The badniks march off down the mountain with the rings. Then the snow crunches behind Eggman."],
+      mid: [
+        [N, "The badniks march off down the mountain with the shrine's rings. Then, from somewhere below, a roar that shakes the snow off the shrines."],
+        ["eggman", "Ah. Knuckles has worked it out. Faster than usual. Time to leave!"],
+      ],
+      meet: [
         ["knuckles", "EGGMAN! You tricked me! AGAIN!"],
         ["eggman", "Ah. Knuckles. Hello. Lovely weather for it."],
-      ] },
-    { title: "Lovely Weather", kind: "battle", arena: "peak", foes: [{ who: "knuckles", lvl: 1 }],
-      before: [
         ["knuckles", "Give back my shrine's rings, or I'll punch you all the way to the moon!"],
         ["eggman", "Funny you should say that. That's EXACTLY where they're going!"],
       ],
@@ -69,9 +75,13 @@
         [N, "The Egg Mobile zooms off down the mountain after the badniks. Nearly all of the rings go with it. Nearly."],
         ["eggman", "Now. That fox of Sonic's has built some sort of radar. And I want it."],
       ] },
-    { title: "The Radar", kind: "battle", arena: "airstrip", foes: [{ who: "tails", lvl: 1 }],
+    { title: "The Radar", kind: "zone", zone: "airstrip", foes: [{ who: "tails", lvl: 1 }],
       before: [
-        [N, "The airstrip. Tails is testing his ring radar, and Eggman arrives in a hurry."],
+        [N, "Workshop Airstrip: hangars, a control tower, and the fox's planes lined up on the runway, all very easy to break."],
+        ["eggman", "Hohoho! Let the fox come to me!"],
+      ],
+      meet: [
+        [N, "At the end of the runway, Tails is testing his ring radar. Eggman arrives in a hurry."],
         ["eggman", "Hand over that radar, fox, and nobody gets hurt! Mainly you!"],
         ["tails", "No way! I built it to stop you!"],
       ],
@@ -151,12 +161,18 @@
         [0.92, "metal", "(The convoy is stopping. Something is on the road ahead.)"],
       ],
       after: [
-        [N, "Shadow stands across the road. The trucks stop. Metal Sonic does not."],
-        ["shadow", "So you're the one who ran at the head of the convoy. A copy of Sonic."],
-        ["metal", "(It drops into a crouch. Its jet flares.)"],
+        [N, "Shadow stands across the road. The trucks stop. Metal Sonic does not: it goes straight past him, and on down the expressway with the crates."],
+        ["metal", "(Behind it, something black and red follows. Fast.)"],
       ] },
-    { title: "Faster", kind: "battle", arena: "expressway", foes: [{ who: "shadow", lvl: 2 }],
+    { title: "Faster", kind: "zone", zone: "expressway", foes: [{ who: "shadow", lvl: 2 }],
       before: [
+        [N, "Sundown Expressway, toward the sunset. Metal Sonic runs it the way it runs everything: as if Sonic were watching."],
+      ],
+      meet: [
+        [N, "At the end of the road, Shadow is waiting for it. He got there first."],
+        ["shadow", "Chaos Control. You'll have to be faster than that."],
+        ["shadow", "So you're the one who ran at the head of the convoy."],
+        ["metal", "(It drops into a crouch. Its jet flares.)"],
         ["shadow", "A copy, built to beat the original. I wonder how you'll do against me."],
         ["metal", "(Metal Sonic's eyes burn brighter.)"],
       ],
@@ -164,7 +180,7 @@
         ["shadow", "Tch... You're faster than I thought."],
         [N, "Metal Sonic is already gone, the crates of rings strapped to its back, the convoy left behind. Its trail leads into Redstone Canyon."],
       ] },
-    { title: "Redstone Canyon", kind: "run", stage: "canyon",
+    { title: "The Records", kind: "zone", zone: "canyon", foes: [{ who: "silver", lvl: 1 }],
       before: [
         [N, "Redstone Canyon. Eggman's blasting has shaken the cliffs, and Metal Sonic's route runs through the rubble."],
         ["eggman", "Take the canyon road, Metal! Nobody's fast enough to follow you there!"],
@@ -174,13 +190,14 @@
         [0.6, "metal", "(Something ahead. A light, cyan, hovering above the canyon floor.)"],
         [0.92, "silver", "A blue hedgehog... carrying the rings. It's you!"],
       ],
-      after: [
+      mid: [
+        [N, "On the canyon wall above, a silver hedgehog is watching the machine go by. His hands begin to glow."],
+        ["metal", "(It does not look up. It does not need to.)"],
+      ],
+      meet: [
         [N, "A silver hedgehog floats down in front of Metal Sonic, his hands glowing."],
         ["silver", "Our records say a blue hedgehog brings the last ring to the engine. But you're... you're not Sonic at all. You're a machine!"],
         ["silver", "It was you. It was always you! I won't let you reach that engine!"],
-      ] },
-    { title: "The Records", kind: "battle", arena: "canyon", foes: [{ who: "silver", lvl: 1 }],
-      before: [
         ["silver", "For my future!"],
         ["metal", "(It sets down the rings, and turns to face him.)"],
       ],
@@ -211,11 +228,16 @@
         [0.9, "metal", "(The dock. Metal Sonic got there first. It turns around.)"],
       ],
       after: [
+        [N, "At the top of the track, Metal Sonic fires its jet and goes straight up, toward the racecourse among the stars. Sonic is right behind it."],
+      ] },
+    { title: "The Real Thing", kind: "zone", zone: "stars", foes: [{ who: "sonic", lvl: 2 }],
+      before: [
+        ["metal", "(Comet Circuit. Its own track, built for it. Here, at last, it will be first.)"],
+      ],
+      meet: [
+        [N, "At the end of the circuit, Metal Sonic stops, and turns around."],
         ["sonic", "Okay, copycat. End of the line."],
         ["metal", "(Its eyes burn red. Nothing, nothing in the world, has ever mattered as much as this.)"],
-      ] },
-    { title: "The Real Thing", kind: "battle", arena: "stars", foes: [{ who: "sonic", lvl: 2 }],
-      before: [
         ["sonic", "You've been second best your whole life, Metal. Let's keep it that way."],
         ["metal", "(It drops into a crouch. Its jet flares.)"],
       ],
@@ -256,7 +278,7 @@
   // ==================================================================== Mighty
   S.EPISODES.push({ who: "mighty", title: "Canyon Wanderer", blurb: "Mighty the Armadillo just wanted a quiet walk through Redstone Canyon. Then Eggman started blowing it up.",
   chapters: [
-    { title: "Redstone Canyon", kind: "run", stage: "canyon",
+    { title: "Redstone Canyon", kind: "zone", zone: "canyon",
       before: [
         [N, "Redstone Canyon. Mighty the Armadillo is passing through, the way he does, on his long walk around the world."],
         ["mighty", "Every time I come back, the canyon's a little different. The river carves it a bit deeper every year."],
@@ -324,7 +346,7 @@
         [N, "Sonic and Silver race off. Mighty looks down at the river. It's running thin. The rubble from the blasting has dammed it."],
         ["mighty", "The river feeds the springs in the forest. If it dries up, so do the pools. I'd better go and see."],
       ] },
-    { title: "The Springs", kind: "run", stage: "springs",
+    { title: "Water and Stone", kind: "zone", zone: "springs", foes: [{ who: "chaos", lvl: 1 }],
       before: [
         [N, "Moonwell Springs, in the forest, where the wild Chao live. The water is low, and Eggman's pumps are sucking up what's left."],
         ["mighty", "The Chao's home. Hold on, little guys!"],
@@ -334,12 +356,13 @@
         [0.6, "mighty", "Out of the way, badniks!"],
         [0.92, "mighty", "The deepest pool. And... something's coming up out of it."],
       ],
-      after: [
+      mid: [
+        [N, "The pools are half drained, and Eggman's pumps are humming. Something deep in the water is very, very angry."],
+        ["mighty", "I'd better find those pumps before whatever that is does."],
+      ],
+      meet: [
         [N, "Out of the deepest pool rises a figure made of living water. Its eyes glow green, and it has seen too many strangers today."],
         ["mighty", "Whoa, whoa! Easy, friend! I'm on your side!"],
-      ] },
-    { title: "Water and Stone", kind: "battle", arena: "springs", foes: [{ who: "chaos", lvl: 1 }],
-      before: [
         [N, "Chaos doesn't answer. It never does."],
         ["mighty", "Okay. I guess we're doing this."],
       ],
@@ -399,7 +422,7 @@
       after: [
         [N, "The gate opens with a flash of light. Silver steps through, into the past."],
       ] },
-    { title: "Arrival", kind: "run", stage: "canyon",
+    { title: "The Blue Hedgehog", kind: "zone", zone: "canyon", foes: [{ who: "sonic", lvl: 1 }],
       before: [
         [N, "Redstone Canyon, two hundred years ago. The sky is blue. The river is running. Silver stands and stares at it."],
         ["silver", "So this is what the world looked like. It's... it's beautiful."],
@@ -410,14 +433,15 @@
         [0.6, "silver", "Something fast went through here. Very fast. The cliffs are scorched."],
         [0.92, "silver", "There! A blue hedgehog!"],
       ],
-      after: [
+      mid: [
+        [N, "Below, on the canyon floor, a blue hedgehog races past, as fast as the stories say."],
+        ["silver", "That's him. The one from the records. I have to stop him."],
+      ],
+      meet: [
         ["sonic", "Uh, hi? Do I know you?"],
         ["silver", "A blue hedgehog. Fast. It's you. You're the one who brings him the last ring."],
         ["sonic", "I'm the one who what now?"],
         ["silver", "I'm sorry. I can't let my future happen!"],
-      ] },
-    { title: "The Blue Hedgehog", kind: "battle", arena: "canyon", foes: [{ who: "sonic", lvl: 1 }],
-      before: [
         ["sonic", "Hold on, you've got the wrong guy!"],
         ["silver", "That's what you would say!"],
       ],
@@ -427,7 +451,7 @@
         ["sonic", "Don't sweat it. But if you want the one carrying Eggman's rings, he went up the expressway with a convoy this evening."],
         ["silver", "Then I'll find out for myself."],
       ] },
-    { title: "The Expressway", kind: "run", stage: "expressway",
+    { title: "Shadow", kind: "zone", zone: "expressway", foes: [{ who: "shadow", lvl: 2 }],
       before: [
         [N, "The expressway out of the city, at night. Burnt-out trucks of Eggman's convoy lie across the road. Silver searches them for the truth."],
         ["silver", "If there's a machine that looks like Sonic, someone here has seen it."],
@@ -437,13 +461,14 @@
         [0.6, "silver", "Footprints. Scorched ones. That's no hedgehog."],
         [0.92, "silver", "Someone's ahead. Black and red. ...Shadow?"],
       ],
-      after: [
+      mid: [
+        [N, "On a girder above the road, a black hedgehog with red stripes is watching him run."],
+        ["silver", "Shadow? Here? ...This time is even stranger than the records say."],
+      ],
+      meet: [
         ["shadow", "Silver. What are you doing in this time?"],
         ["silver", "Shadow! I'm trying to find out who brings the last ring to the Star Engine. Are you helping Sonic? Or the machine?"],
         ["shadow", "You never did learn to ask your questions before throwing things. Very well. Let's see if you've improved."],
-      ] },
-    { title: "Shadow", kind: "battle", arena: "expressway", foes: [{ who: "shadow", lvl: 2 }],
-      before: [
         ["silver", "I won't lose. Not with my whole future riding on this!"],
         ["shadow", "Then show me."],
       ],
@@ -453,9 +478,13 @@
         ["shadow", "The one you're after is Metal Sonic. The Doctor's copy of Sonic. Find it, and you'll find your last ring."],
         ["shadow", "But be careful. Your future isn't written yet. Don't spend it fighting the wrong people."],
       ] },
-    { title: "The Old Machine", kind: "battle", arena: "ruins", foes: [{ who: "emerl", lvl: 1 }],
+    { title: "The Old Machine", kind: "zone", zone: "ruins", foes: [{ who: "emerl", lvl: 1 }],
       before: [
-        [N, "Cinder City, the burnt-out old quarter at the edge of town. To Silver it looks like home, and that hurts. A little machine is sitting on a broken wall, copying the way the birds hop."],
+        [N, "Cinder City, the burnt-out quarter at the edge of town: broken towers, rubble and fires. To Silver it looks like home, and that hurts."],
+        ["silver", "So this is where it all starts. ...Not if I can help it."],
+      ],
+      meet: [
+        [N, "At the end of the old quarter, a little machine is sitting on a broken wall, copying the way the birds hop."],
         ["emerl", "...Silver. Shining. Floating!"],
         ["silver", "You... You're a Gizoid! In my time, there's nothing left of you but old stories."],
         ["emerl", "Fight! Learn! Emerl, learn!"],
@@ -536,9 +565,13 @@
         ["emerl", "Emerl. ...Emerl!"],
         ["sonic", "Here's the thing, Emerl. You want to learn? Go fight my friends. Fight fair, have fun, and watch everything they do."],
       ] },
-    { title: "Tails", kind: "battle", arena: "airstrip", foes: [{ who: "tails", lvl: 1 }], teach: "tails",
+    { title: "Tails", kind: "zone", zone: "airstrip", foes: [{ who: "tails", lvl: 1 }], teach: "tails",
       before: [
-        [N, "The airstrip. Tails is testing his new ring radar. Emerl watches the radar, then the fox, then the fox's two spinning tails."],
+        [N, "Emerl follows the hum of engines to Workshop Airstrip: hangars, a tower, and planes going over."],
+        ["emerl", "...Fly. Things fly! Emerl, see!"],
+      ],
+      meet: [
+        [N, "At the end of the runway, Tails is testing his new ring radar. Emerl watches the radar, then the fox, then the fox's two spinning tails."],
         ["emerl", "Tails. Fly. ...Emerl, fly!"],
         ["tails", "You're the one Sonic found! Okay, a friendly spar. I've always wanted to see how a machine this old works!"],
       ],
@@ -547,9 +580,13 @@
         ["emerl", "...Tails. Clever. Thank you."],
         ["tails", "You're welcome! Hey, Knuckles is up on Guardian Peak. He's the strongest of all of us. Go and say hi!"],
       ] },
-    { title: "Knuckles", kind: "battle", arena: "peak", foes: [{ who: "knuckles", lvl: 1 }], teach: "knuckles",
+    { title: "Knuckles", kind: "zone", zone: "peak", foes: [{ who: "knuckles", lvl: 1 }], teach: "knuckles",
       before: [
-        [N, "The old shrine at the foot of Guardian Peak. Knuckles is studying the carvings on its walls. Emerl is copying them."],
+        [N, "Guardian Peak: snow, black rock, and old shrines all the way up. Emerl climbs."],
+        ["emerl", "Cold. ...Cold! Emerl, keep going!"],
+      ],
+      meet: [
+        [N, "At an old shrine near the summit, Knuckles is studying the carvings on its walls. Emerl is copying them."],
         ["knuckles", "Those carvings... my people's stories talk about machines like you. The Gizoids. Warriors that copied every fighter they ever met."],
         ["emerl", "Fight. Learn. ...Fight Knuckles!"],
         ["knuckles", "Ha! You want to learn from the best? Then pay attention!"],
@@ -571,9 +608,13 @@
         ["emerl", "Amy... fun! Amy loves Sonic?"],
         ["amy", "Of COURSE I love Sonic! Now you're learning the important things!"],
       ] },
-    { title: "Rouge", kind: "battle", arena: "club", foes: [{ who: "rouge", lvl: 1 }], teach: "rouge",
+    { title: "Rouge", kind: "zone", zone: "club", foes: [{ who: "rouge", lvl: 1 }], teach: "rouge",
       before: [
-        [N, "The city at night. Emerl has followed the music to Rouge's club, and is copying the dancers through the window."],
+        [N, "Night falls on the city. Emerl follows the music and the lights to Diamond Club, where everything shines."],
+        ["emerl", "Shining! ...So much shining!"],
+      ],
+      meet: [
+        [N, "Outside Rouge's club, Emerl is copying the dancers through the window."],
         ["rouge", "Now what do we have here? A walking jewel box? That ring in your chest is the shiniest thing I've seen all night."],
         ["emerl", "Mine. Emerl's. ...Fight for it!"],
         ["rouge", "Feisty. I like that."],
@@ -598,9 +639,13 @@
         ["emerl", "Cream. Friend. ...Emerl has friends."],
         ["cream", "Of course you do! Lots of them!"],
       ] },
-    { title: "Chaos", kind: "battle", arena: "springs", foes: [{ who: "chaos", lvl: 1 }], teach: "chaos",
+    { title: "Chaos", kind: "zone", zone: "springs", foes: [{ who: "chaos", lvl: 1 }], teach: "chaos",
       before: [
-        [N, "Moonwell Springs, in the forest. Emerl came to see the Chao, and found the pools half-drained, and Chaos, guarding them."],
+        [N, "Cream told Emerl all about the Chao. So Emerl goes to Moonwell Springs, in the forest, to see them."],
+        ["emerl", "Chao. Small. ...Cute! Emerl, find Chao!"],
+      ],
+      meet: [
+        [N, "At the deepest pool, Emerl finds the springs half drained, and Chaos guarding them."],
         ["emerl", "...Water. Moving. Alive?"],
         [N, "Chaos doesn't answer. It has seen too many of Eggman's machines today, and Emerl looks like a machine."],
         ["emerl", "Emerl, not Eggman. ...Emerl, show you!"],
@@ -622,9 +667,13 @@
         ["emerl", "Emerl... wants to be friend. Not weapon."],
         ["shadow", "Then choose well, Gizoid. The Doctor will want you to choose him."],
       ] },
-    { title: "Gamma", kind: "battle", arena: "depot", foes: [{ who: "gamma", lvl: 2 }], teach: "gamma",
+    { title: "Gamma", kind: "zone", zone: "depot", foes: [{ who: "gamma", lvl: 2 }], teach: "gamma",
       before: [
-        [N, "Iron Hold Depot. Eggman has captured Amy, and Emerl came to get her out. A robot stands guard at her cell."],
+        [N, "Word comes from Sonic: Eggman has captured Amy, and taken her to Iron Hold Depot, deep under the mountain."],
+        ["emerl", "Amy... caught? ...Emerl, go! Now!"],
+      ],
+      meet: [
+        [N, "Deep in the depot, a robot stands guard at Amy's cell."],
         ["gamma", "Unit Chaos Gamma. Unknown machine detected. Query: are you one of the Doctor's units?"],
         ["emerl", "No! Emerl is Sonic's friend. Amy's friend. Let Amy go!"],
         ["gamma", "Request denied. Engaging."],

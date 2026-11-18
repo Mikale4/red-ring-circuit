@@ -109,12 +109,18 @@ Act 1 is cleared. A clear goes on to the next Act, or the next zone's Act 1.
 **Story** is *The Red Star Rings*, told the way Sonic Battle tells its story: one plot, an
 episode for each of the fourteen. Eggman means to set every Red Star Ring in his Star Engine
 aboard the Egg Orbital, and each episode is those same days from one runner's side, with their
-own scenes, runs and battles (Sonic and Emerl ten chapters, the rest nine). Pick whose episode
-first, then its chapters: each a talk, a run (through a stage made for its place in the plot --
-thirteen of them, drawn by `tools/genstages.py`, their goal the Red Star Ring on its plinth --
-or a zone's Act 1), or a battle as the episode's runner, sometimes with an ally. Everyone talks
-and acts as their own games have them; Chaos and Metal Sonic never speak, so theirs are told.
-Every episode is open from the start, and in each a chapter cleared opens the next. Emerl's
+own scenes, runs and battles (seven to ten chapters each). Pick whose episode first, then its
+chapters: each a talk, then a run through a stage made for its place in the plot (thirteen of
+them, drawn by `tools/genstages.py`, their goal the Red Star Ring on its plinth), a **zone**, or a
+battle as the episode's runner, sometimes with an ally. A zone chapter is played the way the
+zones are: Act 1, a word between, Act 2, and at Act 2's end its boss -- Eggman's robot, or, more
+often, one of the cast waiting in the boss's arena: the screen shuts as it does for a boss, they
+drop in, the two talk face to face, VS, and the stage gives way to the fight in that zone's own
+arena. Clear Act 1 and the chapter goes on from Act 2 next time; reach the fight, and from the
+fight. Every episode has a mix of the three. Everyone talks and acts as their own games have
+them; Chaos and Metal Sonic never speak, so theirs are told. Every episode is open from the
+start, and in each a chapter cleared opens the next. Story co-op online plays a zone chapter the
+same way: both Acts raced together, then the fight side by side. Emerl's
 episode is his own story: woken by Eggman's dig, named by Sonic, he spars with eight of the cast
 and learns from each (below).
 
