@@ -571,10 +571,31 @@ other runners' name tags in races -- with Options' **Ping on player tags** (on a
   runs their own copy of each course, the others as ghosts; powers that reach another player go
   to them over the room; the host gathers the times and sends the one result, so the points and
   the standings are everyone's. No retries online: the cup goes on whatever your place.
-- **Story co-op**: up to three through a chapter of an episode: the host is its hero, the
-  others fight beside them, or run the stage alongside; a win clears the chapter on everyone's save.
+- **Story co-op**: up to three through a chapter of an episode: the host is its hero (a
+  spectating host's: the first player), the others fight beside them, or run the stage alongside;
+  a win clears the chapter on every player's save.
 - **Tournament**: up to eight players in a bracket of 8 or 16, CPUs filling the rest; the
   host runs it, and every player's match is an online battle the room watches.
+
+**Spectating.** A room has up to six spectator seats on top of its players' places. **Watch**
+beside a room in the lobby takes one (a full room's only way in; a room whose places are all taken
+seats anyone who asks to join as a spectator), and **Spectate** in a room moves you there (the host
+too); **Play** moves you back if there's a place. The host can move anyone either way (the eye and
+person buttons on their row). Spectators pick no fighter and don't ready up. In the match a bar
+along the bottom says who you're watching:
+
+- a **battle** (a tournament's match or a story fight too, for everyone not in it): the whole
+  arena, framed as ever, or one fighter followed close (the left and right arrows; Z back to the
+  whole arena). Their HUD card is outlined.
+- a **race**, the **grand prix** or a story run: any runner followed -- a player's ghost or a
+  CPU, with their place (left and right) -- or a **free camera** (Z) that the arrows fly anywhere
+  along the course (Z or X back to the runners, the nearest one). On the grand prix's strip the
+  watched face is ringed.
+
+A pad uses its d-pad and buttons the same way; a touch screen gets buttons on the bar. Nothing a
+spectator watches counts: no XP, rating, wins, trophies or story chapters. With nobody playing,
+the CPUs play for the spectators: a battle of two to four CPUs, a grand prix of eight, a bracket
+of sixteen or eight (an exhibition race and story co-op need a player).
 
 **Friends** (requests by friend code or from a card), **messages** (conversations kept on this
 browser, read receipts) and invites to rooms work from anywhere in the game.

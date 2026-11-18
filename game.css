@@ -984,3 +984,50 @@
 .ao-tour-btns .btn{padding:8px 12px;font-size:14px}
 .ao-tour-btns [data-ts]{margin-right:auto}
 .ao-tourb{padding:7px 12px}
+/* ---- spectating: the bar along the bottom of a match (who's watched; the keys, or touch buttons) */
+.np-spec{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:14px;max-width:calc(100% - 24px);padding:7px 14px 8px;
+  background:repeating-linear-gradient(135deg,rgba(255,255,255,.045) 0 14px,rgba(255,255,255,0) 14px 28px),var(--sx-navy);border:3px solid var(--sx-ink);border-radius:12px;
+  box-shadow:inset 0 0 0 2px var(--sx-blue),0 6px 0 rgba(5,10,34,.55);color:#fff}
+.np-spec-t{display:flex;flex-direction:column;gap:3px;min-width:0}
+.np-spec-t i{display:flex;align-items:center;gap:5px;font:700 11px/1 var(--sx-pix);letter-spacing:.08em;text-transform:uppercase;font-style:normal;color:var(--sx-yel)}
+.np-spec-t i .ico{width:14px;height:14px}
+.np-spec-t b{max-width:46vw;font:italic 900 20px/1.05 var(--sx-big);color:#fff;paint-order:stroke fill;-webkit-text-stroke:5px var(--sx-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.np-spec-t small{font:600 12px/1.1 var(--sx-pix);color:var(--sx-pale);white-space:nowrap}
+.np-spec-t small:empty{display:none}
+.np-spec-k{margin:0;font:600 12.5px/1.7 var(--sx-pix);color:#cfe0ff;white-space:nowrap}
+.np-spec-k:empty{display:none}
+.np-spec kbd{display:inline-block;min-width:1.4em;margin:0 1px;padding:1px 6px 0;text-align:center;font:700 13px/1.25 var(--sx-pix);color:var(--sx-ink);background:#fff;
+  border:2px solid var(--sx-ink);border-radius:5px;box-shadow:0 2px 0 var(--sx-ink)}
+.np-spec-b{display:flex;gap:6px;pointer-events:auto}
+.np-spec-b button{width:44px;height:44px;display:grid;place-items:center;touch-action:none;border:3px solid var(--sx-ink);border-radius:50%;background:rgba(20,41,140,.85);color:#fff;cursor:pointer}
+.np-spec-b button.dn{transform:translateY(2px);background:rgba(31,88,224,.95)}
+.np-spec-b .ico{width:18px;height:18px}
+.np-spec-b .up .ico{transform:rotate(180deg)}
+.np-spec-b .fv{display:none}.np-spec.free .np-spec-b .fv{display:grid}
+.np-spec-b .cam{background:var(--sx-yel);color:var(--sx-ink)}
+/* what a spectator's race doesn't need: the runner's rings and air, the touch pad */
+.np-watching .adv-hl,.np-watching .adv-air,.np-watching .adv-pad{display:none}
+/* the one being watched: their card in a battle, their face on the grand prix's strip */
+.adv-fc.watch{outline:3px solid var(--sx-yel);outline-offset:3px;border-radius:10px}
+.gp-strip span.watch{border-color:var(--sx-cyan);box-shadow:0 0 0 2px var(--sx-ink),0 0 10px var(--sx-cyan);z-index:30!important}
+@media (max-width:640px){.np-spec{gap:8px;padding:6px 10px 7px;bottom:10px}.np-spec-t b{font-size:16px;max-width:40vw}.np-spec-k{display:none}.np-spec-b button{width:40px;height:40px}}
+/* a room's spectators: their seats under the players', a watcher's row, your card while you watch */
+.ao-spechd{display:flex;align-items:center;gap:7px;margin:10px 0 6px;padding:8px 2px 2px;border-top:2px dashed rgba(111,230,255,.25)}
+.ao-spechd .ico{width:16px;height:16px;flex:none}
+.ao-spechd b{font:700 13.5px/1 var(--sx-pix);color:var(--sx-yel);text-shadow:var(--sx-out1);white-space:nowrap}
+.ao-spechd small{margin-left:auto;font:500 11.5px/1.2 var(--sx-pix);color:var(--sx-pale);text-align:right}
+.ao-mrow.spec{background:rgba(20,41,140,.32);border-style:dashed}
+.ao-mrow em{display:inline-flex;align-items:center;gap:4px}
+.ao-mrow em .ico{width:12px;height:12px}
+.ao-mrow.spec em{background:var(--sx-blue);color:#fff;text-shadow:var(--sx-out1)}
+.ao-mrow.spec.ready em{background:var(--sx-blue)}
+.ao-nobody{padding:6px 8px 8px;font-size:12.5px}
+.ao-watching>.ico{width:38px;height:38px;flex:none;margin:0 8px 0 4px}
+.ao-watching i{font:500 11.5px/1.35 var(--sx-pix);font-style:normal;color:var(--sx-pale)}
+/* the room list: how many are watching, and Watch */
+.ao-rm-n{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.ao-rm-n small{display:inline-flex;align-items:center;gap:3px;font:600 11.5px/1 var(--sx-pix);color:var(--sx-pale);text-shadow:none}
+.ao-rm-n small .ico{width:13px;height:13px}
+.adv .ao-room .btn .ico{width:14px;height:14px}
+.ao-room.watchable{opacity:1}
+@media (max-width:640px){.adv .ao-room .btn.ao-wsm{padding:7px 9px 6px}.ao-room .ao-wsm span{display:none}.adv .ao-room .ao-wsm .ico{margin:0}}

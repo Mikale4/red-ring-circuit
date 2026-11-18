@@ -5523,8 +5523,9 @@
   function worldStep(dt) {
     const w = world, p = player;
     if (!(NP.on && !NP.host && battle)) stepLater(dt);                 // (an online guest's world only shows the host's)
-    if (w.boss && (mode === "play" || mode === "goal")) stepBoss(dt);
-    if (w.rival && mode === "play") stepRival(dt);
+    const watch = NP.on && NP.watch && !battle;                       // (a spectator's runner is nobody: no boss or rival comes for it)
+    if (w.boss && (mode === "play" || mode === "goal") && !watch) stepBoss(dt);
+    if (w.rival && mode === "play" && !watch) stepRival(dt);
     for (const q of w.plats) {
       const k = Math.sin(w.t * 0.9 + q.ph) * q.range;
       const nx = q.t === "M" ? q.x0 + k : q.x0, ny = q.t === "V" ? q.y0 + k : q.y0;
@@ -5775,7 +5776,7 @@
     if (stopT > 0 && p.state === "hurt" && p.sinceHit < 0.02) { p.spr.position.x += (Math.random() - 0.5) * 0.14; p.spr.position.y += (Math.random() - 0.5) * 0.06; }
     /* KO'd: down a while, then flickering, then gone (till they come back in from above) */
     const koGone = p.ko && battle && (p.koT < 0.12 || (p.koT < 1.1 && Math.sin(world.t * 38) > 0));
-    p.spr.visible = !!(!GLIDE[mode] || (demoOn() && world.demo) || (mode === "scene" && world.rival && world.rival.lock)) && !p.out && !koGone && !(p.hideT > 0) && !(p.inv > 0 && !p.dead && !p.ko && p.state !== "dash" && p.state !== "teleport" && !(p.sp && p.sp.shield) && Math.sin(world.t * 40) > 0.4);
+    p.spr.visible = !!(!GLIDE[mode] || (demoOn() && world.demo) || (mode === "scene" && world.rival && world.rival.lock)) && !p.out && !koGone && !(p.hideT > 0) && !(p === player && !battle && NP.on && NP.watch) && !(p.inv > 0 && !p.dead && !p.ko && p.state !== "dash" && p.state !== "teleport" && !(p.sp && p.sp.shield) && Math.sin(world.t * 40) > 0.4);
   }
   /* The dust behind a rev: Sonic Advance's spray, looping faster and swelling as the rev
      builds (each tap of Space kicks it up), at the runner's heels, trailing away from them. */
@@ -6549,6 +6550,7 @@
     if (!b) return;
     if (mode === "play" || mode === "goal") e.preventDefault();
     keys[b] = down ? 1 : 0;
+    if (down && !e.repeat) specTap[b] = 1;              // (a tap, kept for a spectator's next frame: one between two frames still counts)
   }
   const kd = e => onKey(e, true), ku = e => onKey(e, false);
 
@@ -6666,6 +6668,7 @@
     if (!world || !player) return;
     resize();
     if (mode === "play" || mode === "goal") {
+      if (!paused && npWatching()) npSpecTick(dt);                     // a spectator: who to watch, and how
       if (!paused && NP.on && !NP.host && battle) npGuestTick(dt);      // an online guest: the host's fight, mirrored
       else if (!paused) {
         if (stopT > 0) { stopT = Math.max(0, stopT - dt); acc = 0; }     // a freeze-frame: the world holds still
@@ -6674,6 +6677,7 @@
         let n = 0;
         while (acc >= h && n < 14 && (mode === "play" || mode === "goal")) {
           if (battle) battleTick(h);
+          else if (NP.on && NP.watch) { world.t += h; worldStep(h); }   // a spectator's race: they run nothing; the world goes on round whoever they watch
           else {
             readInput();
             if (npHold() || rivalHold() || gpHold()) { const I = INPUT0; I.L = I.R = I.U = I.D = I.J = I.Z = I.X = I.C = 0; I.jp = I.zp = I.xp = I.cp = 0; I.dash = 0; }   // (an online race: nobody moves till Go)
@@ -7538,7 +7542,8 @@
     return (BAND = { sb, st, t: 0.5 });
   }
   function battleView(aspect, dt) {
-    const fs = battle.fs.filter(f => !f.out);
+    let fs = battle.fs.filter(f => !f.out);
+    const sf = npFollowed(); if (sf && !sf.out) fs = [sf];              // a spectator following one fighter: the camera on them
     const T = Math.tan(17 * PI / 180), W = world.W, { sb, st } = viewBand(dt), band = (st - sb) / 2;
     /* a narrow (upright) screen may back off much further; if everyone still won't fit, it keeps
        to the players' own fighters and whoever is nearest each (the rest marked at the edge) */
@@ -7600,7 +7605,7 @@
   }
   function wirePad(el) {
     el.querySelectorAll("[data-t]").forEach(b => {
-      const k = b.dataset.t, on = e => { e.preventDefault(); touch[k] = 1; b.classList.add("dn"); }, off = e => { e.preventDefault(); touch[k] = 0; b.classList.remove("dn"); };
+      const k = b.dataset.t, on = e => { e.preventDefault(); touch[k] = 1; specTap[k] = 1; b.classList.add("dn"); }, off = e => { e.preventDefault(); touch[k] = 0; b.classList.remove("dn"); };
       b.addEventListener("pointerdown", on); b.addEventListener("pointerup", off); b.addEventListener("pointercancel", off); b.addEventListener("pointerleave", off);
     });
   }
@@ -9762,12 +9767,12 @@
     const hudEl = host.querySelector(".adv-hud");
     const box = document.createElement("div"); box.className = "gp-hud";
     box.innerHTML = `
-      <div class="gp-place"><b class="num">8</b><i>th</i></div>
+      ${G.watch ? "" : `<div class="gp-place"><b class="num">8</b><i>th</i></div>`}
       <div class="gp-strip"><div class="gp-strip-in">${G.runners.map((r, i) => `<span data-gs="${i}" class="${r.me ? "me" : ""}"><canvas width="22" height="22" data-face="${r.who}"></canvas></span>`).join("")}<em class="gp-goal"></em></div></div>
-      <div class="gp-pow"><canvas width="48" height="48"></canvas><i>${TOUCH ? "" : "V"}</i></div>`;
+      ${G.watch ? "" : `<div class="gp-pow"><canvas width="48" height="48"></canvas><i>${TOUCH ? "" : "V"}</i></div>`}`;
     hudEl.append(box);
     box.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 1));
-    if (TOUCH) { const wrap = document.createElement("div"); wrap.className = "gp-pwrap"; wrap.innerHTML = `<button class="gp-pbtn" data-t="V">Power</button>`; (hudEl.querySelector(".adv-pad") || hudEl).append(wrap); wirePad(wrap); }
+    if (TOUCH && !G.watch) { const wrap = document.createElement("div"); wrap.className = "gp-pwrap"; wrap.innerHTML = `<button class="gp-pbtn" data-t="V">Power</button>`; (hudEl.querySelector(".adv-pad") || hudEl).append(wrap); wirePad(wrap); }
     paintPower(null);
     caption(G.online && GPR.count === Infinity ? "Waiting for the others…" : def.name, true);
     world.t = 0;
@@ -9831,7 +9836,7 @@
     /* your Red Rings: run into one and the box spins */
     for (const e of w.powers) {
       if (e.back > 0) { e.back -= dt; if (e.back <= 0) { e.back = 0; e.m.visible = true; } continue; }
-      if (Math.abs(p.x - e.x) < 0.75 && p.y < e.y + 0.8 && p.y + p.hh > e.y - 0.3 && !p.dead) {
+      if (!G.watch && Math.abs(p.x - e.x) < 0.75 && p.y < e.y + 0.8 && p.y + p.hh > e.y - 0.3 && !p.dead) {
         e.back = 4; e.m.visible = false; SFX.ring(); burst(e.x, e.y + 0.4, [0xe42630, 0xffffff, 0xffd21a], 10, 4);
         if (!Rr.power && !Rr.roll) { Rr.roll = 1.1; Rr.rollK = rollPower(gpPlace("you"), Math.random); }
       }
@@ -9850,7 +9855,7 @@
     Rr.lastV = V;
     /* you and the rivals, touching: invincible, or rolling into them, they go down */
     for (const v of Rr.rivals) {
-      if (v.fin != null || v.bumpCd > 0) continue;
+      if (v.fin != null || v.bumpCd > 0 || G.watch) continue;
       if (Math.abs(v.x - p.x) < 0.9 && Math.abs(v.y - p.y) < 1.6) {
         if (p.star > 0 && v.star <= 0) { gpHit(v.r.id, "you"); v.bumpCd = 1.5; }
         else if (v.star > 0 && p.star <= 0) { gpHit("you", v.r.id); v.bumpCd = 1.5; }
@@ -9860,11 +9865,11 @@
     gpStepShots(dt);
     if (G.online) {                                        // online: where you are, to the others; the other players, touched
       Rr.gT += dt;
-      if (Rr.gT >= 0.1) { Rr.gT = 0; const d = { t: "np.g", x: r3(p.x), y: r3(p.y), rf: p._rf || ["idle", 0, 1], fin: Rr.myFin != null ? 1 : 0 }; if (NP.host) Online.toAll(Object.assign({ id: NP.me }, d), true); else Online.toHost(d); }
+      if (Rr.gT >= 0.1 && !G.watch) { Rr.gT = 0; const d = { t: "np.g", x: r3(p.x), y: r3(p.y), rf: p._rf || ["idle", 0, 1], fin: Rr.myFin != null ? 1 : 0 }; if (NP.host) Online.toAll(Object.assign({ id: NP.me }, d), true); else Online.toHost(d); }
       for (const r of G.runners) if (r.human && !r.me) {
         const g = NP.ghosts.get(r.netId); if (!g) continue;
         if (g.fin && Rr.seen[r.netId] == null) Rr.seen[r.netId] = t;
-        if (p.star > 0 && !(Rr.cd && Rr.cd[r.netId] > t) && Math.abs(g.x - p.x) < 0.9 && Math.abs(g.y - p.y) < 1.6) { (Rr.cd = Rr.cd || {})[r.netId] = t + 1.5; gpSend({ k: "hit", to: r.netId }); }
+        if (!G.watch && p.star > 0 && !(Rr.cd && Rr.cd[r.netId] > t) && Math.abs(g.x - p.x) < 0.9 && Math.abs(g.y - p.y) < 1.6) { (Rr.cd = Rr.cd || {})[r.netId] = t + 1.5; gpSend({ k: "hit", to: r.netId }); }
       }
     }
     if (Rr.spin > 0) { Rr.spin -= dt; p.face = Math.floor(Rr.spin * 12) % 2 ? 1 : -1; }
@@ -9872,8 +9877,13 @@
     if (!Rr.shieldS) { Rr.shieldS = new THREE.Sprite(glowMat(0x6ac8ff, 0.55)); Rr.shieldS.scale.set(2.8, 2.8, 1); w.group.add(Rr.shieldS); }
     Rr.shieldS.visible = !!Rr.myShield; Rr.shieldS.position.set(p.x, p.y + p.hh / 2, 0.3);
     gpDraw(dt);
+    /* a spectating host: once the CPUs and every player still here are home, the result */
+    if (G.watch) {
+      if (NP.host && !Rr.netSent && Rr.rivals.every(v => v.fin != null) &&
+          G.runners.every(r => !r.human || Rr.hfin[r.netId] != null || !(NP.room && NP.room.members.some(m => m.id === r.netId)))) { Rr.endT += dt; if (Rr.endT > 1.6) gpNetResult(); }
+    }
     /* all seven home and you not, a while after: the race is over for you */
-    if (Rr.myFin == null && Rr.rivals.every(v => v.fin != null)) { Rr.endT += dt; if (Rr.endT > (G.online ? 25 : 12)) { Rr.myFin = Infinity; Rr.over = true; mode = "goal"; caption("Race over", true);
+    else if (Rr.myFin == null && Rr.rivals.every(v => v.fin != null)) { Rr.endT += dt; if (Rr.endT > (G.online ? 25 : 12)) { Rr.myFin = Infinity; Rr.over = true; mode = "goal"; caption("Race over", true);
       if (G.online) { if (NP.host) gpNetFin(NP.me, 9999); else Online.toHost({ t: "np.gfin", time: 9999 }); } else setTimeout(() => gpResults(), 1600); } }
   }
   /* where a rival's run has it now */
@@ -9886,7 +9896,7 @@
   /* places: home first by time, then by how far along */
   function gpOrder() {
     const Rr = GPR, p = player, list = [];
-    list.push({ id: "you", x: p ? p.x : 0, fin: Rr.myFin });
+    if (!(GP && GP.watch)) list.push({ id: "you", x: p ? p.x : 0, fin: Rr.myFin });   // (a spectator isn't in the race)
     for (const v of Rr.rivals) list.push({ id: v.r.id, x: v.x, fin: v.fin });
     if (GP && GP.online) for (const r of GP.runners) if (r.human && !r.me) { const g = NP.ghosts.get(r.netId); list.push({ id: r.id, x: g ? g.tx : (world ? world.start.x : 0), fin: Rr.seen[r.netId] != null ? Rr.seen[r.netId] : null }); }
     return list.sort((a, b) => (a.fin == null) - (b.fin == null) || (a.fin != null ? a.fin - b.fin : b.x - a.x));
@@ -9983,7 +9993,7 @@
     const Rr = GPR;
     if (id === "you") {
       const p = player;
-      if (p.star > 0 || Rr.myFin != null) return;
+      if (p.star > 0 || Rr.myFin != null || (GP && GP.watch)) return;
       if (Rr.myShield) { Rr.myShield = false; burst(p.x, p.y + p.hh / 2, [0x6ac8ff, 0xffffff], 14, 5); SFX.pop(); return; }
       p.vx = 0; p.vy = 6; p.ground = false; p.state = "hurt"; p.st = 0.55; p.curl = false; p.mv = null; p.sp = null; p.inv = 1.2;
       Rr.spin = 0.9; SFX.hurt(); flashHud(); burst(p.x, p.y + 1, [0xffffff, 0xf2d040], 10, 5);
@@ -10021,7 +10031,7 @@
       if (tp.life <= 0) { tp.gone = true; world.group.remove(tp.m); continue; }
       const armed = tp.t > 0.6;
       const hitBy = [];
-      if (armed && Math.abs(p.x - tp.x) < 0.8 && Math.abs(p.y - tp.y) < 1.4 && Rr.myFin == null) hitBy.push("you");
+      if (armed && Math.abs(p.x - tp.x) < 0.8 && Math.abs(p.y - tp.y) < 1.4 && Rr.myFin == null && !(GP && GP.watch)) hitBy.push("you");
       for (const v of Rr.rivals) if (armed && v.fin == null && Math.abs(v.x - tp.x) < 0.8 && Math.abs(v.y - tp.y) < 1.4 && Rr.rnd() < 0.85) hitBy.push(v.r.id);
       if (hitBy.length) { if (tp.tid && hitBy.includes("you")) gpSend({ k: "trapGone", tid: tp.tid }); tp.gone = true; world.group.remove(tp.m); burst(tp.x, tp.y + 0.5, [0xff8a2a, 0xffd23a, 0xc8ccd8], 18, 6); SFX.impact(); hitBy.forEach(id => gpHit(id, tp.from)); }
     }
@@ -10143,7 +10153,7 @@
         <div class="panel-hd gold">${ico("trophy")}${esc(cup.name)} · ${esc(G.k.name)}</div>
         <div class="gp-pod">${steps.map((r, i) => r ? `
           <div class="gp-step ${H[i]} ${r.me ? "me" : ""}"><canvas width="176" height="144" data-face="${r.who}"></canvas><b>${esc(r.me ? castOf(r.who).name + " (you)" : r.name)}</b><span class="num">${G.pts[r.id]} pts</span><div class="gp-blk">${H[i].slice(1)}</div></div>` : "").join("")}</div>
-        <p class="adv-note">${place <= 3 ? `${["", "Gold", "Silver", "Bronze"][place]} trophy! ${esc(cup.name)}, ${esc(G.k.name)} class.` : `${ORD(place)} overall: the podium is ${esc(top[0].name)}'s this time. Try the cup again!`}</p>
+        <p class="adv-note">${G.watch ? `<b>${esc(top[0].name)}</b> takes the ${esc(cup.name)}, ${esc(G.k.name)} class, with ${G.pts[top[0].id]} points.` : place <= 3 ? `${["", "Gold", "Silver", "Bronze"][place]} trophy! ${esc(cup.name)}, ${esc(G.k.name)} class.` : `${ORD(place)} overall: the podium is ${esc(top[0].name)}'s this time. Try the cup again!`}</p>
         <div class="adv-btns">
           <button class="btn" id="gpAgain" data-focus data-enter>${ico("flag")}Race the cup again</button>
           <button class="btn ghost" id="gpBack" data-back>${ico("back")}Red Ring Circuit</button>
@@ -10178,7 +10188,7 @@
       if (meM) { NP.who = meM.who; NP.em = meM.em; }          // (your runner: the one you picked in the room)
       const humans = plan.mem.map(m => ({ id: m.id === NP.me ? "you" : m.id, netId: m.id, who: m.who === "emerl" ? "emerl" : m.who, name: m.name, me: m.id === NP.me, human: true }));
       const cpus = plan.cpus.map((who, i) => ({ id: "cpu" + i, who, name: castOf(who).name, skill: plan.skill[i] }));
-      GP = { cup: plan.cup, cupId: cup.id, cls: plan.cls, k: GP_CLS[plan.cls], race: 0, online: true, runners: humans.concat(cpus), pts: {}, done: [], retries: 0 };
+      GP = { cup: plan.cup, cupId: cup.id, cls: plan.cls, k: GP_CLS[plan.cls], race: 0, online: true, runners: humans.concat(cpus), pts: {}, done: [], retries: 0, watch: !!NP.watch };   // (watch: a spectator, with no runner of their own)
       GP.runners.forEach(r => { GP.pts[r.id] = 0; });
       gpGrid();
     });
@@ -10535,7 +10545,7 @@
   const RED_I = `<svg class="ico sx-ring" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="#050a22" stroke-width="4"/><circle cx="8" cy="8" r="6" fill="none" stroke="#e42630" stroke-width="2.2"/><path d="M8 4.6l1 2.2 2.3.2-1.8 1.5.6 2.3L8 9.6l-2.1 1.2.6-2.3-1.8-1.5 2.3-.2z" fill="#ffd21a" stroke="#050a22" stroke-width=".6"/></svg>`;
   let hudCache = {};
   function hud() {
-    const h = host.querySelector(".adv-hud"); if (!h || !player) return;
+    const h = host.querySelector(".adv-hud"); if (!h || !player || !h.querySelector(".adv-car")) return;   // (no run's HUD up: a match just left)
     const p = player, set = (key, val, fn) => { if (hudCache[key] !== val) { hudCache[key] = val; fn(val); } };
     if (mode === "play") {
       const over = p.dead ? null : p.star > 0.05 ? "invincible" : p.inWater && p.air < 12 ? "drowning" : null;
@@ -10691,7 +10701,13 @@
   const randomArena = () => { const o = openArenas(); return o.length ? o[Math.floor(Math.random() * o.length)] : 0; };
   /* the match a room's host starts: everything everyone's game needs to set it up the same */
   function npPlan(R, hostId) {
-    const mem = R.members.map(m => ({ id: m.id, name: m.name, who: resolveWho(m.who), em: m.em || null, team: m.team || 0, r: m.r || 1000, uid: m.uid }));
+    const P = npPlanOf(R, hostId);
+    if (!P.err) P.specs = R.members.filter(m => m.spec).map(m => m.id);    // (the spectators: they play nobody, and watch)
+    return P;
+  }
+  function npPlanOf(R, hostId) {
+    const mem = R.members.filter(m => !m.spec).map(m => ({ id: m.id, name: m.name, who: resolveWho(m.who), em: m.em || null, team: m.team || 0, r: m.r || 1000, uid: m.uid }));
+    if (!mem.length && (R.mode === "race" || R.mode === "story")) return { err: R.mode === "race" ? "Nobody is running: an exhibition race has no CPUs, so someone has to play (or pick the grand prix, where CPUs race)." : "Story co-op needs a player: someone has to be the hero." };
     if (R.mode === "race") return { kind: "race", zone: clamp(R.zone | 0, 0, stages().length - 1), mem };
     if (R.mode === "gp") {                                // the grand prix: the room's players, CPUs in the other places
       const used = new Set(mem.map(m => m.who)), pool = CAST.map(c => c.id).filter(id => !used.has(id));
@@ -10702,7 +10718,7 @@
     }
     if (R.mode === "story") {
       const ep = epOf(R.ep); if (!ep) return { err: "Pick an episode first." };
-      return { kind: "story", ep: R.ep, ch: clamp(R.ch | 0, 0, ep.chapters.length - 1), mem, hero: hostId };
+      return { kind: "story", ep: R.ep, ch: clamp(R.ch | 0, 0, ep.chapters.length - 1), mem, hero: mem.some(m => m.id === hostId) ? hostId : mem[0].id };   // (the host is the hero; a spectating host's, the first player)
     }
     if (R.mode === "tourney") return { kind: "tourney", T: tourMake({ size: R.size, lvl: R.tlvl, goal: R.tgoal, arena: R.tarena, online: true,
       humans: mem.map(m => ({ name: m.name, who: m.who, em: m.em, net: m.id, uid: m.uid, r: m.r })) }) };
@@ -10714,7 +10730,7 @@
       const t0 = slots.filter(s => s.team === 0).length;
       slots.push({ who, ctl: "cpu", lvl: R.lvl, team: t0 <= slots.length - t0 ? 0 : 1 });
     }
-    if (slots.length < 2) return { err: "A battle needs two fighters: set CPUs to 1 or more." };
+    if (slots.length < 2) return { err: mem.length ? "A battle needs two fighters: set CPUs to 1 or more." : "Nobody is playing: set CPUs to 2 or more for the spectators to watch." };
     if (R.teams && new Set(slots.map(s => s.team)).size < 2) return { err: "Red vs Blue needs someone on each side." };
     return { kind: "battle", cfg: { kind: "battle", net: true, slots, teams: !!R.teams, arena: R.arena, rule: R.rule, goal: R.goal, time: R.time, hp: R.hp } };
   }
@@ -10722,8 +10738,10 @@
     npInstall();
     npClear();
     Object.assign(NP, { on: true, host: isHost, room, plan, me, kind: plan.kind, ev: [], snapT: 0, inT: 0, seq: 0, remote: new Map(), race: null, story: null,
-      who: null, em: null, def: null, cnt: { jp: 0, zp: 0, xp: 0, cp: 0, dl: 0, dr: 0 }, sent: null, lastSnap: null, spectator: false });
+      who: null, em: null, def: null, cnt: { jp: 0, zp: 0, xp: 0, cp: 0, dl: 0, dr: 0 }, sent: null, lastSnap: null, spectator: false,
+      watch: (plan.specs || []).includes(me), sp: null });      // (watch: a spectator of the room, playing nobody)
     paused = false; storyRun = null; talk = null;
+    host.classList.toggle("np-watching", NP.watch);
     if (plan.kind === "battle") npBattle(plan.cfg);
     else if (plan.kind === "race") npRace(plan, null);
     else if (plan.kind === "story") npStory(plan);
@@ -10892,6 +10910,8 @@
     NP.ghosts.clear();
     const t = host && host.querySelector(".np-tags"); if (t) t.remove();
     const p = host && host.querySelector(".np-pause"); if (p) p.remove();
+    const s = host && host.querySelector(".np-spec"); if (s) s.remove();
+    if (host) host.classList.remove("np-watching", "np-free");
   }
   function npBackToRoom() {
     if (NP.race) clearTimeout(NP.race.timer);
@@ -10966,12 +10986,116 @@
     host.append(p);
     p.querySelector('[data-k="res"]').onclick = () => p.remove();
     p.querySelector('[data-k="out"]').onclick = () => { p.remove(); if (root.Online) Online.leave(); };
+    if (NP.watch) { p.querySelector(".panel-hd").innerHTML = `${ico("eye")}Spectating`; p.querySelector('[data-k="res"]').innerHTML = `${ico("next")}Keep watching`; }
+  }
+
+  /* ---- SPECTATING. A room's spectator (NP.watch) plays nobody, and nor, in a tournament's match
+     or a story fight, does a player who isn't in it (NP.spectator). In a battle the camera frames
+     the whole arena, as ever, or follows one fighter; in a race or the grand prix it follows any
+     runner -- a player's ghost or a CPU -- or flies free along the course. Left and Right: the one
+     before or after; Z (or Jump): the whole arena / the free camera, and back; in the free camera
+     the arrows move it, and X comes back to the runners. A bar along the bottom says who it is.
+     (In a race the spectator's game still has a runner, for the camera to follow: never seen, and
+     put each frame where the one watched is.) */
+  const SPI = {}, specTap = {};                          // (the spectator's buttons: keys, a pad, the touch bar; the keys tapped since the last frame)
+  const npWatching = () => !!(NP.on && (NP.watch || (battle && NP.spectator)));
+  function npFollowed() {
+    const S = NP.sp; if (!battle || !S || S.view !== "follow" || !npWatching()) return null;
+    return battle.fs.find(f => "f" + f.slot === S.key) || null;
+  }
+  /* who there is to watch, in order: { key, x, y, face, name, sub } */
+  function specList() {
+    if (battle) return battle.fs.filter(f => !f.out).map(f => ({ key: "f" + f.slot, x: f.x, y: f.y, face: f.face, name: f.netName || f.c.name,
+      sub: f.netName ? f.c.name : f.ctl === "cpu" ? "CPU" : f.c.name }));
+    const out = [];
+    if (GP && GPR) {
+      const ord = gpOrder(), place = id => ord.findIndex(o => o.id === id) + 1;
+      for (const r of GP.runners) {
+        if (r.human) { const g = NP.ghosts.get(r.netId); if (g) out.push({ key: r.id, x: g.x, y: g.y, face: (g.rf || [])[2] || 1, name: r.name, sub: castOf(r.who).name + " · " + ORD(place(r.id)) }); }
+        else { const v = gpRunner(r.id); if (v) out.push({ key: r.id, x: v.x, y: v.y, face: (v.f || [])[5] || 1, name: r.name, sub: "CPU · " + ORD(place(r.id)) }); }
+      }
+      return out;
+    }
+    const story = NP.race && NP.race.story;
+    for (const m of (NP.plan && NP.plan.mem) || []) {
+      const g = NP.ghosts.get(m.id); if (!g) continue;
+      const who = story && m.id === NP.plan.hero ? story.ch.who : m.who;
+      out.push({ key: m.id, x: g.x, y: g.y, face: (g.rf || [])[2] || 1, name: m.name, sub: castOf(who).name + (g.fin ? " · home" : "") });
+    }
+    return out;
+  }
+  function npSpecTick(dt) {
+    const what = battle || GPR || NP.race;
+    let S = NP.sp;
+    if (!S || S.what !== what) { S = NP.sp = { what, view: battle ? "all" : "follow", key: S && !battle && S.view !== "all" ? S.key : null, fx: player ? player.x : 0, fy: player ? player.y : 0, L: 0, R: 0, bar: "" }; for (const k in specTap) specTap[k] = 0; }
+    readInput(SPI, 0);
+    const tap = Object.assign({}, specTap); for (const k in specTap) specTap[k] = 0;
+    const L = (SPI.L && !S.L) || tap.L, R = (SPI.R && !S.R) || tap.R; S.L = SPI.L; S.R = SPI.R;
+    const list = specList(), n = list.length, cam = SPI.zp || SPI.jp || tap.Z || tap.J;
+    if (tap.X) SPI.xp = 1;
+    const step = d => { const i = S.view === "follow" ? list.findIndex(o => o.key === S.key) : -1; S.view = "follow"; S.key = list[i < 0 ? (d > 0 ? 0 : n - 1) : (i + d + n) % n].key; };
+    if (battle) {
+      if (cam) { S.view = S.view === "all" ? "follow" : "all"; if (S.view === "follow" && !list.some(o => o.key === S.key) && n) S.key = list[0].key; }
+      else if ((L || R) && n) step(R ? 1 : -1);
+      else if (SPI.xp && S.view === "follow") S.view = "all";
+      if (S.view === "follow" && !list.some(o => o.key === S.key)) S.view = "all";     // (they're out of it)
+    } else {
+      const p = player;
+      if (cam || (SPI.xp && S.view === "free")) {
+        if (S.view === "free") {                         // back to the runners: the one nearest where the camera is
+          S.view = "follow"; let best = null, bd = 1e9;
+          for (const o of list) { const d = Math.abs(o.x - S.fx) + Math.abs(o.y - S.fy) * 0.5; if (d < bd) { bd = d; best = o; } }
+          if (best) S.key = best.key;
+        } else if (cam) { S.view = "free"; S.fx = p.x; S.fy = p.y; }
+      } else if (S.view === "free") {
+        S.fx = clamp(S.fx + (SPI.R - SPI.L) * 20 * dt, 2, world.W - 2); S.fy = clamp(S.fy + (SPI.U - SPI.D) * 12 * dt, 0, H - 4);
+      } else if ((L || R) && n) step(R ? 1 : -1);
+      if (S.view === "follow" && !list.some(o => o.key === S.key) && n) S.key = list[0].key;
+      /* the runner nobody sees, where the camera is to be */
+      const o = S.view === "follow" ? list.find(q => q.key === S.key) : null;
+      const x = o ? o.x : S.view === "free" ? S.fx : p.x, y = o ? o.y : S.view === "free" ? S.fy : p.y;
+      if (Math.abs(x - p.x) < 8 && dt > 0) p.vx = clamp(lerp(p.vx || 0, (x - p.x) / dt, 0.2), -30, 30);   // (a cut to someone else: no speed)
+      p.x = x; p.y = y; if (o) p.face = o.face < 0 ? -1 : 1;
+      p.vy = 0; p.ground = true; p.inv = 99; p.dead = 0; p.state = "run"; p.curl = false;
+    }
+    host.classList.toggle("np-free", S.view === "free");
+    npSpecBar(S, list);
+  }
+  /* the bar along the bottom: who's being watched, and the keys (on a touch screen, buttons) */
+  function npSpecBar(S, list) {
+    const h = host.querySelector(".adv-hud"); if (!h) return;
+    let el = h.querySelector(".np-spec");
+    if (!el) {
+      el = document.createElement("div"); el.className = "np-spec";
+      el.innerHTML = `<div class="np-spec-t"><i>${ico("eye")}Spectating</i><b></b><small></small></div><p class="np-spec-k"></p>` +
+        (TOUCH ? `<div class="np-spec-b"><button data-t="L" aria-label="The one before">${ico("back")}</button><button data-t="U" class="fv up" aria-label="Up">${ico("down")}</button>` +
+          `<button data-t="Z" class="cam" aria-label="Change the camera">${ico("eye")}</button><button data-t="D" class="fv" aria-label="Down">${ico("down")}</button><button data-t="R" aria-label="The one after">${ico("next")}</button></div>` : "");
+      h.append(el); wirePad(el); S.bar = "";
+    }
+    const o = S.view === "follow" ? list.find(q => q.key === S.key) : null, two = `${td("L")}${td("R")}`;
+    let t, sub, k;
+    if (battle) {
+      if (o) { t = o.name; sub = o.sub; k = `${two} switch · ${tk("Z")} the whole arena`; }
+      else { t = "The whole arena"; sub = list.length + " in the fight"; k = `${two} follow a fighter`; }
+    } else if (S.view === "free") { t = "Free camera"; sub = "Anywhere on the course"; k = `${td("L")}${td("R")}${td("U")}${td("D")} move · ${tk("Z")} back to the runners`; }
+    else if (o) { t = o.name; sub = o.sub; k = `${two} switch runner · ${tk("Z")} free camera`; }
+    else { t = "Waiting for the runners…"; sub = ""; k = ""; }
+    const key = t + "|" + sub + "|" + k + "|" + S.view;
+    if (S.bar === key) return;
+    S.bar = key;
+    el.querySelector("b").textContent = t; el.querySelector("small").textContent = sub;
+    el.querySelector(".np-spec-k").innerHTML = TOUCH ? "" : k;
+    el.classList.toggle("free", S.view === "free");
+    /* who's being watched: their card in a battle, their face on the grand prix's strip */
+    h.querySelectorAll(".adv-fc.watch, .gp-strip span.watch").forEach(x => x.classList.remove("watch"));
+    if (o && battle) { const f = battle.fs.find(q => "f" + q.slot === o.key), c = f && h.querySelector(`.adv-fc[data-i="${battle.fs.indexOf(f)}"]`); if (c) c.classList.add("watch"); }
+    if (o && GP && GPR) { const i = GP.runners.findIndex(r => r.id === o.key), s = h.querySelector(`[data-gs="${i}"]`); if (s) s.classList.add("watch"); }
   }
 
   /* ---- a race: everyone their own copy, the others as ghosts */
   function npRace(plan, story) {
-    const meM = plan.mem.find(m => m.id === NP.me) || plan.mem[0];
-    NP.who = story && NP.host ? story.ch.who : meM.who; NP.em = meM.em;
+    const meM = plan.mem.find(m => m.id === NP.me) || plan.mem[0];                 // (a spectator: nobody's -- the runner made is never seen)
+    NP.who = story && NP.me === plan.hero ? story.ch.who : meM.who; NP.em = meM.em;
     NP.def = story ? (story.ch.kind === "zone" ? actDef(stageAt(story.ch.zone), story.act || 0) : story.ch.kind === "race" ? raceDef(stageAt(story.ch.zone)) : storyDef(story.ch)) : actDef(plan.zone, 0);
     NP.race = { fin: new Map(), go: false, count: 0, story, mine: null, done: false, timer: null, said: -1 };
     play();
@@ -10989,7 +11113,7 @@
       if (n !== R.said) { R.said = n; if (n > 0) { caption(String(n), true); SFX.blip ? SFX.blip() : SFX.pop(); } else { caption("Go!"); SFX.dash(); world.t = 0; } }
     }
     NP.gT += dt;
-    if (NP.gT >= 0.1 && player && R.go) {
+    if (NP.gT >= 0.1 && player && R.go && !NP.watch) {               // (a spectator runs nowhere)
       NP.gT = 0;
       const p = player, d = { t: "np.g", x: r3(p.x), y: r3(p.y), rf: p._rf || ["idle", 0, 1], fin: R.mine != null ? 1 : 0 };
       if (NP.host) { Online.toAll(Object.assign({ id: NP.me }, d), true); } else Online.toHost(d);
@@ -11086,7 +11210,7 @@
     mode = "results"; bgm("competition-results");
     host.querySelector(".adv-hud").classList.remove("on");
     const place = res.findIndex(r => r.id === NP.me), won = place === 0 && res[0].time != null;
-    const rec = root.Auth && Auth.user ? Auth.record({ kind: "race", won, online: true }) : null;
+    const rec = root.Auth && Auth.user && !NP.watch ? Auth.record({ kind: "race", won, online: true }) : null;   // (watched: not on your record)
     const ov = host.querySelector(".adv-ov");
     ov.innerHTML = `
       <div class="panel adv-small adv-bres pop">
@@ -11178,12 +11302,14 @@
     if (world && world.def.arena) glideX = world.W / 2;
     else if (world) { glideX = Math.max(12, Math.min(world.W - 31, (world.goal ? world.goal.x : world.W) - 22)); camX = glideX + 3; }
     playScene(S.ch.after, () => {
-      saveData.story = saveData.story || {};
-      const eps = saveData.story.eps = saveData.story.eps || {};
-      eps[S.ep.who] = Math.max(eps[S.ep.who] || 0, S.plan.ch + 1); save(saveData);
+      if (!NP.watch) {                                   // (a spectator watched it: their save is as it was)
+        saveData.story = saveData.story || {};
+        const eps = saveData.story.eps = saveData.story.eps || {};
+        eps[S.ep.who] = Math.max(eps[S.ep.who] || 0, S.plan.ch + 1); save(saveData);
+      }
       const ov = screenOn("story");
       ov.innerHTML = `<div class="panel adv-small pop"><div class="panel-hd gold">${ico("check")}Chapter ${S.plan.ch + 1}: ${esc(S.ch.title)}</div>
-        <p class="adv-note">Cleared together. It counts in ${esc(poss(castOf(S.ep.who).name))} episode on your save too.</p>
+        <p class="adv-note">${NP.watch ? "Cleared by the players. You watched: your own save is as it was." : `Cleared together. It counts in ${esc(poss(castOf(S.ep.who).name))} episode on your save too.`}</p>
         <div class="adv-btns"><button class="btn" id="npBack" data-focus data-enter>${ico("back")}Back to the room</button></div></div>`;
       ov.querySelector("#npBack").onclick = () => npBackToRoom(); autoFocus();
     });
