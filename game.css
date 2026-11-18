@@ -662,6 +662,16 @@
 .ao-mrow span{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}
 .ao-mrow b{display:flex;align-items:center;gap:4px;font:700 14px/1.1 var(--sx-pix);text-shadow:var(--sx-out1)}
 .ao-mrow b .ico{width:15px;height:15px}
+/* a player's ping: four bars beside the name, lit green to red by how quick (the time on hover) */
+.ao-ping{display:inline-flex;align-items:flex-end;gap:2px;height:13px;margin-left:5px;padding:0 1px;cursor:help}
+.ao-ping s{display:block;width:4px;border:1.5px solid var(--sx-ink);border-radius:1px;background:rgba(184,212,255,.22);box-sizing:content-box}
+.ao-ping s:nth-child(1){height:3px}.ao-ping s:nth-child(2){height:6px}.ao-ping s:nth-child(3){height:9px}.ao-ping s:nth-child(4){height:12px}
+.ao-ping.p4 s{background:#3ae06a}
+.ao-ping.p3 s:nth-child(-n+3){background:#b8e03a}
+.ao-ping.p2 s:nth-child(-n+2){background:#ffb020}
+.ao-ping.p1 s:nth-child(1){background:#ff4a3a}
+.ao-ping.p0 s{animation:aoPingWait 1.2s steps(1) infinite}.ao-ping.p0 s:nth-child(2){animation-delay:.3s}.ao-ping.p0 s:nth-child(3){animation-delay:.6s}.ao-ping.p0 s:nth-child(4){animation-delay:.9s}
+@keyframes aoPingWait{0%{background:rgba(184,212,255,.55)}25%,100%{background:rgba(184,212,255,.22)}}
 .ao-mrow small{font:500 11.5px/1.2 var(--sx-pix);color:var(--sx-pale)}
 .ao-mrow em{font:700 11.5px/1 var(--sx-pix);font-style:normal;color:var(--sx-pale);padding:5px 8px;border-radius:6px;border:2px solid var(--sx-ink);background:rgba(5,10,34,.4)}
 .ao-mrow.ready em{background:var(--sx-grn);color:#fff;text-shadow:var(--sx-out1)}

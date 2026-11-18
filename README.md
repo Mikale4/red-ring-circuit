@@ -542,8 +542,11 @@ player's key pair signing what they send and sealing their messages; a room link
 straight to the host (PeerJS), with a relay over the brokers when that cannot connect. The
 **lobby** lists the open rooms (Quick match joins one, or makes one), the players online (a
 card each: challenge, invite, add as a friend, message, block) and the leaderboard, beside the
-lobby chat. A **room** is for one of four things, set by its host, its players picking their
-fighters, readying up and chatting (and quick lines):
+lobby chat. A **room** is for one of five things, set by its host, its players picking their
+fighters, readying up and chatting (and quick lines). Beside each player's name are their ping
+bars: the host times a round trip to every player every two seconds and shares the table, four
+bars green under 60 ms, three under 120, two (orange) under 200, one (red) over that; the time
+shows on hover, and the host's own are full (the room runs on their connection).
 
 - **Battle**: up to four, the host's arena, rules, lives or KOs, time and health, teams or not,
   CPUs to fill. The host runs the fight and sends it out twenty times a second; everyone's

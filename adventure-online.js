@@ -271,6 +271,39 @@
     clearTimeout(pushT);
     pushT = setTimeout(() => { if (!N || !N.host) return; toAll({ t: 'room', room: N.room }, true); Dir.update(); setPresence(); redraw(); }, 30);
   }
+  /* PING: how long a player's messages take to reach the host and come back (a room is the host's
+     connection to each player, straight or through the relay). The host sends each player a ping
+     every two seconds and smooths the round trips; the table goes to the room in a message of its
+     own, and the bars beside each name show it (the host's own: theirs is the room). */
+  const PING_EVERY = 2000;
+  function hostPing(S0) {
+    if (N !== S0 || !S0.host || !S0.room) { clearInterval(S0.pingT); return; }
+    const now = performance.now(), table = {};
+    for (const m of S0.room.members) {
+      if (m.host) continue;
+      toMember(m.id, { t: 'ping', s: now });
+      const M = S0.mem.get(m.id);
+      if (M && M.pongAt && now - M.pongAt > PING_EVERY * 3) m.ping = Math.max(m.ping || 0, Math.round(now - M.pongAt));   // (no answer for a while: as slow as that at least)
+      if (m.ping != null) table[m.id] = m.ping;
+    }
+    toAll({ t: 'pings', p: table }, true);
+    paintPings();
+  }
+  /* the bars: four, lit by how quick (60, 120, 200 ms and over), the time on hover */
+  const pingLevel = ms => ms == null ? 0 : ms < 60 ? 4 : ms < 120 ? 3 : ms < 200 ? 2 : 1;
+  function pingBars(m) {
+    const lv = m.host ? 4 : pingLevel(m.ping);
+    const tip = m.host ? 'Host: the room runs on their connection' : m.ping == null ? 'Measuring the ping…' : 'Ping ' + Math.round(m.ping) + ' ms';
+    return `<i class="ao-ping p${lv}" data-pid="${esc(m.id)}" title="${tip}" aria-label="${tip}"><s></s><s></s><s></s><s></s></i>`;
+  }
+  function paintPings() {
+    if (!N || !N.room) return;
+    document.querySelectorAll('.ao-ping[data-pid]').forEach(el => {
+      const m = memberOf(el.dataset.pid); if (!m) return;
+      const tmp = document.createElement('div'); tmp.innerHTML = pingBars(m);
+      const nw = tmp.firstChild; el.className = nw.className; el.title = nw.title; el.setAttribute('aria-label', nw.getAttribute('aria-label'));
+    });
+  }
   function sysSay(text) { if (!N) return; const c = { sys: text }; if (N.host) { toAll({ t: 'chat', c }, true); gotChat(c); } }
   function hostConn(conn) {
     conn.on('data', d => hostData(conn, d));
@@ -324,6 +357,13 @@
         break;
       }
       case 'back': m.back = true; break;                 // (a guest has seen the results)
+      case 'pong': {                                     // a ping come back: the round trip, smoothed
+        const rtt = performance.now() - (+d.s || 0), M = N.mem.get(id);
+        if (!(rtt >= 0 && rtt < 30000)) break;
+        if (M) M.pongAt = performance.now();
+        m.ping = m.ping == null ? Math.round(rtt) : Math.round(m.ping * 0.6 + rtt * 0.4);
+        break;
+      }
       case 'leave': memberGone(id, 'left'); break;
     }
   }
@@ -378,6 +418,8 @@
       case 'kick': toast('The host removed you from the room.', 'bad'); endSession(); AO.lobby(); break;
       case 'closed': hostGone('The host closed the room.'); break;
       case 'start': N.room = d.room; A.np.start(false, d.room, d.plan, N.myId); break;
+      case 'ping': toHost({ t: 'pong', s: d.s }); break;  // (straight back: the host times it)
+      case 'pings': if (N.room && d.p && typeof d.p === 'object') { for (const m of N.room.members) if (typeof d.p[m.id] === 'number') m.ping = d.p[m.id]; paintPings(); } break;
     }
   }
   function hostGone(text) {
@@ -411,7 +453,7 @@
       try { if (S0.conn) S0.conn.close(); } catch (e) { /* fine */ }
       try { if (S0.peer) S0.peer.destroy(); } catch (e) { /* fine */ }
     }, 300);
-    clearTimeout(S0.relayT);
+    clearTimeout(S0.relayT); clearInterval(S0.pingT);
     setPresence();
   }
   Online.leave = silent => {
@@ -445,6 +487,7 @@
         const me = meInfo();
         S0.room.members.push({ id, uid: Auth.id, name: Auth.name, lv: me.lv, r: me.r, who: me.who, em: me.em, team: 0, ready: true, host: true });
         S0.stage = 'room';
+        S0.pingT = setInterval(() => hostPing(S0), PING_EVERY);
         Dir.host(code, listing);
         S0.relay = Relay.host(code, link => { if (N === S0) hostConn(link); });
         setPresence(); AO.room();
@@ -709,7 +752,7 @@
               <div class="ao-mlist">${R.members.map(m => `
                 <div class="ao-mrow ${m.ready || m.host ? 'ready' : ''} ${R.teams && R.mode === 'battle' ? 'team' + m.team : ''}">
                   <canvas class="ao-face" width="44" height="40" data-face="${esc(m.who === 'random' ? 'sonic' : m.who)}"></canvas>
-                  <span><b>${m.host ? ico('crown') : ''}${esc(m.name)}</b><small>${esc(m.who === 'random' ? 'Random' : A.castName(m.who))} · Lv ${m.lv}</small></span>
+                  <span><b>${m.host ? ico('crown') : ''}${esc(m.name)}${pingBars(m)}</b><small>${esc(m.who === 'random' ? 'Random' : A.castName(m.who))} · Lv ${m.lv}</small></span>
                   <em>${m.host ? 'Host' : m.ready ? 'Ready' : 'Not ready'}</em>
                   ${host && !m.host ? `<button class="ao-mini" data-kick="${m.id}" title="Remove">${ico('cross')}</button>` : ''}
                 </div>`).join('')}</div>
