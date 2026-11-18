@@ -12,6 +12,7 @@
     { id: "sfxVolume", label: "Sound effects", type: "choice", def: 0.7, choices: [[0, "Off"], [0.4, "Quiet"], [0.7, "Normal"], [1, "Loud"]] },
     { id: "textSpeed", label: "Dialogue speed", type: "choice", def: 18, choices: [[34, "Relaxed"], [18, "Normal"], [7, "Fast"], [0, "Instant"]] },
     { id: "shake", label: "Screen shake", type: "toggle", def: true },
+    { id: "tagPing", label: "Ping on player tags", type: "toggle", def: true },
   ];
   const defaults = () => { const o = {}; for (const d of DEFS) o[d.id] = d.def; return o; };
   let cache = null;

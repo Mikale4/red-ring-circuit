@@ -6763,7 +6763,9 @@
   const BURST_MAX = 100;
   const SLOT_C = ["#e8403a", "#3a7ae0", "#e8b020", "#3aa04a"], TEAM_C = ["#e8403a", "#3a7ae0"], TEAM_N = ["Red", "Blue"];
   const tagCol = f => battle && battle.teams ? TEAM_C[f.team] : SLOT_C[f.slot];
-  const tagText = f => f.netName && f.ctl !== "p1" ? esc(f.netName) : f.ctl === "p1" ? "1P" : f.ctl === "p2" ? "2P" : "CPU";
+  /* an online player's ping bars, from the room (they go on updating by themselves) */
+  const pingTag = id => NP.on && id && root.Online && Online.pingBars && !(root.Settings && Settings.get("tagPing") === false) ? Online.pingBars(id) : "";   // (Options can turn them off)
+  const tagText = f => (f.netName && f.ctl !== "p1" ? esc(f.netName) : f.ctl === "p1" ? "1P" : f.ctl === "p2" ? "2P" : "CPU") + pingTag(f.net);
 
   /** A fighter is hit. Unless their guard is up (the shield takes it: a clink, a push back),
       the damage comes off their health and they are knocked away -- a jab barely moves them,
@@ -8434,6 +8436,7 @@
             ${row("Sound effects", "", setSeg("sfxVolume"))}
             ${row("Dialogue speed", "How quickly the story's talk types out.", setSeg("textSpeed"))}
             ${row("Screen shake", "The jolt when a heavy blow lands.", seg("set:shake", [[1, "On"], [0, "Off"]], S && S.get("shake") === false ? 0 : 1))}
+            ${row("Ping on player tags", "Online: each player's ping bars by their name, over their head and on their card.", seg("set:tagPing", [[1, "On"], [0, "Off"]], S && S.get("tagPing") === false ? 0 : 1))}
           </div>
           <p class="adv-note">Music, sound, dialogue speed and screen shake are Post Parade's own settings: they change for the whole game.</p>
           <div class="panel-hd adv-hd2">${ico("arcade")}Two players, one keyboard</div>
@@ -8459,6 +8462,7 @@
       const key = el.dataset.seg, v = el.dataset.v;
       if (key === "pad") { KEYMAP.padSwap = v === "1"; saveKeys(); }
       else if (key === "set:shake") S && S.set("shake", v === "1");
+      else if (key === "set:tagPing") S && S.set("tagPing", v === "1");
       else if (S) { const d = def(key.slice(4)); const c = d && d.choices.find(c => String(c[0]) === v); if (c) S.set(d.id, c[0]); }
       bgmVolume();
       optionsScreen();
@@ -11025,7 +11029,7 @@
     camera.updateMatrixWorld();
     for (const g of NP.ghosts.values()) {
       let el = box.querySelector(`[data-g="${g.id}"]`);
-      if (!el) { el = document.createElement("span"); el.className = "adv-tag np-gtag"; el.dataset.g = g.id; el.textContent = g.name; box.append(el); }
+      if (!el) { el = document.createElement("span"); el.className = "adv-tag np-gtag"; el.dataset.g = g.id; el.innerHTML = esc(g.name) + pingTag(g.id); box.append(el); }
       TV.set(g.x, g.y + 1.45, 0).project(camera);
       const sx = Math.round((TV.x + 1) / 2 * W), sy = Math.round((1 - TV.y) / 2 * Hh), off = TV.z > 1 || sx < -40 || sx > W + 40;
       el.style.display = off ? "none" : "";

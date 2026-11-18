@@ -297,7 +297,7 @@
      150, 250, 400 ms), from their presence; yours from your game */
   function netBars(id) {
     const ms = id === Auth.id ? Net.ping : (Net.online(id) || {}).pg;
-    if (typeof ms !== 'number') return '';
+    if (typeof ms !== 'number') { const tip = 'Measuring the connection…'; return `<i class="ao-ping p0" title="${tip}" aria-label="${tip}"><s></s><s></s><s></s><s></s></i>`; }
     const lv = ms < 150 ? 4 : ms < 250 ? 3 : ms < 400 ? 2 : 1, tip = (id === Auth.id ? 'Your connection ' : 'Connection ') + ms + ' ms';
     return `<i class="ao-ping p${lv}" title="${tip}" aria-label="${tip}"><s></s><s></s><s></s><s></s></i>`;
   }
@@ -306,6 +306,7 @@
     const tip = m.host ? 'Host: the room runs on their connection' : m.ping == null ? 'Measuring the ping…' : 'Ping ' + Math.round(m.ping) + ' ms';
     return `<i class="ao-ping p${lv}" data-pid="${esc(m.id)}" title="${tip}" aria-label="${tip}"><s></s><s></s><s></s><s></s></i>`;
   }
+  Online.pingBars = id => { const m = N && N.room ? memberOf(id) : null; return m ? pingBars(m) : ''; };
   function paintPings() {
     if (!N || !N.room) return;
     document.querySelectorAll('.ao-ping[data-pid]').forEach(el => {
@@ -615,7 +616,7 @@
     setPresence();
     ov.innerHTML = `
       <div class="ao-page pop">
-        <div class="ao-head"><button class="btn ghost" data-back data-k="back">${ico('back')}Main menu</button><h2>${ico('comet')}Online lobby</h2><span class="ao-net"></span></div>
+        <div class="ao-head"><button class="btn ghost" data-back data-k="back">${ico('back')}Main menu</button><h2>${ico('comet')}Online lobby</h2><span class="ao-net"></span><button class="btn ghost ao-tourb" data-tour data-k="tour" title="A tour of the lobby">${ico('info')}Tour</button></div>
         <div class="ao-grid">
           <div class="panel ao-left">
             ${tabsHtml([['rooms', 'Rooms'], ['players', 'Players online'], ['top', 'Leaderboard']], tab)}
@@ -687,7 +688,93 @@
       Net.on('chat', drawChat), Net.on('state', () => { drawNet(); drawList(); drawChat(); })];
     const alive = setInterval(() => { if (!ov.isConnected || !ov.querySelector('.ao-list')) { clearInterval(alive); offs.forEach(f => f()); } }, 1000);
     drawList(); drawChat(); drawNet(); log.scrollTop = 1e6;
+    ov.querySelector('[data-tour]').onclick = () => AO.lobbyTour();
     A.autoFocus();
+    if (!(Auth.S.tours && Auth.S.tours.lobby) && !tourOn) setTimeout(() => { if (ov.isConnected && A.where() === 'lobby' && !tourOn) AO.lobbyTour(); }, 450);   // (the first time: the tour)
+  };
+
+  /* ---------------------------------------------------- THE TOURS
+     A spotlight on one thing at a time -- the rest of the screen dimmed -- and a card beside it
+     saying what it is. Back, Next and Skip by pointer or touch; by keys, Enter, Z or the right arrow
+     go on, the left arrow back, X or Esc out. A step can open a tab of the lobby first; a step with
+     no target is a card in the middle. */
+  let tourOn = null;
+  function runTour(steps, done) {
+    if (tourOn) tourOn.end();
+    const host = A.host(), el = document.createElement('div'); el.className = 'ao-tour';
+    el.innerHTML = `<div class="ao-tour-hole"></div><div class="panel ao-tour-card pop"><div class="ao-tour-hd"><b></b><span></span></div><p></p>
+      <div class="ao-tour-btns"><button class="btn ghost" data-tb>${ico('back')}Back</button><button class="btn ghost" data-ts>Skip the tour</button><button class="btn" data-tn>Next${ico('next')}</button></div></div>`;
+    host.append(el);
+    const hole = el.querySelector('.ao-tour-hole'), card = el.querySelector('.ao-tour-card');
+    let i = 0, raf = 0;
+    const T = tourOn = { end: (fin) => { cancelAnimationFrame(raf); removeEventListener('keydown', key, true); removeEventListener('resize', place); el.remove(); tourOn = null; if (done) done(!!fin); } };
+    const target = () => { const st = steps[i]; return st.at ? A.host().querySelector(st.at) : null; };
+    function place() {
+      const H = host.getBoundingClientRect(), t = target(), pad = 6;
+      if (t && t.offsetParent !== null) {
+        const r = t.getBoundingClientRect();
+        const x = r.left - H.left - pad, y = r.top - H.top - pad, w = r.width + pad * 2, h = r.height + pad * 2;
+        Object.assign(hole.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px', opacity: 1 });
+        const cw = card.offsetWidth, ch = card.offsetHeight, gap = 14;
+        let cy = y + h + gap; if (cy + ch > H.height - 8) cy = y - ch - gap; if (cy < 8) cy = Math.max(8, Math.min(H.height - ch - 8, y + h / 2 - ch / 2));
+        let cx = x + w / 2 - cw / 2; cx = Math.max(8, Math.min(H.width - cw - 8, cx));
+        if (cy < y + h && cy + ch > y && (cx < x + w && cx + cw > x)) { cx = x + w + gap + cw < H.width ? x + w + gap : Math.max(8, x - cw - gap); }   // (never over the thing it's about)
+        Object.assign(card.style, { left: cx + 'px', top: cy + 'px' });
+      } else {
+        Object.assign(hole.style, { left: H.width / 2 + 'px', top: H.height / 2 + 'px', width: '0px', height: '0px', opacity: 1 });
+        Object.assign(card.style, { left: Math.max(8, (H.width - card.offsetWidth) / 2) + 'px', top: Math.max(8, (H.height - card.offsetHeight) / 2) + 'px' });
+      }
+    }
+    const loop = () => { place(); raf = requestAnimationFrame(loop); };
+    function show(k) {
+      i = Math.max(0, Math.min(steps.length - 1, k));
+      const st = steps[i];
+      if (st.before) st.before();
+      card.querySelector('.ao-tour-hd b').textContent = st.title;
+      card.querySelector('.ao-tour-hd span').textContent = (i + 1) + ' / ' + steps.length;
+      card.querySelector('p').innerHTML = st.text;
+      card.querySelector('[data-tb]').disabled = i === 0;
+      const last = i === steps.length - 1, nb = card.querySelector('[data-tn]');
+      nb.innerHTML = last ? ico('check') + 'Got it' : 'Next' + ico('next');
+      card.querySelector('[data-ts]').hidden = last;
+      card.classList.remove('pop'); void card.offsetWidth; card.classList.add('pop');
+      A.paintAll(card);
+      try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) { /* fine */ }   // (keys are the tour's; nothing under it gets them)
+    }
+    const next = () => { if (i >= steps.length - 1) T.end(true); else show(i + 1); };
+    card.querySelector('[data-tn]').onclick = next;
+    card.querySelector('[data-tb]').onclick = () => show(i - 1);
+    card.querySelector('[data-ts]').onclick = () => T.end(false);
+    function key(e) {
+      const k = e.key;
+      if (['Enter', 'z', 'Z', ' ', 'ArrowRight'].includes(k)) next();
+      else if (k === 'ArrowLeft' || k === 'Backspace') show(i - 1);
+      else if (k === 'x' || k === 'X' || k === 'Escape') T.end(false);
+      else return;
+      e.preventDefault(); e.stopImmediatePropagation();
+    }
+    addEventListener('keydown', key, true); addEventListener('resize', place);
+    show(0); loop();
+    return T;
+  }
+  const tourBar = (lv, ms) => `<i class="ao-ping p${lv}" title="${ms}"><s></s><s></s><s></s><s></s></i>`;
+  AO.lobbyTour = () => {
+    if (A.where() !== 'lobby') return;
+    const tab = t => () => { if (AO._tab !== t && A.where() === 'lobby') AO.lobby(t); };
+    runTour([
+      { title: 'The online lobby', text: 'This is where you meet other players: chat, find a room, or open your own and play together -- battles, races, the grand prix, story co-op and tournaments. Here\'s a quick look round. <em>Enter, Z or the right arrow go on; X skips.</em>' },
+      { at: '.ao-tabs', before: tab('rooms'), title: 'Three lists', text: '<b>Rooms</b> open right now, the <b>Players online</b>, and the <b>Leaderboard</b> of online ratings. Pick one with these tabs (or the arrow keys and Z).' },
+      { at: '.ao-list', before: tab('rooms'), title: 'Rooms', text: 'Each room shows what it\'s for, its settings, its host and how many are in it. <b>Join</b> to go in; a lock means it needs a password.' },
+      { at: '[data-q]', title: 'Quick match', text: 'Straight into the fullest open room -- or, if there isn\'t one, a room of your own that others can join.' },
+      { at: '[data-h]', title: 'Host a room', text: 'Open your own: you pick what it\'s for and its settings, and you can make it private with a password. Everyone who joins picks their fighter and readies up; you press <b>Start</b>.' },
+      { at: '.ao-join', title: 'Join by code', text: 'Every room has a five-letter code. A friend can tell you theirs: type it here and press Join.' },
+      { at: '.ao-list', before: tab('players'), title: 'Players online', text: 'Everyone here now, friends first. Click someone for their card: add them as a friend, message them, challenge them, or invite them to your room.' },
+      { at: '.ao-net', title: 'Ping bars', text: `These bars are how quick a connection is: ${tourBar(4, 'quick')} four green bars are quick, ${tourBar(3, '')} ${tourBar(2, '')} fewer are slower, ${tourBar(1, 'slow')} one red bar is slow (point at them for the milliseconds). These are <b>yours</b>; every player in the list has theirs by their name.` },
+      { title: 'Ping bars in rooms and matches', text: 'In a room, each player\'s bars are their ping to the host. In a match they go along on everyone\'s name tag too, over their head and on their card. Don\'t want them there? <b>Options &rarr; Ping on player tags</b> turns them off.' },
+      { at: '.ao-right', title: 'The lobby chat', text: 'Say hello to everyone here. Click a name in the chat for their card. Rooms have a chat of their own, with quick lines to send in one tap.' },
+      { title: 'Friends and your card', text: 'At the top of the main menu are your <b>player card</b> (your record, and your favourite fighter: your picture for everyone), <b>Friends</b> and <b>Messages</b>.' },
+      { at: '[data-tour]', before: tab('rooms'), title: 'That\'s the lobby', text: 'This button runs the tour again any time. <b>Main menu</b> (or X) goes back. Have fun out there!' },
+    ], () => { Auth.S.tours = Object.assign({}, Auth.S.tours, { lobby: Date.now() }); Auth.save(); });
   };
   function askPass(code) {
     const body = document.createElement('div');

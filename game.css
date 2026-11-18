@@ -961,3 +961,26 @@
 /* the lobby's connection bars: beside a player's name, and yours by the Online line */
 .ao-who-b b .ao-ping,.ao-net .ao-ping{margin-left:6px}
 .ao-net .ao-ping{vertical-align:-1px}
+/* ping bars on the in-game tags (an online player's name over their head, on their HUD card, a ghost's) */
+.adv-tag .ao-ping,.adv-fc-nm .ao-ping{height:10px;margin-left:4px;gap:1px;vertical-align:-1px;cursor:default}
+.adv-tag .ao-ping s,.adv-fc-nm .ao-ping s{width:3px;border-width:1px}
+.adv-tag .ao-ping s:nth-child(1),.adv-fc-nm .ao-ping s:nth-child(1){height:2px}
+.adv-tag .ao-ping s:nth-child(2),.adv-fc-nm .ao-ping s:nth-child(2){height:4px}
+.adv-tag .ao-ping s:nth-child(3),.adv-fc-nm .ao-ping s:nth-child(3){height:6px}
+.adv-tag .ao-ping s:nth-child(4),.adv-fc-nm .ao-ping s:nth-child(4){height:8px}
+/* ---- the tours: a spotlight on one thing, the rest dimmed, and a card saying what it is */
+.ao-tour{position:absolute;inset:0;z-index:60}
+.ao-tour-hole{position:absolute;border:3px solid var(--sx-yel);border-radius:12px;box-shadow:0 0 0 4000px rgba(5,10,34,.66),0 0 18px rgba(255,210,26,.55);
+  transition:left .28s cubic-bezier(.3,.9,.3,1),top .28s cubic-bezier(.3,.9,.3,1),width .28s cubic-bezier(.3,.9,.3,1),height .28s cubic-bezier(.3,.9,.3,1);pointer-events:none}
+.ao-tour-card{position:absolute;width:min(380px,calc(100% - 16px));padding:0 0 12px}
+.ao-tour-hd{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px 8px;border-bottom:3px solid var(--sx-ink);background:var(--sx-blue)}
+.ao-tour-hd b{font:900 italic 19px/1.05 var(--sx-big);color:var(--sx-yel);-webkit-text-stroke:5px var(--sx-ink);paint-order:stroke fill}
+.ao-tour-hd span{font:700 12px/1 var(--sx-pix);color:var(--sx-pale)}
+.ao-tour-card p{margin:0;padding:10px 14px 4px;font:600 14px/1.45 var(--sx-pix);color:#fff;text-shadow:var(--sx-out1)}
+.ao-tour-card p b{color:var(--sx-yel)}
+.ao-tour-card p em{display:block;margin-top:6px;color:var(--sx-pale);font-style:normal;font-size:12.5px}
+.ao-tour-card p .ao-ping{vertical-align:-1px;margin:0 2px}
+.ao-tour-btns{display:flex;gap:8px;padding:8px 14px 0;justify-content:flex-end;flex-wrap:wrap}
+.ao-tour-btns .btn{padding:8px 12px;font-size:14px}
+.ao-tour-btns [data-ts]{margin-right:auto}
+.ao-tourb{padding:7px 12px}

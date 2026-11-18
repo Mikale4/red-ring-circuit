@@ -541,7 +541,12 @@ your own card, from your team; it's kept with your account and the others see it
 **Online** works the way the other games' lobbies do, with no server of its own: presence,
 profiles, the lobby chat, the room list and private messages go over public MQTT brokers, each
 player's key pair signing what they send and sealing their messages; a room links its players
-straight to the host (PeerJS), with a relay over the brokers when that cannot connect. The
+straight to the host (PeerJS), with a relay over the brokers when that cannot connect. The first
+time an account comes into the lobby it gets a **tour**: a spotlight on each part in turn (the
+tabs, rooms, Quick match, hosting, joining by code, the players, the ping bars and how to turn
+off the ones on name tags, the chat, friends and your card), a card beside it saying what it is,
+Back, Next and Skip (Enter, Z or the right arrow on, the left arrow back, X out); the lobby's
+Tour button plays it again. The
 **lobby** lists the open rooms (Quick match joins one, or makes one), the players online (a
 card each: challenge, invite, add as a friend, message, block) and the leaderboard, beside the
 lobby chat. A **room** is for one of five things, set by its host, its players picking their
@@ -552,7 +557,9 @@ shows on hover, and the host's own are full (the room runs on their connection).
 The lobby's player list has bars too, for each player's own connection: every game sends itself a
 note through the brokers every ten seconds and times it there and back, and sends the result with
 its presence (four bars under 150 ms, three under 250, two under 400, one over); yours shows by the
-Online line at the top.
+Online line at the top. Until a player's first measurement arrives their bars pulse grey. In a match, each
+player's room bars can show on their tag too -- over their head and on their HUD card, and on the
+other runners' name tags in races -- with Options' **Ping on player tags** (on at first; turn it off there).
 
 - **Battle**: up to four, the host's arena, rules, lives or KOs, time and health, teams or not,
   CPUs to fill. The host runs the fight and sends it out twenty times a second; everyone's

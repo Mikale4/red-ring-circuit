@@ -151,7 +151,7 @@
     const cl = Net.clients; Net.clients = null; session = null;
     timers.forEach(clearInterval); timers = []; outbox = [];
     setTimeout(() => cl.forEach(c => { try { c.end(true); } catch (e) { /* fine */ } }), 400);
-    Net.players.clear(); Net.chat = []; Net.rooms.clear(); shared.clear(); Net.me = null; Net.ping = null; probe = null;
+    Net.players.clear(); Net.chat = []; Net.rooms.clear(); shared.clear(); Net.me = null; Net.ping = null; probe = null; pingLv = 0; pingSent = 0;
     setState('off'); Net.emit('players'); Net.emit('chat'); Net.emit('rooms');
   };
   Net.retry = () => { Net.stop(); Net.start(); };
@@ -175,7 +175,8 @@
   /* YOUR CONNECTION: a note to yourself through the brokers every ten seconds, timed there and back
      (the quickest broker's), smoothed into Net.ping and sent with your presence -- the lobby shows
      everyone's as bars by their name */
-  let probe = null;
+  let probe = null, pingLv = 0, pingSent = 0;
+  const lvOf = ms => ms < 150 ? 4 : ms < 250 ? 3 : ms < 400 ? 2 : 1;
   function pingProbe() {
     if (!anyUp() || !Net.me) return;
     probe = { s: Math.round(performance.now() * 10) / 10, done: false };
@@ -188,6 +189,8 @@
     Net.ping = Net.ping == null ? Math.round(rtt) : Math.round(Net.ping * 0.6 + rtt * 0.4);
     const me = Net.players.get(Net.me); if (me) me.pg = Net.ping;
     later('ping', 100);
+    const lv = lvOf(Net.ping);
+    if (lv !== pingLv && Date.now() - pingSent > 5000) { pingLv = lv; pingSent = Date.now(); Net.presence(); }   // (the others see the change)
   }
   function gotPres(e) {
     const age = Date.now() - e.t; if (age > PRES_STALE || age < -300e3) return;
