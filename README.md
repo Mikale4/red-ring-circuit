@@ -534,7 +534,9 @@ typed twice to make an account), remembered on this browser if you like. Account
 this browser (the password salted and hashed); each has its own save (`redringcircuit.save.<id>`),
 and the first one made takes the save that was here before. Your player card shows your
 name and tag (`Name#TAG`, the friend code), level, and your record: battles, wins, KOs, races,
-tournaments, and an online rating that moves with online battles.
+tournaments, and an online rating that moves with online battles. Your favourite fighter is your
+picture everywhere (the top bar, the lobby, rooms, cards): pick it with the arrows beside it on
+your own card, from your team; it's kept with your account and the others see it at once.
 
 **Online** works the way the other games' lobbies do, with no server of its own: presence,
 profiles, the lobby chat, the room list and private messages go over public MQTT brokers, each

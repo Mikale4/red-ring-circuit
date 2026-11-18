@@ -247,12 +247,15 @@
     if (JSON.stringify(st) === JSON.stringify(Net.status)) return;
     Net.status = st; clearTimeout(presT); presT = setTimeout(presence, 400);
   };
-  /* your favourite fighter: the one you've battled with most (else whoever your game has picked) */
+  /* your presence again, soon (your favourite changed) */
+  Net.presence = () => { clearTimeout(presT); presT = setTimeout(presence, 200); };
+  /* your favourite fighter: the one you picked on your card, else the one you've battled with most
+     (else whoever your game has picked) */
   Net.myProfile = () => {
     const S = Auth.S, R = S.rank, st = S.stats;
     const fav = Object.entries(st.fighters || {}).sort((a, b) => b[1] - a[1])[0];
     return { id: Auth.id, n: Auth.name, t: Date.now(), r: R.rating, w: R.wins, l: R.losses, g: R.games, pk: R.peak, lv: Auth.lv(),
-      b: st.battles, bw: st.wins, k: st.kos, tw: st.tourneyWins, rw: st.raceWins, fav: fav ? fav[0] : (Net.favDefault || 'sonic') };
+      b: st.battles, bw: st.wins, k: st.kos, tw: st.tourneyWins, rw: st.raceWins, fav: S.fav || (fav ? fav[0] : (Net.favDefault || 'sonic')) };
   };
   Net.profile = async () => {
     if (!Net.clients || !Auth.user || !anyUp()) return;

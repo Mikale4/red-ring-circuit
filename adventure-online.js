@@ -82,7 +82,7 @@
   function modal(o) {
     const host = A.host();
     const wrap = document.createElement('div'); wrap.className = 'ao-modal';
-    wrap.innerHTML = `<div class="panel adv-small pop ${o.cls || ''}"><div class="panel-hd">${o.icon ? ico(o.icon) : ''}<span>${esc(o.title)}</span><button class="ao-x" data-x aria-label="Close">${ico('cross')}</button></div><div class="ao-mbody"></div><div class="adv-btns"></div></div>`;
+    wrap.innerHTML = `<div class="panel adv-small pop ${o.cls || ''}"><div class="panel-hd">${o.icon ? ico(o.icon) : ''}<span>${esc(o.title)}</span><button class="ao-x" data-x aria-label="Close" title="Close">${ico('close')}</button></div><div class="ao-mbody"></div><div class="adv-btns"></div></div>`;
     const body = wrap.querySelector('.ao-mbody');
     if (typeof o.body === 'string') body.innerHTML = o.body; else if (o.body) body.append(o.body);
     const close = () => { if (!wrap.isConnected) return; wrap.remove(); if (o.onClose) o.onClose(); };
@@ -101,7 +101,9 @@
   AO.modal = modal;
   const face = (who, w, h) => `<canvas class="ao-face" width="${w || 44}" height="${h || 40}" data-face="${esc(who || 'sonic')}"></canvas>`;
   const tagOf = id => '#' + String(id).slice(0, 4).toUpperCase();
-  const favOf = id => { if (id === Auth.id) return A.castId(); const p = Net.online(id) || Net.profiles.get(id) || {}; return p.fav || 'sonic'; };
+  /* a player's favourite (their picture everywhere): yours is the one you picked on your card, else your game's runner */
+  const myFav = () => { const f = Auth.S && Auth.S.fav; return f && A.cast().some(c => c.id === f) ? f : A.castId(); };
+  const favOf = id => { if (id === Auth.id) return myFav(); const p = Net.online(id) || Net.profiles.get(id) || {}; return p.fav || 'sonic'; };
 
   /* ===================================================== the login (the title's panel) */
   let lastName = '';
@@ -173,7 +175,7 @@
       if (!Auth.user) { el.innerHTML = ''; return; }
       const nf = Social.requests(), nm = Social.unread(), st = Net.state;
       el.innerHTML = `
-        <button class="ao-me" data-a="me">${face(A.castId())}<span><b>${esc(Auth.name)}<i>${tagOf(Auth.id)}</i></b><small><em class="ao-dot ${st}"></em>${st === 'up' ? 'Online' : st === 'connecting' ? 'Connecting…' : 'Offline'} · Lv ${Auth.lv()}${A.fighters ? ' · ' + A.fighters() + '/' + A.cast().length + ' fighters' : ''}</small></span></button>
+        <button class="ao-me" data-a="me">${face(myFav())}<span><b>${esc(Auth.name)}<i>${tagOf(Auth.id)}</i></b><small><em class="ao-dot ${st}"></em>${st === 'up' ? 'Online' : st === 'connecting' ? 'Connecting…' : 'Offline'} · Lv ${Auth.lv()}${A.fighters ? ' · ' + A.fighters() + '/' + A.cast().length + ' fighters' : ''}</small></span></button>
         <button class="ao-tb" data-a="friends">${ico('person')}<span>Friends</span>${nf ? `<i class="ao-badge">${nf}</i>` : ''}</button>
         <button class="ao-tb" data-a="msgs">${ico('mail')}<span>Messages</span>${nm ? `<i class="ao-badge">${nm}</i>` : ''}</button>
         <button class="ao-tb" data-a="out">${ico('door')}<span>Log out</span></button>`;
@@ -754,7 +756,7 @@
                   <canvas class="ao-face" width="44" height="40" data-face="${esc(m.who === 'random' ? 'sonic' : m.who)}"></canvas>
                   <span><b>${m.host ? ico('crown') : ''}${esc(m.name)}${pingBars(m)}</b><small>${esc(m.who === 'random' ? 'Random' : A.castName(m.who))} · Lv ${m.lv}</small></span>
                   <em>${m.host ? 'Host' : m.ready ? 'Ready' : 'Not ready'}</em>
-                  ${host && !m.host ? `<button class="ao-mini" data-kick="${m.id}" title="Remove">${ico('cross')}</button>` : ''}
+                  ${host && !m.host ? `<button class="ao-mini" data-kick="${m.id}" title="Remove">${ico('close')}</button>` : ''}
                 </div>`).join('')}</div>
               <div class="ao-pick">
                 <button class="adv-arr" data-pk="-1" aria-label="Previous">${ico('back')}</button>
@@ -804,7 +806,7 @@
         toHost({ t: 'pick', who, em: A.emerlLoadout() });
       });
       ov.querySelectorAll('[data-tm]').forEach(b => b.onclick = () => toHost({ t: 'team', tm: +b.dataset.tm }));
-      ov.querySelectorAll('[data-kick]').forEach(b => b.onclick = () => { const m = memberOf(b.dataset.kick); if (m) modal({ title: 'Remove ' + m.name + '?', icon: 'cross', buttons: [['Remove', () => Online.kick(m.id), ''], ['Remove and block', () => Online.block(m.id), 'ghost'], ['Cancel', null, 'ghost']] }); });
+      ov.querySelectorAll('[data-kick]').forEach(b => b.onclick = () => { const m = memberOf(b.dataset.kick); if (m) modal({ title: 'Remove ' + m.name + '?', icon: 'close', buttons: [['Remove', () => Online.kick(m.id), ''], ['Remove and block', () => Online.block(m.id), 'ghost'], ['Cancel', null, 'ghost']] }); });
       ov.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => Online.set('mode', b.dataset.mode));
       ov.querySelectorAll('[data-set]').forEach(b => b.onclick = () => Online.set(b.dataset.set, JSON.parse(b.dataset.v)));
       ov.querySelectorAll('[data-ar]').forEach(b => b.onclick = () => {
@@ -1012,18 +1014,28 @@
         B.push(['Block', () => Social.block(id, name), 'ghost']);
       }
     }
-    const fav = me ? A.castId() : favOf(id);
-    modal({ title: me ? 'You' : 'Player', icon: 'person', cls: 'ao-card', buttons: B.length ? B : [['Close', null, 'ghost']],
+    const fav = favOf(id);
+    const M = modal({ title: me ? 'You' : 'Player', icon: 'person', cls: 'ao-card', buttons: B.length ? B : [['Close', null, 'ghost']],
       body: `
-        <div class="ao-who">${face(fav, 88, 80)}<div><b>${esc(name)}<i>${tagOf(id)}</i></b><span><em class="ao-dot ${st.on ? 'up' : 'off'}"></em>${esc(st.text)}</span><em>Level ${lv} · Rating ${r}</em></div></div>
+        <div class="ao-who">${me ? `<div class="ao-favpick"><button class="adv-arr" data-fv="-1" aria-label="Previous favourite">${ico('back')}</button>${face(fav, 88, 80)}<button class="adv-arr" data-fv="1" aria-label="Next favourite">${ico('next')}</button></div>` : face(fav, 88, 80)}<div><b>${esc(name)}<i>${tagOf(id)}</i></b><span><em class="ao-dot ${st.on ? 'up' : 'off'}"></em>${esc(st.text)}</span><em>Level ${lv} · Rating ${r}</em></div></div>
         <div class="ao-nums">
           <div><b>${P && P.b != null ? (P.bw || 0) + '/' + (P.b || 0) : '-'}</b><small>Battles won</small></div>
           <div><b>${P && P.k != null ? P.k : '-'}</b><small>KOs</small></div>
           <div><b>${P && P.tw != null ? P.tw : '-'}</b><small>Tournaments won</small></div>
           <div><b>${P && P.rw != null ? P.rw : '-'}</b><small>Races won</small></div>
-          <div><b>${esc(A.castName(fav))}</b><small>Favourite</small></div>
+          <div class="${me ? 'ao-favn' : ''}"><b data-favname>${esc(A.castName(fav))}</b><small>${me ? 'Favourite: pick with the arrows' : 'Favourite'}</small></div>
         </div>
         ${fr ? `<p class="adv-note">Friends since ${new Date(fr.since).toLocaleDateString()}.</p>` : out ? `<p class="adv-note">Friend request sent. Waiting for them.</p>` : blk ? `<p class="adv-note">You've blocked this player.</p>` : ''}` });
+    /* your own card: your favourite, picked from your team -- your picture for everyone */
+    if (me) M.el.querySelectorAll('[data-fv]').forEach(b => b.onclick = () => {
+      const team = A.cast().map(c => c.id).filter(x => !A.hasFighter || A.hasFighter(x)), cur = myFav();
+      const nx = team[((team.indexOf(cur) < 0 ? 0 : team.indexOf(cur)) + (+b.dataset.fv) + team.length) % team.length];
+      Auth.S.fav = nx; Auth.save();
+      const cv = M.el.querySelector('.ao-favpick canvas'); cv.dataset.face = nx; A.paintAll(M.el.querySelector('.ao-favpick'));
+      M.el.querySelector('[data-favname]').textContent = A.castName(nx);
+      document.querySelectorAll('.ao-me canvas').forEach(c => { c.dataset.face = nx; }); document.querySelectorAll('.ao-me').forEach(el => A.paintAll(el));
+      if (root.Net && Net.state === 'up') { Net.profile(); if (Net.presence) Net.presence(); }   // (the others see it at once)
+    });
   };
   function challengeForm(id) {
     if (!Net.online(id)) { toast(Net.nameOf(id) + ' isn\'t online.', 'bad'); return; }
