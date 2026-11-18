@@ -59,7 +59,7 @@
     locked: 'That room is locked: its host isn\'t letting anyone new in.',
     full: 'That room is full.',
     specfull: 'That room\'s spectator seats are all taken.',
-    playing: 'That room is in the middle of a match. Try again when it ends.',
+    playing: 'That room is in the middle of a match and its spectator seats are all taken. Try again when it ends.',
     pass: 'That room is private: it needs its password.',
     wrongpass: 'Wrong password.',
   };
@@ -343,12 +343,12 @@
       if (R.members.some(m => m.uid === uid)) return deny('full');
       const chal = R.chal && uid === R.chal.to;
       if (R.locked && !chal) return deny('locked');
-      if (R.playing) return deny('playing');
-      /* to watch (asked for), or to play; a room whose players' seats are taken seats you to watch */
+      /* to watch (asked for), or to play; a room whose players' seats are taken, or whose match is
+         under way, seats you to watch */
       const nSpec = specsOf(R).length, nPlay = R.members.length - nSpec;
-      let spec = !!d.spec;
+      let spec = !!d.spec || R.playing;
       if (!spec && nPlay >= R.max) { if (nSpec < SPEC_MAX) spec = true; else return deny('full'); }
-      if (spec && nSpec >= SPEC_MAX) return deny(nPlay < R.max ? 'specfull' : 'full');
+      if (spec && nSpec >= SPEC_MAX) return deny(R.playing ? 'playing' : nPlay < R.max ? 'specfull' : 'full');
       if (R.priv && !chal && String(d.pass || '') !== N.pass) return deny(d.pass ? 'wrongpass' : 'pass');
       N.mem.set(id, { conn });
       const teamN = t => playersOf(R).filter(m => m.team === t).length;
@@ -359,13 +359,22 @@
       sysSay(m.name + (spec ? ' came to watch.' : ' joined.'));
       if (chal) R.chal = null;
       fitCpus(R);
-      pushRoom(); return;
+      pushRoom();
+      if (R.playing) watchIn(id);                        // a match under way: straight in to watch it
+      return;
     }
     if (!N.mem.has(id)) return;
     hostGot(id, d);
   }
   /* fewer seats for CPUs when players come in (a battle holds four fighters) */
   function fitCpus(R) { const n = playersOf(R).length; if (R.mode === 'battle') R.cpu = U.clamp(R.cpu, n > 1 ? 0 : 2 - n, 4 - n); }   // (nobody playing: two CPUs at least, for the spectators)
+  /* a spectator into the match under way: its plan (with them among its spectators); their game
+     asks the host's for where everything has got to once it's ready (np.ws) */
+  function watchIn(id) {
+    const R = N.room, m = memberOf(id); if (!R.playing || !N.plan || !m || !m.spec) return;
+    N.plan.specs = (N.plan.specs || []).filter(x => x !== id).concat(id);
+    toMember(id, { t: 'start', room: R, plan: N.plan, late: true });
+  }
   /* a member to the spectators' seats, or back among the players (if there's a place) */
   function seatSpec(m, on) {
     const R = N.room;
@@ -384,6 +393,7 @@
     switch (d.t) {
       case 'ready': if (R.playing || m.spec) return; m.ready = !!d.on; pushRoom(); break;
       case 'spec': if (R.playing) return; seatSpec(m, !!d.on); break;      // watch, or play again
+      case 'watch': watchIn(id); break;                                     // a spectator back from the room into the match
       case 'pick': if (R.playing) return; m.who = A.validWho(d.who); m.em = d.em && typeof d.em === 'object' ? d.em : null; pushRoom(); break;
       case 'team': if (R.playing || !R.teams) return; if (d.tm !== 0 && d.tm !== 1) return; m.team = d.tm; pushRoom(); break;
       case 'say': {
@@ -437,6 +447,7 @@
     const plan = A.np.plan(R, N.myId);
     if (plan.err) { toast(plan.err, 'bad'); return; }
     R.playing = true; R.members.forEach(m => { m.ready = false; m.back = false; });
+    N.plan = plan;                                       // (kept: anyone who comes to watch mid-match gets it)
     pushRoom();
     toAll({ t: 'start', room: R, plan }, true);
     A.np.start(true, R, plan, N.myId);
@@ -460,7 +471,7 @@
       case 'chat': gotChat(d.c); break;
       case 'kick': toast('The host removed you from the room.', 'bad'); endSession(); AO.lobby(); break;
       case 'closed': hostGone('The host closed the room.'); break;
-      case 'start': N.room = d.room; A.np.start(false, d.room, d.plan, N.myId); break;
+      case 'start': N.room = d.room; A.np.start(false, d.room, d.plan, N.myId, !!d.late); break;   // (late: a spectator into a match under way)
       case 'ping': toHost({ t: 'pong', s: d.s }); break;  // (straight back: the host times it)
       case 'pings': if (N.room && d.p && typeof d.p === 'object') { for (const m of N.room.members) if (typeof d.p[m.id] === 'number') m.ping = d.p[m.id]; paintPings(); } break;
     }
@@ -682,14 +693,14 @@
         const rs = listedRooms().sort((a, b) => (a.state === 'open' ? 0 : 1) - (b.state === 'open' ? 0 : 1) || b.n - a.n);
         /* each room: Join to play; Watch to take a spectator's seat (a full room's only way in) */
         list.innerHTML = rs.length ? rs.map(r => {
-          const watch = (r.state === 'open' || r.state === 'full') && (r.sp || 0) < SPEC_MAX;
+          const watch = r.state !== 'locked' && (r.sp || 0) < SPEC_MAX;        // (a match under way too: you watch from where it's got to)
           return `
           <div class="ao-room ${r.state}${watch ? ' watchable' : ''}">
             <span class="ao-rm-ic">${ico(MODE_ICO[r.mode] || 'trophy')}</span>
             <span class="ao-rm-tx"><b>${esc(r.name)}${r.priv ? ico('lock') : ''}</b><small>${esc(MODES[r.mode] || '')} · ${esc(r.what)} · host ${esc(r.host)}</small></span>
             <span class="ao-rm-n">${r.n}/${r.max}${r.sp ? `<small>${ico('eye')}${r.sp}</small>` : ''}</span>
             ${r.state === 'open' ? `<button class="btn" data-room="${r.code}" data-priv="${r.priv ? 1 : 0}">Join</button>` : ''}
-            ${watch ? `<button class="btn ${r.state === 'open' ? 'ghost ao-wsm' : ''}" data-room="${r.code}" data-priv="${r.priv ? 1 : 0}" data-spec title="Join to watch: follow any player, or the whole match" aria-label="Watch">${ico('eye')}<span>Watch</span></button>`
+            ${watch ? `<button class="btn ${r.state === 'open' ? 'ghost ao-wsm' : ''}" data-room="${r.code}" data-priv="${r.priv ? 1 : 0}" data-spec title="${r.state === 'playing' ? 'Watch the match under way: follow any player, or the whole of it' : 'Join to watch: follow any player, or the whole match'}" aria-label="Watch">${ico('eye')}<span>Watch</span></button>`
               : r.state === 'open' ? '' : `<button class="btn ghost" disabled>${r.state === 'playing' ? 'Playing' : r.state === 'full' ? 'Full' : 'Locked'}</button>`}
           </div>`; }).join('') : `<p class="ao-empty">${Net.state === 'up' ? 'No rooms open right now. Host one, or take a Quick match.' : 'Connecting to the lobby…'}</p>`;
         list.querySelectorAll('[data-room]').forEach(b => b.onclick = () => {
@@ -802,7 +813,7 @@
     runTour([
       { title: 'The online lobby', text: 'This is where you meet other players: chat, find a room, or open your own and play together -- battles, races, the grand prix, story co-op and tournaments. Here\'s a quick look round. <em>Enter, Z or the right arrow go on; X skips.</em>' },
       { at: '.ao-tabs', before: tab('rooms'), title: 'Three lists', text: '<b>Rooms</b> open right now, the <b>Players online</b>, and the <b>Leaderboard</b> of online ratings. Pick one with these tabs (or the arrow keys and Z).' },
-      { at: '.ao-list', before: tab('rooms'), title: 'Rooms', text: 'Each room shows what it\'s for, its settings, its host and how many are in it (and, by an eye, how many are watching). <b>Join</b> to play; <b>Watch</b> to take a spectator\'s seat instead -- the way into a full room too. A lock means it needs a password.' },
+      { at: '.ao-list', before: tab('rooms'), title: 'Rooms', text: 'Each room shows what it\'s for, its settings, its host and how many are in it (and, by an eye, how many are watching). <b>Join</b> to play; <b>Watch</b> to take a spectator\'s seat instead -- the way into a full room, or a match already under way. A lock means it needs a password.' },
       { at: '[data-q]', title: 'Quick match', text: 'Straight into the fullest open room -- or, if there isn\'t one, a room of your own that others can join.' },
       { at: '[data-h]', title: 'Host a room', text: 'Open your own: you pick what it\'s for and its settings, and you can make it private with a password. Everyone who joins picks their fighter and readies up; you press <b>Start</b>. Anyone can <b>Spectate</b> instead (you too) and watch the match, following whoever they like.' },
       { at: '.ao-join', title: 'Join by code', text: 'Every room has a five-letter code. A friend can tell you theirs: type it here and press Join.' },
@@ -912,7 +923,7 @@
               ${R.teams && R.mode === 'battle' && !me.spec ? `<div class="ao-seg-row"><span>Your side</span><div class="seg adv-seg"><button data-tm="0" class="${me.team === 0 ? 'sel' : ''}">Red</button><button data-tm="1" class="${me.team === 1 ? 'sel' : ''}">Blue</button></div></div>` : ''}
               <div class="adv-btns">
                 ${host ? `<button class="btn lg" data-start data-focus>${ico('flag')}Start</button>` : me.spec ? '' : `<button class="btn lg" data-ready data-focus>${ico('check')}${me.ready ? 'Not ready' : 'Ready'}</button>`}
-                ${R.playing ? '' : me.spec ? (plays.length < R.max ? `<button class="btn ${host ? 'ghost' : ''}" data-myspec="0" ${host ? '' : 'data-focus'}>${ico('person')}Play</button>` : '')
+                ${R.playing ? (me.spec && !host ? `<button class="btn" data-watchin data-focus>${ico('eye')}Watch the match</button>` : '') : me.spec ? (plays.length < R.max ? `<button class="btn ${host ? 'ghost' : ''}" data-myspec="0" ${host ? '' : 'data-focus'}>${ico('person')}Play</button>` : '')
                   : specs.length < SPEC_MAX ? `<button class="btn ghost" data-myspec="1">${ico('eye')}Spectate</button>` : ''}
                 <button class="btn ghost" data-inv>${ico('mail')}Invite a friend</button>
               </div>
@@ -954,6 +965,7 @@
       });
       ov.querySelectorAll('[data-tm]').forEach(b => b.onclick = () => toHost({ t: 'team', tm: +b.dataset.tm }));
       ov.querySelectorAll('[data-sp]').forEach(b => b.onclick = () => Online.toSpec(b.dataset.sp, b.dataset.on === '1'));
+      if (q('[data-watchin]')) q('[data-watchin]').onclick = () => toHost({ t: 'watch' });
       if (q('[data-myspec]')) q('[data-myspec]').onclick = () => { const on = q('[data-myspec]').dataset.myspec === '1'; if (host) Online.toSpec(N.myId, on); else toHost({ t: 'spec', on }); };
       ov.querySelectorAll('[data-kick]').forEach(b => b.onclick = () => { const m = memberOf(b.dataset.kick); if (m) modal({ title: 'Remove ' + m.name + '?', icon: 'close', buttons: [['Remove', () => Online.kick(m.id), ''], ['Remove and block', () => Online.block(m.id), 'ghost'], ['Cancel', null, 'ghost']] }); });
       ov.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => Online.set('mode', b.dataset.mode));

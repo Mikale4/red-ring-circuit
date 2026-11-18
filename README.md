@@ -580,7 +580,13 @@ other runners' name tags in races -- with Options' **Ping on player tags** (on a
 **Spectating.** A room has up to six spectator seats on top of its players' places. **Watch**
 beside a room in the lobby takes one (a full room's only way in; a room whose places are all taken
 seats anyone who asks to join as a spectator), and **Spectate** in a room moves you there (the host
-too); **Play** moves you back if there's a place. The host can move anyone either way (the eye and
+too); **Play** moves you back if there's a place. A room whose match is already under way can be
+watched too: Watch (or joining it at all) seats you and takes you straight into the match where
+it has got to -- the battle as it stands, the race's clock and everyone's places, the grand prix's
+race, CPUs and points (or its standings, between races), the tournament's bracket and its match,
+the story's part (a scene: you watch from what comes after it). A spectator who goes back to the
+room mid-match has **Watch the match** to go in again; a match that has just ended sends you back
+to the room to watch the next. The host can move anyone either way (the eye and
 person buttons on their row). Spectators pick no fighter and don't ready up. In the match a bar
 along the bottom says who you're watching:
 

@@ -9724,6 +9724,7 @@
           if (GP !== G) return;
           gpGo(def);
           if (G.online) { if (NP.host) gpNetReady(NP.me); else Online.toHost({ t: "np.gok" }); }
+          if (NP.late) Online.toHost({ t: "np.ws" });     // (a late spectator, its course built: where the race has got to)
         }, 350);
         return;
       }
@@ -10190,7 +10191,8 @@
       const cpus = plan.cpus.map((who, i) => ({ id: "cpu" + i, who, name: castOf(who).name, skill: plan.skill[i] }));
       GP = { cup: plan.cup, cupId: cup.id, cls: plan.cls, k: GP_CLS[plan.cls], race: 0, online: true, runners: humans.concat(cpus), pts: {}, done: [], retries: 0, watch: !!NP.watch };   // (watch: a spectator, with no runner of their own)
       GP.runners.forEach(r => { GP.pts[r.id] = 0; });
-      gpGrid();
+      if (NP.late) { npLateWait("Catching up with the grand prix…"); Online.toHost({ t: "np.ws" }); }   // (come mid-cup: which race, the points, from the host)
+      else gpGrid();
     });
   }
   const gpNetId = id => id === "you" ? NP.me : id;
@@ -10734,20 +10736,117 @@
     if (R.teams && new Set(slots.map(s => s.team)).size < 2) return { err: "Red vs Blue needs someone on each side." };
     return { kind: "battle", cfg: { kind: "battle", net: true, slots, teams: !!R.teams, arena: R.arena, rule: R.rule, goal: R.goal, time: R.time, hp: R.hp } };
   }
-  function npStart(isHost, room, plan, me) {
+  function npStart(isHost, room, plan, me, late) {
     npInstall();
     npClear();
     Object.assign(NP, { on: true, host: isHost, room, plan, me, kind: plan.kind, ev: [], snapT: 0, inT: 0, seq: 0, remote: new Map(), race: null, story: null,
       who: null, em: null, def: null, cnt: { jp: 0, zp: 0, xp: 0, cp: 0, dl: 0, dr: 0 }, sent: null, lastSnap: null, spectator: false,
-      watch: (plan.specs || []).includes(me), sp: null });      // (watch: a spectator of the room, playing nobody)
+      watch: (plan.specs || []).includes(me), sp: null,        // (watch: a spectator of the room, playing nobody)
+      late: !!late && !isHost });                              // (late: come to watch a match already under way)
     paused = false; storyRun = null; talk = null;
     host.classList.toggle("np-watching", NP.watch);
     if (plan.kind === "battle") npBattle(plan.cfg);
     else if (plan.kind === "race") npRace(plan, null);
     else if (plan.kind === "story") npStory(plan);
-    else if (plan.kind === "tourney") { TOUR = plan.T; TOUR.me = null; tourBracket(); }
+    else if (plan.kind === "tourney") { TOUR = plan.T; TOUR.me = null; if (NP.late) npLateWait("Catching up with the tournament…"); else tourBracket(); }
     else if (plan.kind === "gp") npGP(plan);
+    if (NP.late && plan.kind !== "gp") Online.toHost({ t: "np.ws" });    // (where it's got to: the host's game says; the grand prix asks once it's loaded)
     if (root.Online) Online.setPresence();
+  }
+  /* ---- WATCHING A MATCH ALREADY UNDER WAY. A spectator who comes in mid-match is given the plan,
+     sets its match up as anyone would, and asks the host's game where everything has got to
+     (np.ws): the host answers with the battle being fought (its snapshots do the rest), the race's
+     clock, who's home and where everyone is, the story's part, the tournament's bracket, or the
+     grand prix's race, points and CPUs (np.wst). A match just over: back to the room, to watch
+     the next. */
+  function npCatch() {
+    const s = { kind: NP.kind };
+    if (battle) { s.cfg = Object.assign({}, battle.cfg, { arena: battle.arena }); s.over = !!battle.over; }
+    if (NP.kind === "tourney" && TOUR) s.T = TOUR;
+    const gh = {};
+    for (const g of NP.ghosts.values()) gh[g.id] = { x: r3(g.tx), y: r3(g.ty), rf: g.rf, fin: g.fin ? 1 : 0 };
+    if (player && !battle && !NP.watch && (NP.race || GPR)) gh[NP.me] = { x: r3(player.x), y: r3(player.y), rf: player._rf || ["idle", 0, 1], fin: (NP.race ? NP.race.mine != null : GPR.myFin != null) ? 1 : 0 };
+    s.ghosts = gh;
+    if (NP.race) { const R = NP.race; s.race = { go: !!R.go, count: r3(R.count), t: world ? r3(world.t) : 0, fin: [...R.fin], done: !!R.done }; }
+    if (NP.story) s.story = { stage: NP.story.stage, act: NP.story.act == null ? null : NP.story.act };
+    if (GP && GP.online) {
+      const pts = {}; for (const r of GP.runners) pts[r.human ? r.netId : r.id] = GP.pts[r.id] || 0;
+      s.gp = { race: GP.race, pts, phase: GPR ? (GPR.done ? "between" : "race") : mode === "setup" ? "grid" : "podium" };
+      if (GPR && !GPR.done) {
+        const Rr = GPR;
+        s.gpr = { t: r3(world.t), cnt: Rr.count === Infinity ? null : r3(Rr.count), go: !!Rr.go, hfin: Rr.hfin || {}, seen: Rr.seen || {},
+          rivals: Rr.rivals.map(v => ({ id: v.r.id, u: r3(v.u), fin: v.fin == null ? null : r3(v.fin), stun: r3(v.stun), boost: r3(v.boost), star: r3(v.star), shield: v.shield ? 1 : 0 })) };
+      }
+    }
+    return s;
+  }
+  function npWatchSync(s) {
+    if (!NP.on || !NP.late || !s) return;
+    const K = NP.kind;
+    if (K === "gp") return gpLateSync(s);
+    NP.late = false;
+    if (K === "battle") { if (!s.cfg || s.over) npLateOver(); return; }
+    if (K === "tourney") { if (s.T) { TOUR = s.T; TOUR.me = null; } if (s.cfg && !s.over) npBattle(s.cfg); else tourBracket(); return; }
+    if (K === "race") { if (!s.race || s.race.done) npLateOver(); else npRaceCatch(s); return; }
+    if (K === "story") {
+      const S = NP.story, st = s.story; if (!S || !st || st.stage === "after") return npLateOver();
+      if (st.act != null) S.act = storyRun.act = st.act;
+      S.stage = st.stage; S.ok = new Set();
+      if (st.stage === "action") {
+        if (s.cfg && !s.over) return npBattle(s.cfg);
+        if (s.race && !s.race.done) { npRace(NP.plan, S); return npRaceCatch(s); }
+      }
+      npLateWait(st.stage === "action" ? "The players are between parts of the chapter: you'll watch the next one." : "The players are watching a scene: you'll watch what comes after it.");
+    }
+  }
+  /* a race under way: who's home, where everyone is, and the clock (no count, unless it's still on) */
+  function npRaceCatch(s) {
+    const R = NP.race, r = s.race; if (!R || !r) return;
+    for (const id in s.ghosts || {}) npGhost(id, s.ghosts[id]);
+    for (const [id, t] of r.fin || []) { R.fin.set(id, t); const g = NP.ghosts.get(id); if (g) g.fin = true; }
+    if (r.go) { R.go = true; R.count = Math.max(0, r.count || 0); R.said = R.count > 0 ? Math.ceil(R.count - 0.4) : 0; if (world) world.t = r.t || 0; if (R.count <= 0) caption(""); }
+  }
+  /* the grand prix: the points so far, then the race being run (its course built first: it asks
+     again once it is), or the standings between races, or the podium */
+  function gpLateSync(s) {
+    const G = GP, g = s.gp; if (!G || !g) { NP.late = false; return npLateOver(); }
+    for (const r of G.runners) G.pts[r.id] = (g.pts || {})[r.human ? r.netId : r.id] || 0;
+    if (g.phase === "podium") { NP.late = false; gpEndRace(); G.race = 3; return gpPodium(); }
+    if (g.phase === "between") { NP.late = false; gpEndRace(); G.race = g.race; screenOn("story"); return gpStandings(Object.assign({}, G.pts), []); }
+    const cid = GPD().CUPS[G.cup].courses[g.race];
+    if (!GPR || G.race !== g.race || GPR.cid !== cid) { gpEndRace(); G.race = g.race; return gpGrid(); }
+    NP.late = false;
+    const Rr = GPR, q = s.gpr; if (!q) return;          // (the host's still on the grid: Go comes from them)
+    world.t = q.t || 0; Rr.go = !!q.go;
+    Rr.count = q.cnt == null ? Infinity : Math.max(0, q.cnt);
+    Rr.said = Rr.count > 0 && Rr.count !== Infinity ? Math.ceil(Rr.count - 0.4) : 0;
+    if (Rr.count <= 0) caption("");
+    for (const id in q.seen || {}) Rr.seen[id] = q.seen[id];
+    for (const id in q.hfin || {}) Rr.seen[id] = q.hfin[id];
+    for (const v of Rr.rivals) {
+      const o = (q.rivals || []).find(x => x.id === v.r.id); if (!o) continue;
+      v.u = o.u || 0; v.stun = o.stun || 0; v.boost = o.boost || 0; v.star = o.star || 0; v.shield = !!o.shield; v.fin = o.fin;
+      v.at = 0; gpSample(v); v.lastX = v.x;
+      if (v.fin != null) Rr.fin.push({ id: v.r.id, t: v.fin });
+    }
+    for (const id in s.ghosts || {}) npGhost(id, s.ghosts[id]);
+  }
+  /* catching up: a card till the host's game answers (or till the next part starts) */
+  function npLateWait(text) {
+    const ov = screenOn("story");
+    ov.innerHTML = `<div class="panel adv-small pop ao-wait"><div class="ao-spin"></div><p>${esc(text)}</p><div class="adv-btns"><button class="btn ghost" data-back>${ico("door")}Leave the room</button></div></div>`;
+    ov.querySelector("[data-back]").onclick = () => { if (root.Online) Online.leave(); };
+  }
+  /* come just as it ended: back to the room, to watch the next one */
+  function npLateOver() {
+    NP.late = false;
+    if (NP.race) clearTimeout(NP.race.timer);
+    NP.race = null; if (GP) gpEndRace();
+    const ov = screenOn("story");
+    ov.innerHTML = `<div class="panel adv-small pop"><div class="panel-hd">${ico("eye")}Spectating</div><p class="adv-note">This match is just over: the room is getting ready for the next one. You'll watch that from the room.</p>
+      <div class="adv-btns"><button class="btn" id="npBack" data-focus data-enter>${ico("back")}Back to the room</button></div></div>`;
+    ov.querySelector("#npBack").onclick = () => npBackToRoom();
+    autoFocus();
   }
   /* a battle: on the host, its guests' fighters steered by what they send; on a guest, a mirror */
   function npBattle(cfg) {
@@ -10952,6 +11051,7 @@
       case "np.gok": gpNetReady(id); break;
       case "np.gfin": gpNetFin(id, +d.time || 9999); break;
       case "np.pw": Online.toAll(Object.assign({}, d, { by: id }), true); gpNetPw(Object.assign({}, d, { by: id })); break;
+      case "np.ws": Online.toMember(id, { t: "np.wst", s: npCatch() }); break;      // a late spectator: where it's got to
     }
   }
   function npGuestGot(d) {
@@ -10974,6 +11074,7 @@
       case "np.pw": gpNetPw(d); break;
       case "np.gres": if (GPR) { if (mode !== "goal" && mode !== "play") mode = "goal"; gpResults(d.res); } break;
       case "np.gnext": gpNetNext(); break;
+      case "np.wst": npWatchSync(d.s); break;
     }
   }
   /* the pause menu, online: the match goes on behind it */
@@ -11234,7 +11335,8 @@
     else if (ch.kind === "race") { storyRun.def = raceDef(stageAt(ch.zone)); loadDef(storyRun.def); glideX = 12; camX = 15; }
     else { disposeWorld(); world = buildWorld(arenaDef(stageAt(ch.arena))); player = makePlayer(castOf(ch.who)); glideX = world.W / 2; snapCamera(); }
     music();
-    playScene(ch.before, () => npStoryOk());
+    if (NP.late) npLateWait("Catching up with the story…");        // (come mid-chapter: what part it's at comes from the host)
+    else playScene(ch.before, () => npStoryOk());
   }
   const NP_GATE = { before: 1, mid: 1, meet: 1 };            // (the talk everyone sees before the story goes on)
   function npStoryOk() {
