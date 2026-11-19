@@ -5507,14 +5507,20 @@
         for (let x = R.xa + 1; x < R.xb; x += 5) { const y = rideYAt(R, x); if (y == null) continue; const f = mechFloor(w, x, y - 0.3); if (y - f > 0.4) mechBar(group, post, x, f, x, y - 0.15, 0.2, 0.2, -0.3); }
         break;
       }
-      case "tube": {                                   // a glass pipe, a ring at each mouth
-        TUBE_MAT = TUBE_MAT || new THREE.MeshLambertMaterial({ color: 0xcfe8ff, transparent: true, opacity: 0.28, depthWrite: false });
-        const rim = lamb(hi);
-        for (let k = 1; k < R.p.length; k++) {
-          const a = R.p[k - 1], b = R.p[k], len = Math.hypot(b[0] - a[0], b[1] - a[1]);
-          const m = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, len + 0.2, 14, 1, true), TUBE_MAT);
-          m.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 0.5, 0); m.rotation.z = Math.atan2(b[1] - a[1], b[0] - a[0]) - PI / 2; m.renderOrder = 4; group.add(m);
+      case "tube": {                                   // a transport pipe, one piece end to end round its bends: its back wall drawn over whatever it runs through, the rider on that, tinted glass in front -- a ring at each mouth
+        const TM = [new THREE.MeshLambertMaterial({ color: mixC(hi, 0x101830, 0.55), side: THREE.BackSide, depthTest: false, depthWrite: false }),   // (solid, drawn after the ground and before the runners)
+                                new THREE.MeshLambertMaterial({ color: 0xcfe8ff, emissive: 0x1a2a3a, side: THREE.FrontSide, transparent: true, opacity: 0.46, depthTest: false, depthWrite: false })];
+        const rim = lamb(hi), path = new THREE.CurvePath(), P = R.p.map(q => new THREE.Vector3(q[0], q[1] + 0.5, 0));
+        let from = P[0];
+        for (let k = 1; k < P.length; k++) {
+          const at = P[k];
+          if (k === P.length - 1) { path.add(new THREE.LineCurve3(from, at)); break; }
+          const nx = P[k + 1], din = at.clone().sub(P[k - 1]), dout = nx.clone().sub(at);
+          const d = Math.min(1.4, din.length() * 0.45, dout.length() * 0.45), a0 = at.clone().sub(din.normalize().multiplyScalar(d)), a1 = at.clone().add(dout.normalize().multiplyScalar(d));
+          path.add(new THREE.LineCurve3(from, a0)); path.add(new THREE.QuadraticBezierCurve3(a0, at, a1)); from = a1;   // (a bend, rounded)
         }
+        const segs = Math.max(8, Math.ceil(R.L[R.L.length - 1] * 3));
+        for (let s = 0; s < 2; s++) { const m = new THREE.Mesh(new THREE.TubeGeometry(path, segs, 0.8, 16, false), TM[s]); m.renderOrder = s ? 12 : 10; group.add(m); }
         for (const q of [R.p[0], R.p[R.p.length - 1]]) { const t = new THREE.Mesh(new THREE.TorusGeometry(0.85, 0.12, 6, 16), rim); t.position.set(q[0], q[1] + 0.5, 0); t.rotation.y = PI / 2; group.add(t); }
         break;
       }
@@ -5557,9 +5563,14 @@
       if (core) { z.core = new THREE.Mesh(box, core); z.core.visible = false; z.core.renderOrder = 3; group.add(z.core); }   // (the stream itself, the chunks tumbling round it)
       z.blobs = []; for (let k = 0; k < 16; k++) { const m = new THREE.Mesh(box, mats[k % 3]); m.visible = false; m.renderOrder = 4; group.add(m); z.blobs.push(m); }
       z.crown = []; for (let k = 0; k < 7; k++) { const m = new THREE.Mesh(box, k % 2 ? foam : mats[0]); m.visible = false; m.renderOrder = 4; group.add(m); z.crown.push(m); }
-    } else if (z.k === "devil") {                                    // a funnel of dust, turning
-      z.rings = [];
-      for (let k = 0; k < 7; k++) { const m = new THREE.Mesh(new THREE.TorusGeometry(0.35 + k * 0.17, 0.06, 5, 14), glow(z.c || 0xe0c090, 0.5)); m.rotation.x = PI / 2; m.renderOrder = 4; group.add(m); z.rings.push(m); }
+    } else if (z.k === "devil") {                                    // a dust devil: sand whirled up a funnel, narrow at its foot and wide at its top
+      const c = new THREE.Color(z.c || 0xe0c090), light = c.clone().lerp(new THREE.Color(0xffffff), 0.35).getHex(), deep = c.clone().multiplyScalar(0.7).getHex();
+      const haze = (h, op) => new THREE.MeshLambertMaterial({ color: h, transparent: true, opacity: op, depthWrite: false });
+      const mats = [lamb(light), lamb(c.getHex()), lamb(deep), haze(light, 0.6), haze(c.getHex(), 0.42)], cube = new THREE.BoxGeometry(1, 1, 1);
+      z.dust = []; for (let k = 0; k < 96; k++) { const m = new THREE.Mesh(cube, mats[k % mats.length]); m.renderOrder = 4; group.add(m); z.dust.push(m); }
+      const cloud = [haze(light, 0.22), haze(c.getHex(), 0.18)];
+      z.cloud = []; for (let k = 0; k < 22; k++) { const m = new THREE.Mesh(cube, cloud[k % 2]); m.renderOrder = 3; group.add(m); z.cloud.push(m); }   // (the funnel's body: dust hanging in it)
+      z.puffs = []; for (let k = 0; k < 12; k++) { const m = new THREE.Mesh(cube, mats[3 + (k % 2)]); m.renderOrder = 4; group.add(m); z.puffs.push(m); }
     }
   }
   const devilX = (z, t) => z.x0 + (z.x1 - z.x0) * (0.5 + 0.5 * Math.sin(t * (z.sp || 0.5) + (z.ph || 0)));
@@ -5596,7 +5607,21 @@
         if (on && Math.abs(z.x - camX) < 20 && Math.random() < 0.5) burst(z.x + (Math.random() - 0.5) * 1.6, z.y + h + 0.3, [0xffffff, z.c || 0xd8f4ff], 1, 3);   // (spray off the top)
       } else if (z.k === "devil") {
         const x = devilX(z, w.t);
-        z.rings.forEach((m, k) => { m.position.set(x + Math.sin(w.t * 6 + k) * 0.12 * k, z.y + 0.3 + k * (z.h / 7), 0.2); m.rotation.z = w.t * (8 + k); });
+        const n = z.dust.length, hh = z.h || 6;
+        z.dust.forEach((m, k) => {                         // grains spiralling up, faster at the foot, the funnel's top swaying
+          const f = (w.t * 0.5 + k / n) % 1, r = 0.25 + 1.75 * Math.pow(f, 1.3), a = w.t * (10 - 5 * f) + k * 2.399;
+          const sway = Math.sin(w.t * 1.6 + f * 2.6) * 0.45 * f, s = 0.15 + 0.26 * f + 0.05 * Math.sin(k * 3.1);
+          m.position.set(x + sway + Math.cos(a) * r, z.y + 0.1 + f * hh, 0.2 + Math.sin(a) * r * 0.7);
+          m.scale.set(s * 1.7, s, s); m.rotation.set(0, -a, 0.3 * Math.sin(a));
+        });
+        z.cloud.forEach((m, k) => {                        // the haze in the funnel, turning slower
+          const f = (w.t * 0.32 + k / z.cloud.length) % 1, r = (0.2 + 1.4 * Math.pow(f, 1.3)) * 0.6, a = w.t * 4 + k * 2.8, s = 0.5 + 1.3 * f;
+          m.position.set(x + Math.sin(w.t * 1.6 + f * 2.6) * 0.45 * f + Math.cos(a) * r, z.y + 0.3 + f * hh * 0.97, 0.1 + Math.sin(a) * r * 0.5); m.scale.set(s * 1.3, s * 0.8, s); m.rotation.set(0, -a, 0);
+        });
+        z.puffs.forEach((m, k) => {                        // and dust kicked out round its foot
+          const f = (w.t * 1.1 + k / z.puffs.length) % 1, a = k * 2.2 + w.t * 1.5, r = 0.4 + f * 1.6, s = 0.12 + 0.3 * (1 - f);
+          m.position.set(x + Math.cos(a) * r, z.y + 0.08 + f * 0.5, 0.2 + Math.sin(a) * r * 0.5); m.scale.set(s, s * 0.8, s);
+        });
       }
     }
   }
@@ -5684,23 +5709,76 @@
       return;
     }
     if (R.k === "zip") S.v = R.up ? (R.v || 8) : clamp(S.v + (-(R.p[1][1] - R.p[0][1]) / R.total) * GRAV * 0.55 * dt, 9, 24);
-    else if (R.k === "rail") {
-      const d = rideAt(R, S.u); S.v = clamp(S.v - d[3] * GRAV * 0.55 * dt, 8, 26);
-      if (input.jp) { rideEnd(p, p.x, p.y + 0.05, d[2] * S.v, Math.max(0, d[3] * S.v) + p.c.jump * 0.9, true); p.jumping = true; SFX.jump(); return; }
-    }
+    else if (R.k === "rail") { if (grindStep(p, S, R, dt)) return; }
     S.u += S.v * dt;
     if (S.u >= R.total) {
       const d = rideAt(R, R.total);
       if (R.k === "loop") rideEnd(p, R.x + 0.05, R.y, S.v, 0, false, true);
       else if (R.k === "cork") rideEnd(p, R.x1, R.y, S.v, 0, false, true);
-      else rideEnd(p, d[0], d[1], d[2] * S.v, d[3] * S.v, true);
+      else { const ve = R.k === "rail" ? Math.min(S.v, 26) : S.v; rideEnd(p, d[0], d[1], d[2] * ve, d[3] * ve, true); }   // (off a rail's end no faster than the courses were drawn for: the speed's for the rail)
       if (R.k === "zip" && R.handle) setTimeout(() => { if (R.handle) R.handle.visible = true; }, 1500);
       return;
     }
     const d = rideAt(R, S.u);
     p.x = d[0]; p.y = d[1]; p.vx = d[2] * S.v; p.vy = d[3] * S.v;
     if (Math.abs(p.vx) > 0.5) p.face = sgn(p.vx);
-    if (R.k === "rail" && Math.random() < 0.5) burst(p.x - p.face * 0.2, p.y, [0xffe080, 0xffffff], 1, 2);
+  }
+  /* Grinding, as Sonic Adventure 2 and Sonic Rush have it. Momentum: downhill builds speed and
+     uphill costs it. Balance (bal, -1 back .. +1 forward): the rider sways as it goes, and the
+     rail's crests throw it forward and its dips back, the harder the faster; Left and Right lean
+     back or forward against it (a meter shows it). Balanced, it gains speed and the sparks fly;
+     off balance, it drags; tipped right over, it falls off. Down crouches for more speed --
+     balanced, that is: off balance, crouching only makes it worse. Light or Heavy: a grind trick,
+     three a rail, each a burst of speed that rocks the balance. Jump: off, any time; at the rail's
+     very end, a Just Trick -- off it faster and higher. Returns true when it has left the rail. */
+  const GRIND = { top: 26, crouchTop: 31, unstable: 1.5, lean: 3.4, kick: 0.55 };
+  function grindStep(p, S, R, dt) {
+    const d = rideAt(R, S.u), face = d[2] >= 0 ? 1 : -1, ang = Math.atan2(d[3], Math.abs(d[2]) || 1e-6);
+    if (S.bal == null) { S.bal = 0; S.drift = 0; S.tricks = 0; S.trT = 0; S.ang = ang; S.push = 0; }
+    const bend = ang - S.ang; S.ang = ang;
+    if (bend) S.push += clamp(-bend * GRIND.kick * (0.4 + S.v / 40), -0.45, 0.45);   // (a crest throws it forward, a dip back -- a shove, not a blow: caught in time, it's ridden)
+    const sh = S.push * Math.min(1, dt * 5); S.bal += sh; S.push -= sh;
+    S.drift += ((Math.random() - 0.5) * 7 - S.drift * 1.6) * dt;                     // (the sway, wandering)
+    const lean = (input.R - input.L) * face, crouch = !!input.D, steady = Math.abs(S.bal) < 0.28;
+    S.bal += (S.bal * GRIND.unstable * (crouch && !steady ? 2 : 1) + S.drift * (0.35 + S.v / 34) - ang * 0.35 + lean * GRIND.lean) * dt;
+    S.crouch = crouch && steady;
+    S.v -= d[3] * GRAV * 0.55 * dt;                                                   // (momentum: the slope)
+    if (steady) S.v += (crouch ? 7 : 1.5) * dt * (S.v < (crouch ? GRIND.crouchTop : GRIND.top) ? 1 : 0);
+    else S.v -= (9 * (Math.abs(S.bal) - 0.28) + (crouch ? 6 : 0)) * dt;
+    S.v = clamp(S.v, 6, GRIND.crouchTop);
+    if (S.trT > 0) S.trT -= dt;
+    if ((input.zp || input.xp) && S.trT <= 0 && S.tricks < 3) {                      // a grind trick
+      S.tricks++; S.trT = 0.36; S.v = Math.min(GRIND.crouchTop, S.v + 2.6); S.bal += (Math.random() < 0.5 ? -1 : 1) * (0.22 + Math.random() * 0.14);
+      SFX.double(); burst(p.x, p.y + 0.8, [0xfff3a0, 0xffffff, 0x9ad8ff], 6, 3); emit("grindTrick", { p, n: S.tricks });
+    }
+    if (Math.abs(S.bal) >= 1) {                                                       // tipped over: off the rail
+      const tip = sgn(S.bal) * face;
+      rideEnd(p, p.x, p.y + 0.05, d[2] * S.v * 0.55 + tip * 1.2, 2.5, true); p.curl = false; p.rideCd = 0.7;
+      SFX.stumble(); burst(p.x, p.y + 0.3, [0xff9040, 0xffe080], 8, 4); emit("grindFall", { p }); p.grindFalls = (p.grindFalls || 0) + 1;
+      if (p === player && !cpuNow) hudToast("Off balance!");
+      return true;
+    }
+    if (input.jp) {
+      const just = S.u > R.total - 1.6;                                               // (the very end: a Just Trick)
+      const vj = just ? Math.min(S.v * 1.22, 29) : Math.min(S.v, 28);
+      rideEnd(p, p.x, p.y + 0.05, d[2] * vj, Math.max(0, d[3] * S.v) + p.c.jump * (just ? 1.12 : 0.9), true); p.jumping = true;
+      if (just) { SFX.dash(); burst(p.x, p.y + 0.6, [0xffd23a, 0xffffff], 14, 5); if (p === player && !cpuNow) hudToast("Just Trick!"); emit("justTrick", { p }); } else SFX.jump();
+      return true;
+    }
+    if (Math.random() < (steady ? 0.75 : 0.35)) burst(p.x - face * 0.2, p.y, steady ? [0xffe080, 0xffffff, 0x9ad8ff] : [0xff8040, 0xffc060], 1, steady ? 3 : 2);   // (sparks: bright balanced, dull dragging)
+    return false;
+  }
+  /* your balance on a rail, a meter under the HUD while you grind: the marker's lean, the green
+     middle where it builds speed */
+  function grindHud() {
+    const h = host && host.querySelector(".adv-hud"); if (!h) return;
+    let el = h.querySelector(".grind-bal");
+    const S = player && player.state === "ride" && player.ride && player.ride.R.k === "rail" && !(NP.on && NP.watch) ? player.ride : null;
+    if (!S) { if (el) el.classList.remove("on"); return; }
+    if (!el) { el = document.createElement("div"); el.className = "grind-bal"; el.innerHTML = "<i>Balance</i><b><span></span><em></em></b>"; h.append(el); }
+    const a = clamp((S.bal || 0) * (player.face || 1), -1, 1), m = Math.abs(a);
+    el.classList.add("on"); el.querySelector("em").style.left = (50 + a * 46) + "%";
+    el.classList.toggle("ok", m < 0.28); el.classList.toggle("bad", m >= 0.7);
   }
   function rideEnd(p, x, y, vx, vy, ballistic, ground) {
     p.rideLast = p.ride && p.ride.R; p.ride = null; p.state = "run"; p.x = x; p.y = y; p.vx = vx; p.vy = vy; p.rideCd = 0.45; p.coyote = 0;
@@ -6115,7 +6193,14 @@
           name = framesOf(id, h[0]) ? h[0] : framesOf(id, "jump") ? "jump" : "idle"; const hi = h[1]; pick = () => Math.min(hi, count(name) - 1);
         }
         else if ((k === "loop" || k === "cork") && framesOf(id, "run")) { name = "run"; fps = 22; face = 1; spin = Math.atan2(p.vy, p.vx); }   // (a corkscrew too: along it on its feet, leaning with it)   // (round a loop on its feet, as Sonic does: up the side, over the top upside down)
-        else if (k === "rail" && framesOf(id, "land")) { name = "land"; const L = framesOf(id, "land"); let kk = 0; L.forEach((f, j) => { if (f[3] < L[kk][3]) kk = j; }); pick = () => kk; }
+        else if (k === "rail") {                           // grinding: a trick spins it through its ball; crouched for speed; and leaning with its balance
+          const S = p.ride, f0 = p.face || 1;
+          if (S.trT > 0 && framesOf(id, ball)) { name = ball; fps = 24; spin = -f0 * (1 - S.trT / 0.36) * PI * 2; }
+          else if (S.crouch && framesOf(id, "crouch")) { name = "crouch"; loop = false; }
+          else if (framesOf(id, "land")) { name = "land"; const L = framesOf(id, "land"); let kk = 0; L.forEach((f, j) => { if (f[3] < L[kk][3]) kk = j; }); pick = () => kk; }
+          else name = "idle";
+          if (!(S.trT > 0)) spin = -(S.bal || 0) * 0.42 * f0;
+        }
         else { name = ball; fps = 24; }
         break;
       }
@@ -6180,6 +6265,8 @@
       p.spr.position.x = p.x + dx * cs - dy * sn; p.spr.position.y = p.y + dx * sn + dy * cs;
     }
     p.spr.rotation.z = spin;
+    const tubed = p.state === "ride" && p.ride && p.ride.R.k === "tube";   // (in a pipe: drawn in front of what the pipe runs through, between its back wall and its glass)
+    p.spr.renderOrder = 11; if (tubed) p.spr.position.z = 0.75;          // (runners after a pipe's back wall, always: none hidden behind one)
     /* struck: white for an instant, shaking through the freeze-frame */
     const wm = p.whiteT > 0 ? whiteMat(p.spr.userData.who) : null;
     p.whiteT = Math.max(0, (p.whiteT || 0) - dt);
@@ -6262,7 +6349,7 @@
       for (const f of battle.fs) { input = f.inp; drawRunner(f, dt); drawDust(f, dt); drawAura(f, dt); }
       input = INPUT0;
     } else {
-      drawRunner(p, dt); drawDust(p, dt); drawAura(p, dt);
+      drawRunner(p, dt); drawDust(p, dt); drawAura(p, dt); grindHud();
       if (CPUS.length) { const keep = input; for (const q of CPUS) { input = q.D.inp; drawRunner(q.p, dt); drawDust(q.p, dt); drawAura(q.p, dt); } input = keep; }   // the CPU runners, each with its own hands
       if (NP.on && NP.ghosts.size) npDrawGhosts(dt);
     }
@@ -9862,7 +9949,7 @@
     if (!why && dead && y < 2) { why = "fall"; gy = botGroundBehind(x); }
     if (!why) return;
     const L = les.find(o => o.x0 < x1 + 1.5 && o.x1 > x0 - 1.5 && Math.abs(o.y - gy) < 1.6);
-    if (L) { L.n++; L.x0 = Math.min(L.x0, x0) - 0.5; L.x1 = Math.max(L.x1, x1) + 1.5; }
+    if (L) { L.n++; if (L.n <= 3) { L.x0 = Math.min(L.x0, x0) - 0.5; L.x1 = Math.max(L.x1, x1) + 1.5; } }   // (wider a few times; no wider after, or it grows past any jump over it)
     else les.push({ x0, x1, y: gy, n: 1, why });
   }
   /* (the ground a fall to nothing was taken from: the last ground behind x) */
@@ -9971,13 +10058,49 @@
       const side = i + 0.5 < p.x ? 1 : -1;                                  // (the side it jumps from)
       let room = true;
       for (let k = y0 + 1; k <= j + 1 && room; k++) for (const dx of [0, side, 2 * side]) if (!open(i + dx, k)) { room = false; break; }
+      const ic = Math.floor(p.x);
+      let shaft = false;
+      if (!room && (wallKicksOf(c) || c.climb || AIR_UP[c.air] >= 2 || c.air === "hover") && Math.abs(i - ic) <= 1) {   // (or a shaft straight up where it stands, the ledge at its top beside it -- for one that kicks, climbs or flies up)
+        room = shaft = true; for (let k = y0 + 1; k <= j + 1; k++) if (!open(ic, k)) { room = shaft = false; break; }
+      }
       if (!room) continue;
       const score = Math.abs(i + 0.5 - p.x) - (j - y0) * 0.6;
-      if (score < bs) { bs = score; best = { x: i + 0.5, y: j }; }
+      if (score < bs) { bs = score; best = shaft && !wallKicksOf(c) ? { x: ic + 0.5, y: j, shaft: true } : { x: i + 0.5, y: j }; }   // (a shaft, for one that flies or climbs up it: up it, where it is, the ledge beside its top the way on; one that kicks makes for the ledge, off the shaft's walls)
     }
     return best;
   }
-  const BOT_ONESHOT = { teleport: 1, double: 1, hover: 1, glide: 1 };   // (air actions that set a runner's rise lower than a spring's, once)
+  const BOT_ONESHOT = { teleport: 1, double: 1, hover: 1, glide: 1 };
+  /* the robot on a rail: it feels its balance a beat late and leans against it (back when it tips
+     forward, forward when it tips back), crouches for speed while it's steady, and now and then,
+     steady, throws in a trick */
+  function botGrind(D, p, I, h) {
+    const S = p.ride, face = p.face || 1;
+    I.R = I.L = I.J = I.D = 0;
+    if (D.gR !== S.R) { D.gR = S.R; D.gb = 0; }
+    D.gb += ((S.bal || 0) - D.gb) * Math.min(1, h * 16);
+    const b = D.gb + (S.push || 0) * 0.9 + (S.drift || 0) * 0.1 + (S.bal || 0) * 0.2;   // (and the shove it's riding into, as a rider feels the crest coming)
+    if (b > 0.05) { if (face > 0) I.L = 1; else I.R = 1; }
+    else if (b < -0.05) { if (face > 0) I.R = 1; else I.L = 1; }
+    if (Math.abs(S.bal || 0) < 0.14) I.D = 1;
+    if ((S.tricks || 0) < 3 && Math.abs(S.bal || 0) < 0.07 && !(S.trT > 0) && Math.random() < h * 0.7) { I.xp = 1; I.X = 1; }
+    D.still = 0; D.best = Math.max(D.best, p.x); D.hold = 0;
+  }
+  /* cracked rock or a crate it could break its way out through, nearest first: beside it at its
+     body's height ({up: false}), or over its head ({up: true}); within r across */
+  function botRockNear(p, r) {
+    let best = null, bs = 1e9;
+    const j0 = Math.floor((p.ground ? p.y : Math.max(0, p.y - 1.2)) + 0.1), jb = Math.floor(p.y + p.hh - 0.05), jt = Math.floor(p.y + p.hh + Math.min(4, jumpRows(p.c)));   // (hovering, what's under it too; overhead, as high as it gets)
+    for (let di = -Math.ceil(r); di <= Math.ceil(r); di++) {
+      const i = Math.floor(p.x) + di, dx = i + 0.5 - p.x;
+      for (let j = j0; j <= jt; j++) {
+        if (!botBrk(tile(i, j))) continue;
+        const up = j > jb, s = Math.abs(dx) + (up ? 1.5 + (j - jb) : 0);
+        if (up) { let clear = true; for (let k = Math.floor(p.y + 0.1); k < j; k++) { const t = tile(i, k); if (solid(t) && !botBrk(t)) { clear = false; break; } } if (!clear) continue; }   // (overhead: only with open air -- or more of it to break -- under it, down to its feet)
+        if (s < bs) { bs = s; best = { i, j, dx, up }; }
+      }
+    }
+    return best;
+  }   // (air actions that set a runner's rise lower than a spring's, once)
   function demoBot(D, p, w, h) {
     const I = D.inp, c = p.c;
     I.R = 1; I.L = 0; I.U = 0; I.D = 0; I.Z = I.X = I.C = 0;
@@ -9985,6 +10108,7 @@
     if (p.state === "hurt" && D.ps !== "hurt") botLearn(D.les, p, false);   // (hurt: what by, and where -- remembered)
     D.ps = p.state;
     if (p.demoFell || p.dead || p.y < 0.3) return "fail";
+    if (p.state === "ride" && p.ride && p.ride.R.k === "rail") { botGrind(D, p, I, h); return; }   // (a rail: balanced, as you'd grind it)
     if (p.state === "ride" || (p.ballistic && !p.ground)) { I.R = 1; I.J = 0; D.hold = 0; D.still = 0; D.best = Math.max(D.best, p.x); return; }   // (carried, or flying true: nothing to do but hold on)
     if (p.state === "hurt") { D.best = p.x; D.still = 0; }             // (knocked back: not stuck -- it goes on from where it lands)
     else if (p.x > D.best + 0.4) { D.best = p.x; D.still = 0; } else D.still += h;
@@ -9997,6 +10121,39 @@
       I.J = I.jp ? 1 : 0;
       return;
     }
+    if (D.brk) {                                                       // breaking out: to it, facing it, and every blow it has -- light, heavy, its special (a trap set, then set off); under it, upward
+      D.brk.t -= h; D.brkT -= h;
+      if (!botBrk(tile(D.brk.i, D.brk.j))) { const nx = botRockNear(p, 3); D.brk = nx ? { i: nx.i, j: nx.j, up: nx.up, t: 2.5 } : null; D.still = 0; }   // (broken: the next piece, if there's more in the way)
+      else if (D.brk.t <= 0) D.brk = null;
+      if (D.brk) {
+        const dx = D.brk.i + 0.5 - p.x, d = dx > 0 ? 1 : -1, near = D.brk.up ? Math.abs(dx) < 0.35 : Math.abs(dx) < c.w / 2 + 0.95;
+        I.R = !near && d > 0 ? 1 : 0; I.L = !near && d < 0 ? 1 : 0; I.J = 0;
+        D.brkStall = !near && p.ground && Math.abs(p.vx) < 0.4 ? (D.brkStall || 0) + h : 0;
+        if (D.tr) D.why = "brk " + D.brk.i + "," + D.brk.j + (D.brk.up ? " up" : "") + (near ? " near" : "");
+        if (D.brkStall > 0.25 && D.brkT <= 0) {                          // (something in the way to it -- a monitor, a crate: a blow at it, or over it)
+          if ((D.brkN = (D.brkN || 0) + 1) % 2) { I.xp = 1; I.X = 1; } else { I.jp = 1; I.J = 1; D.hold = 0.35; }
+          D.brkT = 0.35;
+        }
+        else if (near && !D.brk.up && p.face !== d) { if (d > 0) I.R = 1; else I.L = 1; }   // (turned to it first)
+        else if (near && D.brkT <= 0 && (p.state === "run" || p.state === "crouch" || (D.brk.up && !p.ground))) {   // (each once the last is done: a press mid-blow is lost)
+          const k = D.brkN = ((D.brkN || 0) + 1) % 4;
+          if (D.brk.up) {                                               // over its head: an upward blow (Up + Heavy, Up + Special), or up at it and a blow at the top
+            I.U = 1;
+            if (!p.ground) {
+              const gap = D.brk.j - (p.y + p.hh);                       // (how far its head is from it)
+              if (gap > 0.7 && p.vy < 3 && c.air !== "glide") { I.jp = 1; I.J = 1; D.brkT = 0.18; }   // (out of reach: its air action takes it up -- flight, a hover, a second jump)
+              else if (gap <= 0.7) { I.xp = 1; I.X = 1; D.brkT = 0.3; }              // (in reach, rising still: the blow, before it drops away)
+            }
+            else if (k === 1) { I.jp = 1; I.J = 1; D.hold = 0.45; D.brkT = 0.12; }
+            else if (k === 2 || k === 0) { I.xp = 1; I.X = 1; D.brkT = 0.32; }
+            else { I.cp = 1; I.C = 1; D.brkT = 0.32; }
+          }
+          else { if (k === 1 || k === 3) { I.xp = 1; I.X = 1; } else if (k === 2) { I.zp = 1; I.Z = 1; } else { I.cp = 1; I.C = 1; } D.brkT = 0.32; }
+        }
+        if (D.hold > 0) I.J = 1;
+        return;
+      }
+    }
     if (D.back > 0) {                                                  // backing off, for a run at it -- not back into thorns, nor off an edge
       const bx = p.x - c.w / 2 - Math.max(1.2, -p.vx * 0.25);
       if (p.ground && (botSore({ les: D.les }, bx - 1, bx, p.y) || botFloorIn(Math.floor(bx), Math.floor(p.y + 0.05)) < 1)) D.back = 0;
@@ -10005,7 +10162,7 @@
     if (D.goal) {                                                      // on the way up to a ledge
       const g = D.goal, dx = g.x - p.x;
       D.gt += h;
-      if (p.ground && p.y >= g.y - 0.3 && (Math.abs(dx) < 1.6 || dx < 0)) { D.goal = null; D.best = p.x; D.still = 0; D.tries = 0; }
+      if ((p.ground && p.y >= g.y - 0.3 && (Math.abs(dx) < 1.6 || dx < 0)) || (g.shaft && p.y >= g.y + 0.15)) { D.goal = null; D.best = p.x; D.still = 0; D.tries = 0; }   // (up there -- or up out of the shaft, onto the ledge as it runs on)
       else if (dx < -3 && p.y >= g.y - 0.3 && p.ground) { D.goal = null; D.still = 0; }           // (up there already, past it, another way)
       else if (D.gt > 4.5) { D.tried.push(g); D.goal = null; D.still = 0; }                      // (it gave that one a fair go)
       else if (p.state === "dash" && c.steer) { I.R = I.L = 0; I.J = 0; return; }                // (Gamma's Drive Mode: let go of it first, and it stops)
@@ -10028,7 +10185,10 @@
     if (D.still > 1.6) {
       if (++D.tries > 5) return "fail";
       D.still = 0; D.jt = 0;
+      const rk = D.tries <= 4 && botRockNear(p, 9);                   // (shut in -- a secret room, a pit -- with cracked rock to break: break out)
+      if (rk) { D.brk = { i: rk.i, j: rk.j, up: rk.up, t: 3 }; D.brkT = 0.05; return; }
       const g = stepUp(p, D.tried) || (wallKicksOf(c) ? stepUp(p, D.tried, kickRows(c)) : null);   // (a ledge its wall kicks get it to, if there's none nearer)
+      if (D.tr) D.why = g ? "up:" + g.x + "," + g.y : "back";
       if (g) { D.goal = g; D.gt = 0; } else D.back = 0.45 * Math.min(3, D.tries);             // a way up; else a run at it, further back each time
       return;
     }
@@ -10106,8 +10266,8 @@
       if (p.state === "fly") {
         if (safe) I.D = 1;
         else if (D.jt <= 0 && (p.vy < 0.2 || land === "wall")) { I.jp = 1; D.jt = 0.2; }
-      } else if (p.state === "glide") { if (!safe) D.hold = Math.max(D.hold, 0.1); }
-      else if (!safe && !D.airUsed && D.jt <= 0 && !(p.coyote > 0) && (p.vy < 1.5 || (land === "wall" && (p.vy < 6 || !BOT_ONESHOT[c.air]))) && !obs.some(o => o.spiky && o.x0 < 3)) { I.jp = 1; D.airUsed = true; D.hold = 0.6; D.jt = 0.25; }   // (at a wall, a one-shot air action not while a spring or a jump still carries it up fast: it would only take that rise away; flight climbs on from there)
+      } else if (p.state === "glide") { if (land !== "ground") D.hold = Math.max(D.hold, 0.1); }   // (a glide only sinks: down onto clean ground the moment a drop would land there -- never glided on into thorns it can't rise over)
+      else if (!safe && !(BOT_ONESHOT[c.air] && land === "ground") && !D.airUsed && D.jt <= 0 && !(p.coyote > 0) && (p.vy < 1.5 || (land === "wall" && (p.vy < 6 || !BOT_ONESHOT[c.air]))) && !obs.some(o => o.spiky && o.x0 < 3)) { I.jp = 1; D.airUsed = true; D.hold = c.air === "glide" ? 0.1 : 0.6; D.jt = 0.25; }   // (at a wall, a one-shot air action not while a spring or a jump still carries it up fast: it would only take that rise away; flight climbs on from there)
     }
     I.J = D.hold > 0 || I.jp ? 1 : 0;
   }
@@ -10142,6 +10302,7 @@
       world = buildWorld(def); world.sim = true;
       if (skill && skill.broken) for (const k in world.tiles) { const t = world.tiles[k]; if (t.c === "C") { t.gone = 1e9; t.fall = 9; world.S.grid[t.j][t.i] = "."; } }   // (a test: the crumbling ledges gone already, as the runners ahead leave them)
       const p = player = makePlayer(castOf(who)); p.demo = true;
+      if (skill && skill.at) { p.x = skill.at[0]; p.y = skill.at[1]; p.check = { x: p.x, y: p.y }; }   // (a test: from a spot of its own)
       const D = newBot(p, skill);
       input = D.inp; mode = "sim";
       let rec = 0;
@@ -10161,7 +10322,7 @@
         if (world.t >= rec) { rec += 1 / 30; drawRunner(p, 1 / 30); const f = p._rf || ["idle", 0, 1]; res.track.push([+world.t.toFixed(3), +p.spr.position.x.toFixed(3), +p.spr.position.y.toFixed(3), f[0], f[1], f[2]]); }
         if ((world.goal && p.x >= world.goal.x) || (!world.goal && world.arena && p.x >= world.arena.x0)) { res.ok = true; break; }   // (to the post; an Act 2, to the boss's arena)
       }
-      res.time = world.t; res.st.dist = (world.goal ? world.goal.x : world.W) - world.start.x; res.st.ideal = res.st.dist / p.c.run; res.st.endX = p.x;
+      res.time = world.t; res.st.gfalls = p.grindFalls || 0; res.st.dist = (world.goal ? world.goal.x : world.W) - world.start.x; res.st.ideal = res.st.dist / p.c.run; res.st.endX = p.x;
     } catch (e) { console.error(e); }
     finally { disposeWorld(); world = null; player = null; input = keep.input; mode = keep.mode; demo = keep.demo; SIM = false; Math.random = keep.rnd; }
     return res;
@@ -12124,8 +12285,8 @@
      or a story fight, does a player who isn't in it (NP.spectator). In a battle the camera frames
      the whole arena, as ever, or follows one fighter; in a race or the grand prix it follows any
      runner -- a player's ghost or a CPU -- or flies free along the course. Left and Right: the one
-     before or after; Z (or Jump): in a fight the whole arena and back, in a race the auto camera
-     (it picks who to watch), then the free camera, then back; in the free camera the arrows move
+     before or after; Z (or Jump): in a fight the whole arena and back; in a race it starts on the
+     auto camera (it picks who to watch), then Z the free camera, then a runner, then back; in the free camera the arrows move
      it, and X comes back to the runners. A bar along the bottom says who it is.
      (In a race the spectator's game still has a runner, for the camera to follow: never seen, and
      put each frame where the one watched is.) */
@@ -12160,7 +12321,7 @@
   function npSpecTick(dt) {
     const what = battle || GPR || NP.race;
     let S = NP.sp;
-    if (!S || S.what !== what) { S = NP.sp = { what, view: battle ? "all" : "follow", key: S && !battle && S.view !== "all" ? S.key : null, fx: player ? player.x : 0, fy: player ? player.y : 0, L: 0, R: 0, bar: "" }; for (const k in specTap) specTap[k] = 0; }
+    if (!S || S.what !== what) { S = NP.sp = { what, view: battle ? "all" : "auto", key: S && !battle && S.view !== "all" ? S.key : null, fx: player ? player.x : 0, fy: player ? player.y : 0, L: 0, R: 0, bar: "" }; for (const k in specTap) specTap[k] = 0; }
     readInput(SPI, 0);
     const tap = Object.assign({}, specTap); for (const k in specTap) specTap[k] = 0;
     const L = (SPI.L && !S.L) || tap.L, R = (SPI.R && !S.R) || tap.R; S.L = SPI.L; S.R = SPI.R;
@@ -12779,7 +12940,7 @@
                 const near = o => Math.abs((o.x != null ? o.x : o.x0) - x) < r && Math.abs((o.y != null ? o.y : o.y0) - y) < 6;
                 const out = { rows, hz: w.hazards.filter(near).map(z => [z.t || "hz", z.x0, z.x1, z.y0, z.y1]), en: w.enemies.filter(near).map(e => [e.key, e.x, e.y]), ents: w.ents.filter(near).map(e => [e.t, e.x, e.y]), sol: w.solids.filter(near).map(b => [b.t, b.x0, b.y0]) };
                 disposeWorld(); world = null; return out; },
-              botStats: (where, who, skill) => { const def = typeof where === "number" ? raceDef(where) : /^[ab]\d+$/.test(where) ? actDef(+where.slice(1), where[0] === "b" ? 1 : 0) : /^s\d+$/.test(where) ? storyStages()[+where.slice(1)] : gpDef(where); const r = simRun(def, who, 1000, skill); return { trace: r.trace, ok: r.ok, time: +r.time.toFixed(1), ideal: +r.st.ideal.toFixed(1), hurt: r.st.hurt, rides: r.st.rides || 0, bump: r.st.bump, stumble: r.st.stumble, water: +r.st.water.toFixed(1), endX: Math.round(r.st.endX), dist: Math.round(r.st.dist), ev: r.st.ev }; },
+              botStats: (where, who, skill) => { const def = typeof where === "number" ? raceDef(where) : /^[ab]\d+$/.test(where) ? actDef(+where.slice(1), where[0] === "b" ? 1 : 0) : /^s\d+$/.test(where) ? storyStages()[+where.slice(1)] : gpDef(where); const r = simRun(def, who, 1000, skill); return { trace: r.trace, ok: r.ok, time: +r.time.toFixed(1), ideal: +r.st.ideal.toFixed(1), hurt: r.st.hurt, rides: r.st.rides || 0, bump: r.st.bump, stumble: r.st.stumble, water: +r.st.water.toFixed(1), endX: Math.round(r.st.endX), dist: Math.round(r.st.dist), gfalls: r.st.gfalls || 0, ev: r.st.ev }; },
               raceStart: o => raceStart(o), get race() { return RACE; }, actDef: (i, a) => actDef(i, a), storyStages: () => storyStages(),
               get tut() { return TUT; }, tutorialStart, trainingMenu, tutLessons: () => tutLessons().map(l => l.id),
               tutJump: id => { if (!TUT) return; TUT.i = LESSONS.findIndex(l => l.id === id) - 1; TUT.ok = null; tutNext(); },

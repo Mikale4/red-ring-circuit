@@ -176,11 +176,22 @@ deck broken by the runners ahead, ends in a slope up out of the water.
 belts, ice, mud and water: **loops** and **corkscrews** (run in at speed and round you go -- round a loop on your feet,
 upside down over the top; too slow and you run on under them), **zip lines** (pulleys, vines, cables between airships: run into
 the handle and hang on; the cable car goes up), **rails** to grind (coasters, mine railways, the
-monorail, ice rails; downhill you gain, Jump leaves them), **pipes** (in at the mouth and through
-at speed), **cannons** (in, a moment, and fired true: nothing steers a shot till it lands),
+monorail, ice rails -- see Grinding below), **pipes** (in at the mouth and through at speed, one
+piece round their bends, seen over whatever they run through), **cannons** (in, a moment, and fired true: nothing steers a shot till it lands),
 diagonal **springs**, water **currents** that carry you, **wind** at your back or in your face,
 **low gravity**, **spouts and geysers** that throw you up when they go off, and **dust devils**
-that wander a stretch and lift whoever they reach.
+(sand whirled up a funnel) that wander a stretch and lift whoever they reach. A spring under a
+high road throws you up through it: the road is planks there, so nobody is thrown into its
+underside.
+
+**Grinding**, as Sonic Adventure 2 and Sonic Rush have it: a fast ride you balance on. Downhill
+builds speed and uphill costs it. You sway as you go, and the rail's crests throw you forward and
+its dips back, harder the faster you are; Left and Right lean back or forward against it, and a
+Balance meter shows where you are. Balanced (the green middle) you gain speed and the sparks
+fly; off balance you drag; tipped right over, you fall off. Down crouches for more speed, but
+only balanced -- off balance, crouching makes it worse. Light or Heavy is a grind trick, three
+to a rail, each a burst of speed that rocks your balance; Jump leaves the rail any time, and at
+its very end it's a **Just Trick**, off it faster and higher. The CPUs grind by the same rules.
 
 Rows of **Red Rings** stand across every road at the power points. Run into one and the box spins
 up a power; the power button (V or Shift; a pad's left shoulder; Power on a touch screen) uses it.
@@ -215,7 +226,9 @@ machinery as you do, and using powers of their own (a runner who can fly or glid
 over water, a fall, thorns or a wall: flying is slower than running). They learn from their
 blunders: a CPU hurt by thorns or a badnik, or lost down a fall, remembers the spot for the rest
 of the race (its respawns too) and from then on jumps or flies further past it, a little further
-each time it happens there again. The HUD shows your place, the
+each time it happens there again. Shut in -- a secret room, a pit -- by cracked rock or crates,
+a CPU breaks its way out, as you would: up to it, and every blow it has (its trap too), upward
+at what's over its head. The HUD shows your place, the
 whole field along the course on a strip, and the power box.
 
 **Story** is *The Red Star Rings*, told the way Sonic Battle tells its story: one plot, an
@@ -652,12 +665,12 @@ along the bottom says who you're watching:
 - a **battle** (a tournament's match or a story fight too, for everyone not in it): the whole
   arena, framed as ever, or one fighter followed close (the left and right arrows; Z back to the
   whole arena). Their HUD card is outlined.
-- a **race**, the **grand prix** or a story run: any runner followed -- a player's ghost or a
-  CPU, with their place (left and right) -- or, Z, the **auto camera**, a race director cutting
+- a **race**, the **grand prix** or a story run: it starts on the **auto camera**, a race
+  director cutting
   to where the race is (the leader, runners side by side, the run-in to the line: a shot held
-  four seconds at least, twelve at most on one runner; left and right pick one to follow), then
-  Z again the **free camera**, which the arrows fly anywhere along the course (Z or X back to
-  the runners, the nearest one). On the grand prix's strip the watched face is ringed, and the
+  four seconds at least, twelve at most on one runner); left and right follow any runner -- a
+  player's ghost or a CPU, with their place; Z goes to the **free camera**, which the arrows fly
+  anywhere along the course, then back to the runners (X too, the nearest one). On the grand prix's strip the watched face is ringed, and the
   power box is theirs: what they hold (spinning as they pick it up) and, as they use it, a flash
   and its name.
 
