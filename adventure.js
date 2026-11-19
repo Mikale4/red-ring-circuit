@@ -10175,7 +10175,7 @@
     "peak-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "peak-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "club-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "club-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "expressway-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "expressway-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "museum-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "museum-3": "tails knuckles amy rouge shadow cream chaos gamma eggman metal silver",
+    "museum-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "museum-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "springs-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "springs-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "canyon-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "canyon-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "ruins-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "ruins-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
