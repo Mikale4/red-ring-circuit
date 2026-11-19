@@ -1033,13 +1033,4 @@
 .adv .ao-room .btn .ico{width:14px;height:14px}
 .ao-room.watchable{opacity:1}
 @media (max-width:640px){.adv .ao-room .btn.ao-wsm{padding:7px 9px 6px}.ao-room .ao-wsm span{display:none}.adv .ao-room .ao-wsm .ico{margin:0}}
-/* grinding: the balance meter (a rail's lean, the green middle where it builds speed) */
-.grind-bal{position:absolute;left:50%;bottom:138px;transform:translateX(-50%);display:none;flex-direction:column;align-items:center;gap:4px;pointer-events:none;z-index:5}
-.grind-bal.on{display:flex}
-.grind-bal i{font:700 11px/1 var(--sx-pix);font-style:normal;letter-spacing:.1em;text-transform:uppercase;color:var(--sx-yel);text-shadow:var(--sx-out1)}
-.grind-bal b{position:relative;display:block;width:190px;height:14px;border:3px solid var(--sx-ink);border-radius:8px;background:linear-gradient(90deg,var(--sx-red) 0 15%,var(--sx-org) 15% 36%,var(--sx-grn) 36% 64%,var(--sx-org) 64% 85%,var(--sx-red) 85%);box-shadow:0 3px 0 var(--sx-ink)}
-.grind-bal em{position:absolute;top:-6px;width:10px;height:20px;margin-left:-5px;border:2px solid var(--sx-ink);border-radius:3px;background:#fff;transition:left .05s linear}
-.grind-bal.ok em{background:var(--sx-yel)}
-.grind-bal.bad b{animation:grind-warn .25s steps(2) infinite}
-@keyframes grind-warn{50%{border-color:var(--sx-red)}}
 

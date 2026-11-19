@@ -37,7 +37,7 @@ request. The credits for every sprite sheet, track and sound are below.
 | `voxkit.js` | The voxel grid and AO mesher (from Post Parade's race renderer). |
 | `settings.js`, `icons.js` | The settings (music, sound, dialogue speed, shake) and the interface's icons. |
 | `theme.css`, `game.css` | The base styles (from Post Parade) and the game's own Sonic look. |
-| `audio/` | The music (the Sonic soundtracks below, at 96 kbps) and `audio/sfx/`, the sound effects. |
+| `audio/` | The music (the Sonic soundtracks below, at 96 kbps; the grand prix's, Mario Kart 64's, `mk64-*`, at 128) and `audio/sfx/`, the sound effects. |
 | `tools/` | Local only (not in the repository): the stage generator, the packers, the validator, the source art. |
 
 ## How it plays
@@ -156,7 +156,7 @@ then its own thing at full stretch, its set piece last), several roads through m
 high road quick for those who get up there, the low road with its secrets), and one thing at
 its heart nobody else has. Each cup is harder than the last: more roads and secret rooms (seven
 in the Flicky Cup, thirty-one in the Emerald), more badniks (the cup's own, from seventeen to
-forty-eight), more thorns and more falls to nothing, bigger set pieces -- each cup's danger its
+forty-eight), more spikes and more falls to nothing, bigger set pieces -- each cup's danger its
 own kind (ice and freezing water in the Aurora, the sky under you in the Skyward). Whatever
 you fall into has a way out that the slowest, heaviest runner can take: a secret room is
 climbed out of with a jump and a wall kick, a climb or a flight (its monitor one that lasts -- rings, a shield or the
@@ -165,7 +165,7 @@ deck broken by the runners ahead, ends in a slope up out of the water.
 
 | Cup | Courses |
 |---|---|
-| Flicky Cup | **Checker Hills** (loops and corkscrews on the green coast; a cave under the hills; the headland's long downhill into a big loop, then the jump over the cove) · **Coral Coast** (boardwalks over the tide channels: up on the planks, some rotten, or down in the water where the tide carries you on faster; the lighthouse's zip line across the bay) · **Mushroom Grove** (bounce up the giant caps, swing vine to vine through the canopy, or keep to the floor with its logs and thorns and hollow log; the long vine over the clearing) · **Lagoon Ruins** (stepping stones between the sinking columns, the flooded halls under the colonnade, a broken tower the water spouts throw you up, spouts over the channels out to sea) |
+| Flicky Cup | **Checker Hills** (loops and corkscrews on the green coast; a cave under the hills; the headland's long downhill into a big loop, then the jump over the cove) · **Coral Coast** (boardwalks over the tide channels: up on the planks, some rotten, or down in the water where the tide carries you on faster; the lighthouse's zip line across the bay) · **Mushroom Grove** (bounce up the giant caps, swing vine to vine through the canopy, or keep to the floor with its logs and spikes and hollow log; the long vine over the clearing) · **Lagoon Ruins** (stepping stones between the sinking columns, the flooded halls under the colonnade, a broken tower the water spouts throw you up, spouts over the channels out to sea) |
 | Carnival Cup | **Pinball Palace** (plunger cannons up into the bumper gallery, the slot lanes below, the bumper shaft to climb for the jackpot, plungers in a row over the drain) · **Funfair Twilight** (ride the coaster rails over the fair, the Ferris wheel's cars up to the top walk, a loop on the old track, the human cannonball over the big top) · **Sugar Rush Factory** (belts of cake, the syrup pipes over the vats, the chocolate river and its wafer bridges, the candy lift, the long pipe down from the top of the works) · **Firework Pier** (mortars that throw you up to the balloon road among the fireworks, the old pier falling into the sea under you, the big mortar from the pier's end back to the shore) |
 | Aurora Cup | **Powder Slopes** (the cable car over the slopes to the top, then down: icy runs and moguls, the pines or the cliff edge, an ice cave under the piste, the ski jumps) · **Crystal Cavern** (down the shaft into the deep cave, crystal clusters to smash or jump and the crevasses after them, the frozen lake's floes, the crystal pipe all the way up to daylight) · **Iceberg Bay** (floes over the open water, the current under the ice, icebergs to climb and slide down) · **Aurora Tundra** (the blizzard leaning on you -- the ice cave under the drifts is out of it -- updraft cliffs, ice rails across the chasms (or the floes across, nothing under them), the long rail down from the summit) |
 | Ember Cup | **Pyramid Dunes** (quicksand in the hollows, through the pyramids or over their steps, the treasure rooms behind the cracked stone, the cable to the oasis) · **Dust Devil Town** (main street or the rooftops, the dust devils wandering the square to lift you up to them, the mine railway through the hill, the twister over the canyon) · **Magma Foundry** (the casting floor's belts over the molten pools, the lifts up the furnace tower, the gangways, the pipes down through the works) · **Volcano Rim** (lava geysers throwing you up the terraces, rock bridges falling away into the lava, the eruption that shoots you off the summit) |
@@ -177,21 +177,27 @@ belts, ice, mud and water: **loops** and **corkscrews** (run in at speed and rou
 upside down over the top; too slow and you run on under them), **zip lines** (pulleys, vines, cables between airships: run into
 the handle and hang on; the cable car goes up), **rails** to grind (coasters, mine railways, the
 monorail, ice rails -- see Grinding below), **pipes** (in at the mouth and through at speed, one
-piece round their bends, seen over whatever they run through), **cannons** (in, a moment, and fired true: nothing steers a shot till it lands),
+piece round their bends, seen over whatever they run through; each mouth level, sitting on the
+road, a rim square on it, so you run straight in and out; where two pipes fork, the first's mouth
+stands up on a post, a jump's height: jump into it, or run on under it into the other),
+**cannons** (a turret, a banded steel barrel on its pivot, a lip round its mouth: in, a moment,
+and fired true -- nothing steers a shot till it lands),
 diagonal **springs**, water **currents** that carry you, **wind** at your back or in your face,
 **low gravity**, **spouts and geysers** that throw you up when they go off, and **dust devils**
 (sand whirled up a funnel) that wander a stretch and lift whoever they reach. A spring under a
 high road throws you up through it: the road is planks there, so nobody is thrown into its
 underside.
 
-**Grinding**, as Sonic Adventure 2 and Sonic Rush have it: a fast ride you balance on. Downhill
-builds speed and uphill costs it. You sway as you go, and the rail's crests throw you forward and
-its dips back, harder the faster you are; Left and Right lean back or forward against it, and a
-Balance meter shows where you are. Balanced (the green middle) you gain speed and the sparks
-fly; off balance you drag; tipped right over, you fall off. Down crouches for more speed, but
-only balanced -- off balance, crouching makes it worse. Light or Heavy is a grind trick, three
-to a rail, each a burst of speed that rocks your balance; Jump leaves the rail any time, and at
-its very end it's a **Just Trick**, off it faster and higher. The CPUs grind by the same rules.
+**Grinding** is a fast ride that keeps you on the rail: nothing to balance, and you never fall
+off. Downhill builds speed and uphill costs it; Down crouches for more. Light or Heavy is a
+grind trick, three to a rail, each a burst of speed; Jump leaves the rail any time, and at its
+very end it's a **Just Trick** (Sonic Rush's), off it faster and higher. The CPUs grind by the
+same rules.
+
+The **spikes** on the courses and in the zones are the classic ones: rows of silver cones on a
+plate. Touch them and you're hit. **Cracked rock** (crystal clusters, cracked walls) shatters
+whole: break it anywhere and all of it goes, top to bottom, with nothing left hanging over
+the road.
 
 Rows of **Red Rings** stand across every road at the power points. Run into one and the box spins
 up a power; the power button (V or Shift; a pad's left shoulder; Power on a touch screen) uses it.
@@ -200,7 +206,7 @@ Fifteen, the classic games' and the Wisps' (Team Sonic Racing's own racing power
 | Power | What it does |
 |---|---|
 | Speed Shoes | faster for 4.5 seconds |
-| Bubble Shield | takes one hit, for 4.5 seconds (a shield from a monitor on the course too: 4.5 seconds in the grand prix) |
+| Bubble Shield | a soap bubble round you (a rainbow sheen on it, little bubbles floating up beside it) that takes one hit, for 4.5 seconds (a shield from a monitor on the course too: 4.5 seconds in the grand prix) |
 | Invincibility | 7 seconds untouchable and faster, and anyone you touch goes down |
 | Buzz Bomber | Sonic 1's wasp flies after the runner ahead; with nobody ahead, it hovers where you left it, a trap |
 | Eggman Monitor | a fake monitor left behind you |
@@ -223,12 +229,16 @@ quicker or slower than the next (Breeze: about nine tenths of your top speed and
 a little under yours, dashing now and then; Storm: flat out), the pack kept near you, taking the
 rings, Red Rings and monitors they run through and lighting the Star Posts, riding the courses'
 machinery as you do, and using powers of their own (a runner who can fly or glide only does it
-over water, a fall, thorns or a wall: flying is slower than running). They learn from their
-blunders: a CPU hurt by thorns or a badnik, or lost down a fall, remembers the spot for the rest
+over water, a fall, spikes or a wall: flying is slower than running). They learn from their
+blunders: a CPU hurt by spikes or a badnik, or lost down a fall, remembers the spot for the rest
 of the race (its respawns too) and from then on jumps or flies further past it, a little further
-each time it happens there again. Shut in -- a secret room, a pit -- by cracked rock or crates,
+each time it happens there again (a badnik's shot or freezing water too). They see badniks' shots
+in the air, and won't jump up into a Spiny's lobbed ball or hover in its way. Killed twice at the
+same spot, a CPU comes up to it slower the next time, at another speed after every death, till
+an approach works: the same run at it is never the same death over and over. Shut in -- a secret room, a pit -- by cracked rock or crates,
 a CPU breaks its way out, as you would: up to it, and every blow it has (its trap too), upward
-at what's over its head. The HUD shows your place, the
+at what's over its head; then straight up the shaft it opened, each its own way -- wall kicks
+off its side, flight, a double jump, and Knuckles a glide onto its wall and the climb. The HUD shows your place, the
 whole field along the course on a strip, and the power box.
 
 **Story** is *The Red Star Rings*, told the way Sonic Battle tells its story: one plot, an
@@ -506,7 +516,7 @@ are in `HITS` in `adventure.js`.
 | Chaos Gamma | walks slowly; a double tap is **Drive Mode**, fast and steerable for as long as the direction is held; **Flight Mode** in the air, sinking slowly | Solid Knuckle, Electric Stab, Paralyze Cut; Electric Shock, Upper Electric Shock, Buster Drill, Air Electric Shock, Air Knuckle; **Devastator**, which charges while C is held (the charging frames only while it is held) and lets go far bigger; **Meltdown**, his reactor going up, which costs him a heart; Blinker, a mine |
 | Dr. Eggman | in his **Egg Mobile**, a hovercraft, floating off the ground with its shadow under it; **Egg Hover**, Space in the air: held up a while, then sinking slowly (Down lets go) | Egg Fist, Spike Jab, Egg Driver; Wrecker Swing, Upper Fist, Hidden Drill, Wrecking Ball, Fist Piledriver; the Death Egg Cannon, a ball of fire; Missile Launch, a missile that goes off where it hits; Bomb Drop, a bomb out of the bottom, its fuse lit |
 | Metal Sonic | built to outrun Sonic (Sonic CD), the second fastest; his **jet** in the air, a burst ahead and a moment's hover; Spin Dash | Metal Jab, Swipe, Kick; Electrical Discharge, Electric Upper, Fireball Crash, Metal Rocket, Metal Eagle; Electric Bolt; **Black Shield**, a crystal round him that nothing gets through and that breaks what it meets; Plasma Grenade, thrown |
-| Mighty | strong; **Shell Launch**, Space in the air, straight up and curled; against a wall, a **wall jump** off it (Knuckles' Chaotix), three before he lands; curled, spikes and thorns can't hurt him (Sonic Mania Plus); Spin Dash | Mighty Punch, Kick, Hook; Explosive Punch, Mighty Uppercut, Mighty Chop, Mighty Rocket, Axe Sledge; Mighty Cyclone, a tornado along the ground (a ring of fire from the air); Hammer Spin, three times round; **Hammer Drop** (Up + C in the air), straight down through cracked rock, a shockwave both ways where he lands; Peacemaker |
+| Mighty | strong; **Shell Launch**, Space in the air, straight up and curled; against a wall, a **wall jump** off it (Knuckles' Chaotix), three before he lands; curled, spikes can't hurt him (Sonic Mania Plus); Spin Dash | Mighty Punch, Kick, Hook; Explosive Punch, Mighty Uppercut, Mighty Chop, Mighty Rocket, Axe Sledge; Mighty Cyclone, a tornado along the ground (a ring of fire from the air); Hammer Spin, three times round; **Hammer Drop** (Up + C in the air), straight down through cracked rock, a shockwave both ways where he lands; Peacemaker |
 | Silver | psychokinesis (Sonic '06); the **Air Psycho Dash**, Space in the air: ahead, a hover, and then Space held floats him down; Spin Dash | Silver Punch, Jab, Kick; Psycho Shock, Psycho Upper, Silver Bash, Silver Rocket, Psycho Crush; Psycho Knife, gone in a moment; Psycho Surge, a whirlwind round him; Psycho Orb, sent ahead to hang in the air, one at a time |
 
 **Wall kicks.** In a stage, Space against a wall you meet in the air kicks off it, up: held
@@ -580,7 +590,7 @@ everything else (its runner framed in the open band between Start and the strip,
 the title covers it), runs a demo: one of the cast at random plays a zone's first Act at random, by
 itself, to the goal post (the post spins), then another runner in another zone, round and round.
 A robot plays it honestly, keeping its speed as a player who knows the road would: it looks
-further ahead the faster it goes for walls, hurdles, monitors, thorns, badniks, the end of the
+further ahead the faster it goes for walls, hurdles, monitors, spikes, badniks, the end of the
 road and water, and jumps each in good time for how tall it is, the jump planned before it's made
 (the shortest that clears it and comes down with room to jump the next); runs up slopes and onto
 what they lead to, plans tall walls from their steps, rolls through cracked rock (those who can
@@ -715,7 +725,7 @@ zone is written as its two Acts, cut from the one stage at the Star Post between
 course pieces (`tools/gengp.py`: loops, corkscrews, cables, rails, pipes, cannons, currents,
 wind, geysers, dust devils, low gravity) and `tools/genstages.py`'s older set pieces -- runs,
 hills, climbs, pits with stepping stones, high roads, vaults, balloon ladders, bumper pits --
-then the passes every zone gets (secret rooms, thorns and crevasses, badniks where there's room
+then the passes every zone gets (secret rooms, spikes and crevasses, badniks where there's room
 to see them coming, more of each zone by zone), and writes the file, each Act with its
 machinery; `node tools/validate.js` checks them,
 and `tools/dev/adventure-bot.js` plays them through in a test page. Besides the old pieces
@@ -741,16 +751,21 @@ stages take their place's. The bosses fight to Sonic 3's boss theme (Gemerl to S
 Knuckles' mini-boss, Mecha Knuckles to Sonic 4's Metal Sonic battle, the Egg Frog to Big Arms,
 the two chases to Sonic 4's boss theme, its second phase past half). The title, main menu,
 zone select, options and story have their own; Battle has Sonic 3's competition menu, its five
-competition stages by arena, and its results; Training the Glowing Spheres. The grand prix's
-twenty-four courses each have a zone theme of their own from the same albums: Checker Hills
-Emerald Hill, Coral Coast Angel Island, Mushroom Grove Mushroom Hill, Lagoon Ruins Aquatic Ruin,
-Pinball Palace and Firework Pier Sonic 4's Casino Street (Acts 1 and 2), Funfair Twilight and
-Sugar Rush Factory Carnival Night (1 and 2), Powder Slopes and Iceberg Bay White Park (1 and 2),
-Crystal Cavern Mystic Cave, Aurora Tundra Hidden Palace, Pyramid Dunes Oil Desert, Dust Devil Town
-Oil Ocean, Magma Foundry Mad Gear, Volcano Rim Hill Top, Cloud Temple Sky Sanctuary, Gale
-Highlands Marble Garden, Storm Fleet Flying Battery, Jet Stream Spires Sky Chase, Chemical
-Refinery Chemical Plant, Neon Metropolis Launch Base, Egg Fortress Wing Fortress and Starfall
-Orbit the Doomsday Zone; the award ceremony has Sonic 2's Chaos Emerald jingle. The jingles are
+competition stages by arena, and its results; Training the Glowing Spheres. **The grand prix
+plays Mario Kart 64's soundtrack** (the N64 gamerip, khinsider, at 128 kbps): its menus the
+Main Menu theme; the starting grid and the count the Race Start Fanfare; each course from Go the
+MK64 course theme nearest its own -- Checker Hills, Pinball Palace, Gale Highlands and Chemical
+Refinery the raceways' (Luigi's, Mario's, Royal Raceway, Wario Stadium), Coral Coast, Firework
+Pier and Iceberg Bay Koopa Troopa Beach, Mushroom Grove and Cloud Temple Moo Moo Farm / Yoshi
+Valley, Lagoon Ruins and Pyramid Dunes DK's Jungle Parkway, Funfair Twilight and Storm Fleet
+Banshee Boardwalk, Sugar Rush Factory, Crystal Cavern and Volcano Rim Choco Mountain, Powder
+Slopes and Aurora Tundra Frappe Snowland / Sherbet Land, Dust Devil Town Kalimari Desert, Magma
+Foundry and Egg Fortress Bowser's Castle, Neon Metropolis Toad's Turnpike, Jet Stream Spires and
+Starfall Orbit Rainbow Road. Past the last Star Post the Final Lap fanfare, and the course's
+tune again a little faster; invincible, Super Star; home, the 1st, 2nd-4th or 5th-8th place
+fanfare, and the results to the top four's or the back four's results theme; the cup's podium
+the Award Ceremony, then Congratulations! (or No Trophy for You!). A trap laid (a fake monitor,
+a spring) makes MK64's item-drop sound (The Mushroom Kingdom's wavs). The jingles are
 there too: the Act clear, invincibility (over whatever plays, which picks up again where it
 left off), and the drowning count. The sound effects are Sonic 3 & Knuckles' (Mr Lange's Sonic
 Sounds Complete rips, named from the Sonic Retro disassembly): jump, the rings right and left,
