@@ -1477,7 +1477,7 @@
      for a low road, a high one and the sky over both. H is the stage being run. */
   let H = 32;
   const SOLIDS = "#=XBImC{}";
-  const ENTS = "PGKEc*JHS>rbknphMVUOT^Qo@";
+  const ENTS = "PGKEc*JHS>rbknphMVUOT^Qo@Y";
   function parse(def) {
     const chunks = def.chunks.map(raw => {
       const lines = raw.split("\n");
@@ -3805,6 +3805,14 @@
         case "E": w.arena = { x0: e.i, y }; break;          // Eggman's arena: its left edge (the boss, below)
         case "@": w.powers.push({ x, y: y + 0.25, col: e.i, m: put(propGeo("powerring"), x, y + 0.25), back: 0 }); break;   // a Red Ring: a power
         case "H": w.shoes.push({ t: "shoe", n: shoeN, x, y: y + 0.2, m: put(propGeo("redring"), x, y + 0.2) }); shoeN++; break;   // a Red Star Ring
+        case "Y": {                                     // a spring set at forty-five degrees, up and on
+          const m = new THREE.Group(), part = n => { const q = new THREE.Mesh(propGeo(n), M.vox); q.castShadow = q.receiveShadow = true; m.add(q); return q; };
+          part("springBase"); const coil = part("springCoil"), cap = part("springCap");
+          m.position.set(x, y, 0); m.rotation.z = -PI / 4; group.add(m);
+          w.ents.push({ t: "dspring", x, y, m, coil, cap, sq: 0 });
+          springPose({ coil, cap, sq: 0 });
+          break;
+        }
         case "S": {                                     // a spring, its coil squashed down at rest
           const m = new THREE.Group(), part = n => { const q = new THREE.Mesh(propGeo(n), M.vox); q.castShadow = q.receiveShadow = true; m.add(q); return q; };
           part("springBase"); const coil = part("springCoil"), cap = part("springCap");
@@ -3849,6 +3857,7 @@
         }
       }
     }
+    buildMech(w, def, T, M, group);                    // the course's rides and zones (the grand prix's)
     // updraft columns: drifting motes
     for (const d of w.drafts) {
       const geo = vox(v => v.box(0, 0, 0, 0, 1, 0, typeof T.snowfall === "number" ? T.snowfall : T.snowfall ? 0xffffff : 0xd8f0d0));
@@ -3925,8 +3934,8 @@
   const surfaceAt = (x, y) => tile(Math.floor(x), Math.floor(y - 0.05));
   /* the runner's whole body hurts what it touches: curled, rolling, gliding, diving, in the
      live frames of a blow, or with the rainbow's shine */
-  const BODY_HITS = { roll: 1, charge: 1, homing: 1, glide: 1, dive: 1, tornado: 1, jet: 1 };
-  const attacking = p => p.star > 0 || !!BODY_HITS[p.state] || (p.state === "atk" && p.mv.live) ||
+  const BODY_HITS = { roll: 1, charge: 1, homing: 1, glide: 1, dive: 1, tornado: 1, jet: 1, ride: 1 };
+  const attacking = p => p.star > 0 || p.drillT > 0 || !!BODY_HITS[p.state] || (p.state === "atk" && p.mv.live) ||
                          (p.curl && !p.ground && p.state !== "hurt");
   /** The ground under (x, y), slopes and planks included, within a metre or so; or null. */
   function groundY(x, y) {
@@ -4084,7 +4093,7 @@
         if (battle && p.state === "hurt" && p.smashT > 0 && p.cmb && !p.cmb.wb && Math.abs(p.vx) > 6) return wallBounce(p, sgn(dx));   // smashed into it
         if (p.state === "homing" || p.state === "seek" || p.state === "dash" || p.state === "jet" || p.state === "psy") { p.state = "run"; p.st = 0; }
         if (p.state === "glide" && p.c.climb) { startClimb(p, sgn(dx)); return; }
-        p.vx = 0;
+        p.vx = 0; p.ballistic = false;
         if (p.state === "roll") p.state = "run";
       }
     }
@@ -4113,7 +4122,7 @@
     if (!p.ground && p.vy < -14 && !(p.state === "dive" && p.diveS && p.diveS.bits === 0)) burst(p.x, p.y, [0xd8d0c0, 0xc8c0b0], 5, 2);
     if (!p.ground && p.vy < -4) p.landT = 0.14;
     const fell = p.vy;
-    p.ground = true; p.vy = 0; p.airMove = false; p.airSp = false; p.airUses = 0; p.airChain = 0; p.jumping = false; p.flyLeft = p.c.flyTime || 0;
+    p.ground = true; p.vy = 0; p.ballistic = false; p.airMove = false; p.airSp = false; p.airUses = 0; p.airChain = 0; p.jumping = false; p.flyLeft = p.c.flyTime || 0;
     p.on = hit.on; p.onTile = hit.tl;
     /* a juggle comes down: the chase's smash bounces off the floor (once a combo); else after a
        combo of three or more, or a hard fall, they are knocked down a moment */
@@ -4132,7 +4141,7 @@
   /* Hurt, the Sonic way: a shield takes the hit and goes; else the rings fly out; with no rings
      at all, the runner is down, and goes back to the last Star Post. */
   function hurt(p, fromX) {
-    if (p.inv > 0 || p.star > 0 || p.dead) return;
+    if (p.inv > 0 || p.star > 0 || p.dead || p.state === "ride" || p.drillT > 0) return;
     p.inv = 1.6;
     p.vx = -sgn(fromX - p.x || p.face) * 7; p.vy = 8; p.ground = false;
     p.state = "hurt"; p.st = 0.45; p.curl = false; p.mv = null; p.sp = null;
@@ -4150,7 +4159,7 @@
   }
   function respawn(p) {
     p.dead = 0; p.carrots = 0; p.shield = false; p.speedT = 0; p.x = p.check.x; p.y = p.check.y + 0.02; p.vx = 0; p.vy = 0; p.inv = 1.4;
-    p.state = "run"; p.ground = false; p.air = AIR; p.star = 0; p.rev = 0; p.mv = null; p.sp = null; p.curl = false;
+    p.state = "run"; p.ground = false; p.air = AIR; p.star = 0; p.rev = 0; p.mv = null; p.sp = null; p.curl = false; p.ride = null; p.ballistic = false;
     if (!p.cpu) snapCamera();
   }
 
@@ -4166,6 +4175,7 @@
     }
     if (mode === "goal") { p.vx *= Math.pow(0.02, dt); goalStep(p, dt); if (!p.ground) p.vy = Math.max(p.vy - GRAV * dt, -22); integrate(p, dt); return; }
     p.inv = Math.max(0, p.inv - dt); p.star = Math.max(0, p.star - dt); p.speedT = Math.max(0, (p.speedT || 0) - dt);
+    if (p.slowT > 0) p.slowT -= dt; if (p.drillT > 0) p.drillT -= dt;
     for (const k in p.cd) p.cd[k] = Math.max(0, p.cd[k] - dt);
     p.comboT = Math.max(0, (p.comboT || 0) - dt);
     p.drop = false;
@@ -4184,7 +4194,7 @@
       if (p.air < 6 && w.t > p.warnAt) { SFX.warn(); p.warnAt = w.t + 1; }
       if (p.air <= 0) { die(p, "air"); return; }
     } else p.air = AIR;
-    let top = c.run * (p.star > 0 ? 1.22 : 1) * (p.speedT > 0 ? 1.35 : 1) * (p.paceK || 1), acc = (p.ground ? c.accel : c.airAccel) * (p.speedT > 0 ? 1.3 : 1), fr = p.ground ? 30 : 4;
+    let top = c.run * (p.star > 0 ? 1.22 : 1) * (p.speedT > 0 ? 1.35 : 1) * (p.paceK || 1) * (p.slowT > 0 ? 0.55 : 1) * (p.drillT > 0 ? 1.6 : 1), acc = (p.ground ? c.accel : c.airAccel) * (p.speedT > 0 ? 1.3 : 1), fr = p.ground ? 30 : 4;
     if (p.inWater) { if (c.swims) { acc *= 1.2; fr = 12; } else { top *= 0.62; acc *= 0.6; fr = 8; } }
     if (mud) top *= 0.5;
     if (ice) { acc *= 0.32; fr = 2.2; }
@@ -4205,6 +4215,9 @@
     if (p.floorT > 0) p.floorT -= dt;
     p.hh =(p.state === "crouch" || p.state === "roll" || p.state === "charge") && !c.lift ? 0.72 : c.h;
     if (p.state === "ledge") { stepLedge(p, dt); interact(p, dt); return; }
+    if (p.rideCd > 0) p.rideCd -= dt;
+    if (p.state === "ride") { stepRide(p, dt); if (p.state === "ride") interact(p, dt, true); return; }   // on a ride: it carries you (rings on the way)
+    const px0 = p.x;
 
     // what they are in the middle of
     switch (p.state) {
@@ -4287,8 +4300,8 @@
         p.vx = p.face * clamp(Math.abs(p.vx) + 6 * dt, 4, p.inWater ? 5 : 10);
         break;
     }
-    // running, and steering in the air
-    if (p.state === "run" || p.state === "fly" || p.state === "teleport") {
+    // running, and steering in the air (not a shot from a cannon or a spring that flies true)
+    if ((p.state === "run" || p.state === "fly" || p.state === "teleport") && !(p.ballistic && !p.ground)) {
       const t2 = p.state === "fly" ? Math.min(top * 1.3, c.run * (c.flyK || (srcOf(p, "air") === "rouge" ? 0.8 : 0.66))) : top;
       if (dir) {
         if (sgn(p.vx) !== dir && Math.abs(p.vx) > 0.4) p.vx += dir * acc * (ice ? 1 : 2.4) * dt;
@@ -4301,6 +4314,7 @@
       }
     }
 
+    const zg = w.zones && w.zones.length ? zoneStep(p, dt, dir) : 1;         // the course's currents, winds and low gravity
     // the buttons
     const free = p.state === "run" || p.state === "crouch" || p.state === "fly" || p.state === "glide" || p.state === "dash" ||
                  p.state === "roll" || p.state === "teleport" || p.state === "jet" || p.state === "psy";
@@ -4326,7 +4340,7 @@
     }
 
     // gravity
-    let g = GRAV, maxFall = 22;
+    let g = GRAV * zg, maxFall = 22;
     if (p.inWater) { g *= c.swims ? 0.3 : 0.45; maxFall = c.swims ? 4 : 6; }
     switch (p.state) {
       case "homing": case "seek": case "climb": case "dive": g = 0; break;
@@ -4363,6 +4377,7 @@
       p.vy = Math.min(p.vy + (floaty ? 60 : 46) * dt, floaty ? 8 : 4.5); p.ground = false;
       if (floaty) maxFall = 2.0;
     }
+    if (w.zones && w.zones.length) liftStep(p);
     p.vy = Math.max(p.vy - g * dt, -maxFall);
     // slopes pull
     if (p.ground && (p.state === "run" || p.state === "roll")) {
@@ -4373,6 +4388,7 @@
     }
     integrate(p, dt);
     interact(p, dt);
+    if (w.rides && w.rides.length) rideCheck(p, px0);
   }
 
   function jump(p, mud) {
@@ -4386,6 +4402,7 @@
   /** Space again in the air: the runner's air action. */
   function airAction(p) {
     const c = p.c;
+    p.ballistic = false;
     emit("airaction", { p });
     if (p.inWater && c.swims) {                          // Chaos swims: a stroke for every press, as long as he likes
       p.vy = Math.max(p.vy, 6.5); p.jumping = false; p.curl = false; SFX.flap();
@@ -5355,7 +5372,285 @@
     if (p.y < -3 && !p.dead) die(p, "fell");
   }
 
-  function interact(p, dt) {
+  // ---------------------------------------------------------------- the courses' own machinery
+  /* A course can carry, beside its tiles, the things a tile can't draw (the grand prix's do):
+     `rides`, which take a runner along a path of their own and let go at its end, and `zones`,
+     boxes where something acts on whoever is in them. x and y are the stage's metres (y up from
+     the bottom row; what's placed is a runner's feet).
+       rides
+         loop    {x, y, r}            a loop-de-loop, its foot on the road at (x, y): run in at speed
+                                      and round it you go, out again at the speed you came in (too
+                                      slow, and you run on under it)
+         cork    {x0, x1, y, amp}     a corkscrew over the road: at speed, round it you spin
+         zip     {x0, y0, x1, y1, up} a cable (a pulley, a vine, a cable car), y its height: run into
+                                      its handle and hang on, carried along it -- down one gaining
+                                      speed, up one (`up`) at its own -- and let go at its end
+         rail    {pts}                a rail to grind: land on it or run onto it and slide, downhill
+                                      gaining; Jump leaves it
+         tube    {pts}                a pipe: in at its mouth, through it at speed, out the far end
+         cannon  {x, y, a, v}         a cannon on the road: in, a moment, and fired along `a` degrees
+                                      at v m/s (a shot flies true: nothing steers it till it lands)
+       zones
+         current {x0, x1, y0, y1, vx} water running: in it, you go with it (against it, slowly)
+         wind    {.., vx}             a gale: it holds you back, or blows you on
+         lowg    {.., g}              low gravity: g of it
+         geyser  {x, y, h, on, off, ph}  a spout: for `on` seconds of every on + off it throws
+                                      whoever is over it up to y + h
+         devil   {x0, x1, y, h, sp}   a dust devil, wandering to and fro between x0 and x1, lifting
+                                      whoever it reaches up to y + h
+       (`Y` in the tiles is a spring set at forty-five degrees: up and on, and the shot flies true.) */
+  const RIDE_VMIN = 8.5;                              // (slower than this, a loop or a corkscrew lets you by)
+  let TUBE_MAT = null;
+  function buildMech(w, def, T, M, group) {
+    w.rides = []; w.zones = (def.zones || []).map(z => Object.assign({ t0: 0 }, z));
+    const col = (T.block && T.block[0]) || 0x8a8aa0, hi = (T.neon && T.neon[0]) || T.flowers && T.flowers[0] || 0xffd23a;
+    for (const r0 of def.rides || []) {
+      const R = Object.assign({}, r0), pts = [];
+      switch (R.k) {
+        case "loop": { const cx = R.x, cy = R.y + R.r; for (let a = -90; a <= 270.001; a += 4) { const t = a * PI / 180; pts.push([cx + (R.r - 0.05) * Math.cos(t), cy + (R.r - 0.05) * Math.sin(t)]); } break; }   // (the feet on the track all the way round: drawn running on it)
+        case "cork": { R.n = Math.max(1, Math.round((R.x1 - R.x0) / 12)); for (let x = R.x0; x <= R.x1 + 1e-6; x += 0.5) { const ph = (x - R.x0) / (R.x1 - R.x0) * R.n * PI * 2; pts.push([x, R.y + R.amp * (1 - Math.cos(ph)) / 2]); } break; }
+        case "zip": pts.push([R.x0, R.y0 - 2.2], [R.x1, R.y1 - 2.2]); break;
+        case "rail": for (const q of R.pts) pts.push([q[0], q[1]]); break;
+        case "tube": for (const q of R.pts) pts.push([q[0], q[1] - 0.5]); break;
+        default: pts.push([R.x, R.y], [R.x + 0.01, R.y]);
+      }
+      R.p = pts; R.L = [0];
+      for (let k = 1; k < pts.length; k++) R.L.push(R.L[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]));
+      R.total = R.L[R.L.length - 1];
+      R.xa = Math.min(...pts.map(q => q[0])); R.xb = Math.max(...pts.map(q => q[0]));
+      mechMesh(w, R, group, T, M, col, hi);
+      w.rides.push(R);
+    }
+    for (const z of w.zones) zoneMesh(z, group, T, M);
+  }
+  /* the floor under (x, y): the first thing to stand on, down from y */
+  function mechFloor(w, x, y) {
+    const i = Math.floor(x);
+    for (let j = Math.min(H - 1, Math.floor(y)); j >= 0; j--) { const c = (i < 0 || i >= w.W) ? "#" : w.S.grid[j][i]; if (SOLIDS.indexOf(c) >= 0 || c === "-" || c === "/" || c === "\\") return j + 1; }
+    return 0;
+  }
+  /* a bar from (x0, y0) to (x1, y1), w wide and d deep, at depth z */
+  function mechBar(group, mat, x0, y0, x1, y1, w, d, z) {
+    const len = Math.hypot(x1 - x0, y1 - y0) || 0.01;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(len, w, d), mat);
+    m.position.set((x0 + x1) / 2, (y0 + y1) / 2, z); m.rotation.z = Math.atan2(y1 - y0, x1 - x0);
+    m.castShadow = true; group.add(m); return m;
+  }
+  const lamb = c => new THREE.MeshLambertMaterial({ color: c });
+  function mechMesh(w, R, group, T, M, col, hi) {
+    switch (R.k) {
+      case "loop": {                                   // the track: a ring of the course's own blocks, a bright stripe round its inside
+        const r = R.r, s = 0.25, n = Math.round(r / s);
+        const g = vox(v => {
+          for (let a = 0; a < 360; a += 0.7) {
+            const t = a * PI / 180;
+            for (let k = 0; k <= 2; k++) {
+              const rr = n + k, ix = Math.round(Math.cos(t) * rr), iy = Math.round(Math.sin(t) * rr);
+              for (let z = -6; z <= -2; z++) v.set(ix, iy, z, k === 0 ? ((Math.floor(a / 18) & 1) ? hi : 0xffffff) : col);
+            }
+          }
+        }, s);
+        const m = new THREE.Mesh(g, M.vox); m.position.set(R.x, R.y + r, 0); m.castShadow = true; group.add(m);
+        break;
+      }
+      case "cork": {                                   // a ribbon twisting round, behind the road
+        const g = vox(v => {
+          for (let x = 0; x <= (R.x1 - R.x0) / 0.25; x++) {
+            const ph = x * 0.25 / (R.x1 - R.x0) * R.n * PI * 2, y = Math.round(R.amp * (1 - Math.cos(ph)) / 2 / 0.25) - 1;
+            const zc = Math.round(-4 + Math.cos(ph) * 2);
+            for (let z = zc - 1; z <= zc + 1; z++) v.set(x, y, z, (x >> 2) & 1 ? col : hi);
+          }
+        }, 0.25);
+        const m = new THREE.Mesh(g, M.vox); m.position.set(R.x0, R.y, 0); group.add(m);
+        break;
+      }
+      case "zip": {                                    // two posts, the cable, and the handle waiting at its start
+        const dark = lamb(0x3a3a44), cab = lamb(0x2a2a30);
+        for (const [x, y] of [[R.x0, R.y0], [R.x1, R.y1]]) { const f = mechFloor(w, x, y - 0.5); mechBar(group, dark, x, f, x, y + 0.4, 0.22, 0.22, -0.7); }
+        mechBar(group, cab, R.x0, R.y0, R.x1, R.y1, 0.07, 0.07, -0.2);
+        R.handle = mechBar(group, lamb(hi), R.x0 - 0.35, R.y0 - 1.0, R.x0 + 0.35, R.y0 - 1.0, 0.12, 0.12, 0.2);
+        mechBar(group, cab, R.x0, R.y0, R.x0, R.y0 - 1.0, 0.05, 0.05, 0.2);
+        break;
+      }
+      case "rail": {                                   // the rail, and posts down to the ground
+        const bar = lamb(hi), post = lamb(col);
+        for (let k = 1; k < R.p.length; k++) mechBar(group, bar, R.p[k - 1][0], R.p[k - 1][1] - 0.08, R.p[k][0], R.p[k][1] - 0.08, 0.16, 0.3, 0);
+        for (let x = R.xa + 1; x < R.xb; x += 5) { const y = rideYAt(R, x); if (y == null) continue; const f = mechFloor(w, x, y - 0.3); if (y - f > 0.4) mechBar(group, post, x, f, x, y - 0.15, 0.2, 0.2, -0.3); }
+        break;
+      }
+      case "tube": {                                   // a glass pipe, a ring at each mouth
+        TUBE_MAT = TUBE_MAT || new THREE.MeshLambertMaterial({ color: 0xcfe8ff, transparent: true, opacity: 0.28, depthWrite: false });
+        const rim = lamb(hi);
+        for (let k = 1; k < R.p.length; k++) {
+          const a = R.p[k - 1], b = R.p[k], len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+          const m = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, len + 0.2, 14, 1, true), TUBE_MAT);
+          m.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 0.5, 0); m.rotation.z = Math.atan2(b[1] - a[1], b[0] - a[0]) - PI / 2; m.renderOrder = 4; group.add(m);
+        }
+        for (const q of [R.p[0], R.p[R.p.length - 1]]) { const t = new THREE.Mesh(new THREE.TorusGeometry(0.85, 0.12, 6, 16), rim); t.position.set(q[0], q[1] + 0.5, 0); t.rotation.y = PI / 2; group.add(t); }
+        break;
+      }
+      case "cannon": {                                 // a squat base and a barrel, aimed
+        const a = R.a * PI / 180, base = lamb(0x30303a), brl = lamb(hi);
+        const b = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.7, 1.2), base); b.position.set(R.x, R.y + 0.35, -0.2); b.castShadow = true; group.add(b);
+        const c = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 1.8, 12), brl);
+        c.position.set(R.x + Math.cos(a) * 0.55, R.y + 0.65 + Math.sin(a) * 0.55, -0.2); c.rotation.z = a - PI / 2; c.castShadow = true; group.add(c);
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.09, 6, 14), lamb(0xf2f2f2));
+        ring.position.set(R.x + Math.cos(a) * 1.4, R.y + 0.65 + Math.sin(a) * 1.4, -0.2); ring.rotation.y = PI / 2; ring.rotation.x = 0; ring.rotation.z = a; group.add(ring);
+        R.barrel = c;
+        break;
+      }
+    }
+  }
+  /* the height of a rail (or any ride's path) at x, where it has one */
+  function rideYAt(R, x) {
+    for (let k = 1; k < R.p.length; k++) { const a = R.p[k - 1], b = R.p[k]; if (x < Math.min(a[0], b[0]) || x > Math.max(a[0], b[0]) || a[0] === b[0]) continue; return a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]); }
+    return null;
+  }
+  function zoneMesh(z, group, T, M) {
+    const glow = (c, op) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: op, depthWrite: false });
+    z.bits = [];
+    if (z.k === "current" || z.k === "wind" || z.k === "lowg") {    // streaks going with it (or sparkles drifting up)
+      const n = Math.min(40, Math.round((z.x1 - z.x0) * (z.y1 - z.y0) / (z.k === "lowg" ? 10 : 6)));
+      const geo = z.k === "lowg" ? new THREE.BoxGeometry(0.09, 0.09, 0.09) : new THREE.BoxGeometry(z.k === "wind" ? 1.6 : 0.8, 0.05, 0.05);
+      const mat = glow(z.k === "current" ? 0xe8f8ff : z.k === "wind" ? 0xffffff : 0xfff6c0, z.k === "wind" ? 0.45 : 0.7);
+      for (let k = 0; k < n; k++) { const m = new THREE.Mesh(geo, mat); m.position.set(z.x0 + Math.random() * (z.x1 - z.x0), z.y0 + Math.random() * (z.y1 - z.y0), z.k === "wind" ? 0.6 : 0.35); group.add(m); z.bits.push(m); }
+    } else if (z.k === "geyser") {                                   // a vent, and its spout
+      const v = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.3, 1.2), lamb(0x3a3430)); v.position.set(z.x, z.y + 0.15, -0.1); group.add(v);
+      z.col = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.75, 1, 10, 1, true), glow(z.c || T.geyser || 0xd8f4ff, 0.42));
+      z.col.renderOrder = 4; z.col.visible = false; group.add(z.col);
+    } else if (z.k === "devil") {                                    // a funnel of dust, turning
+      z.rings = [];
+      for (let k = 0; k < 7; k++) { const m = new THREE.Mesh(new THREE.TorusGeometry(0.35 + k * 0.17, 0.06, 5, 14), glow(z.c || 0xe0c090, 0.5)); m.rotation.x = PI / 2; m.renderOrder = 4; group.add(m); z.rings.push(m); }
+    }
+  }
+  const devilX = (z, t) => z.x0 + (z.x1 - z.x0) * (0.5 + 0.5 * Math.sin(t * (z.sp || 0.5) + (z.ph || 0)));
+  const geyserOn = (z, t) => { const per = z.on + z.off, ph = (((t + (z.ph || 0)) % per) + per) % per; return ph < z.on; };
+  /* the zones' look, a frame: streaks going with the water and the wind, spouts up, whirlwinds wandering */
+  function zonesDraw(w, dt) {
+    for (const z of w.zones || []) {
+      if (z.bits && z.bits.length) for (const m of z.bits) {
+        if (z.k === "lowg") { m.position.y += dt * 0.8; if (m.position.y > z.y1) m.position.y = z.y0; continue; }
+        m.position.x += z.vx * dt * (z.k === "wind" ? 1.4 : 1);
+        if (m.position.x > z.x1) m.position.x = z.x0; else if (m.position.x < z.x0) m.position.x = z.x1;
+      }
+      if (z.k === "geyser") {
+        const on = geyserOn(z, w.t);
+        z.col.visible = on; if (on) { const h = z.h * (0.9 + Math.sin(w.t * 30) * 0.05); z.col.scale.set(1, h, 1); z.col.position.set(z.x, z.y + h / 2, 0); }
+        if (on && Math.abs(z.x - camX) < 20 && Math.random() < 0.6) burst(z.x, z.y + z.h * Math.random(), [0xffffff, z.c || 0xd8f4ff], 1, 3);
+      } else if (z.k === "devil") {
+        const x = devilX(z, w.t);
+        z.rings.forEach((m, k) => { m.position.set(x + Math.sin(w.t * 6 + k) * 0.12 * k, z.y + 0.3 + k * (z.h / 7), 0.2); m.rotation.z = w.t * (8 + k); });
+      }
+    }
+  }
+  /* zones acting on a runner, this step: carried by the water, pushed by the wind; and the gravity
+     there (what's returned: a fraction) */
+  function zoneStep(p, dt, dir) {
+    let gk = 1;
+    for (const z of world.zones) {
+      if (z.k === "geyser" || z.k === "devil" || p.x < z.x0 || p.x > z.x1 || p.y < z.y0 || p.y > z.y1) continue;
+      if (z.k === "current") { if (p.inWater) p.vx = lerp(p.vx, z.vx + dir * 2.5, 1 - Math.exp(-dt * 3)); }
+      else if (z.k === "wind") moveX(p, z.vx * dt * (p.ground ? 0.45 : 0.7));
+      else if (z.k === "lowg") gk = Math.min(gk, z.g);
+    }
+    return gk;
+  }
+  /* spouts and whirlwinds: up they throw you, to their top */
+  function liftStep(p) {
+    for (const z of world.zones) {
+      let cx, r;
+      if (z.k === "geyser") { if (!geyserOn(z, world.t)) continue; cx = z.x; r = 0.8; }
+      else if (z.k === "devil") { cx = devilX(z, world.t); r = 1.0; }
+      else continue;
+      const top = z.y + z.h;
+      if (Math.abs(p.x - cx) > r || p.y < z.y - 0.3 || p.y > top - 0.4) continue;
+      const v = Math.sqrt(2 * GRAV * Math.max(0.6, top - p.y));
+      if (p.vy < v) {
+        p.vy = v; p.ground = false; p.on = null; p.jumping = false; p.ballistic = false;
+        if (p.state !== "fly" && p.state !== "glide" && p.state !== "roll") p.state = "run";
+      }
+    }
+  }
+  /* on to a ride: if one's there to take, and you're right for it */
+  function rideCheck(p, px) {
+    const w = world;
+    if (!w.rides || !w.rides.length || p.dead || p.ko || p.state === "ride" || p.state === "climb" || p.state === "hurt") return;
+    for (const R of w.rides) {
+      if (p.x < R.xa - 2 || p.x > R.xb + 2) continue;
+      if (p.rideCd > 0 && R === p.rideLast) continue;                  // (just off this one: not straight back on -- the next one, though, at once)
+      let u = null;
+      switch (R.k) {
+        case "loop": case "cork": { const x0 = R.k === "loop" ? R.x : R.x0;
+          if (p.ground && p.vx >= RIDE_VMIN && px < x0 && p.x >= x0 && Math.abs(p.y - R.y) < 0.6) u = 0; break; }
+        case "zip": if (Math.abs(p.x - R.x0) < 1.0 && p.y + p.hh > R.y0 - 1.8 && p.y < R.y0 + 0.2) u = 0; break;   // (its handle: caught by anyone running under it or jumping up at it)
+        case "tube": { const q = R.p[0]; if (Math.abs(p.x - q[0]) < 1.2 && p.y > q[1] - 0.6 && p.y < q[1] + 1.4) u = 0; break; }   // (a pipe's mouth takes you in from a little way off)
+        case "cannon": if (Math.abs(p.x - R.x) < 0.75 && p.y > R.y - 0.3 && p.y < R.y + 1.2) u = 0; break;
+        case "rail": {
+          if (p.vy > 0.5 || p.vx < 0) break;
+          for (let k = 1; k < R.p.length; k++) {
+            const a = R.p[k - 1], b = R.p[k];
+            if (p.x < Math.min(a[0], b[0]) || p.x > Math.max(a[0], b[0]) || a[0] === b[0]) continue;
+            const f = (p.x - a[0]) / (b[0] - a[0]), ry = a[1] + (b[1] - a[1]) * f;
+            if (p.y > ry - 0.45 && p.y < ry + 0.3) u = R.L[k - 1] + (R.L[k] - R.L[k - 1]) * f;
+            break;
+          }
+          break;
+        }
+      }
+      if (u != null) { rideStart(p, R, u); return; }
+    }
+  }
+  function rideStart(p, R, u) {
+    const v0 = Math.max(Math.abs(p.vx), Math.hypot(p.vx, p.vy) * 0.8);
+    p.ride = { R, u, t: 0, v: R.k === "tube" ? Math.max(v0, 20) : R.k === "zip" ? (R.up ? (R.v || 8) : Math.max(v0, 9)) : R.k === "rail" ? Math.max(v0, 9) : R.k === "cork" ? v0 * 1.08 : v0 };
+    p.state = "ride"; p.st = 0; p.ground = false; p.on = null; p.curl = R.k !== "zip"; p.mv = null; p.sp = null; p.jumping = false; p.ballistic = false; p.drop = false;
+    if (R.k === "cannon") { p.hideT = 0.4; p.x = R.x; p.y = R.y; p.vx = p.vy = 0; }
+    if (R.k === "zip" && R.handle) R.handle.visible = false;
+    if (R.k === "cannon" || R.k === "tube") SFX.roll(); else if (R.k === "zip" || R.k === "rail") SFX.grab(); else SFX.dash();
+  }
+  /* where along a ride u is, and which way it's going there */
+  function rideAt(R, u) {
+    const L = R.L, P = R.p; let k = 1;
+    while (k < L.length - 1 && L[k] < u) k++;
+    const a = P[k - 1], b = P[k], seg = L[k] - L[k - 1] || 1, f = clamp((u - L[k - 1]) / seg, 0, 1);
+    return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, (b[0] - a[0]) / seg, (b[1] - a[1]) / seg];
+  }
+  function stepRide(p, dt) {
+    const S = p.ride, R = S.R;
+    S.t += dt;
+    if (R.k === "cannon") {
+      p.x = R.x; p.y = R.y; p.vx = p.vy = 0;
+      if (S.t < 0.38) return;
+      const a = R.a * PI / 180, mx = R.x + Math.cos(a) * 1.5, my = R.y + 0.65 + Math.sin(a) * 1.5;
+      rideEnd(p, mx, my - 0.5, Math.cos(a) * R.v, Math.sin(a) * R.v, true);
+      burst(mx, my, [0xffffff, 0xd8d0c0, 0xffd23a], 14, 6); SFX.boom();
+      return;
+    }
+    if (R.k === "zip") S.v = R.up ? (R.v || 8) : clamp(S.v + (-(R.p[1][1] - R.p[0][1]) / R.total) * GRAV * 0.55 * dt, 9, 24);
+    else if (R.k === "rail") {
+      const d = rideAt(R, S.u); S.v = clamp(S.v - d[3] * GRAV * 0.55 * dt, 8, 26);
+      if (input.jp) { rideEnd(p, p.x, p.y + 0.05, d[2] * S.v, Math.max(0, d[3] * S.v) + p.c.jump * 0.9, true); p.jumping = true; SFX.jump(); return; }
+    }
+    S.u += S.v * dt;
+    if (S.u >= R.total) {
+      const d = rideAt(R, R.total);
+      if (R.k === "loop") rideEnd(p, R.x + 0.05, R.y, S.v, 0, false, true);
+      else if (R.k === "cork") rideEnd(p, R.x1, R.y, S.v, 0, false, true);
+      else rideEnd(p, d[0], d[1], d[2] * S.v, d[3] * S.v, true);
+      if (R.k === "zip" && R.handle) setTimeout(() => { if (R.handle) R.handle.visible = true; }, 1500);
+      return;
+    }
+    const d = rideAt(R, S.u);
+    p.x = d[0]; p.y = d[1]; p.vx = d[2] * S.v; p.vy = d[3] * S.v;
+    if (Math.abs(p.vx) > 0.5) p.face = sgn(p.vx);
+    if (R.k === "rail" && Math.random() < 0.5) burst(p.x - p.face * 0.2, p.y, [0xffe080, 0xffffff], 1, 2);
+  }
+  function rideEnd(p, x, y, vx, vy, ballistic, ground) {
+    p.rideLast = p.ride && p.ride.R; p.ride = null; p.state = "run"; p.x = x; p.y = y; p.vx = vx; p.vy = vy; p.rideCd = 0.45; p.coyote = 0;
+    p.ground = !!ground; p.ballistic = !!ballistic && !ground; p.curl = !!(p.ballistic && Math.abs(vy) > 2);
+  }
+
+  function interact(p, dt, riding) {
     const w = world;
     const bx0 = p.x - p.c.w / 2, bx1 = p.x + p.c.w / 2, by0 = p.y, by1 = p.y + p.hh;
     const touches = (x, y, r) => x + r > bx0 && x - r < bx1 && y + r > by0 && y - r < by1;
@@ -5374,7 +5669,15 @@
     }
     for (const e of w.ents) {
       if (e.gone) continue;
-      if (e.t === "loose") continue;
+      if (e.t === "loose" || (riding && e.t !== "monitor")) continue;
+      if (e.t === "dspring") {                             // up and on at forty-five degrees: the shot flies true
+        if (touches(e.x + 0.3, e.y + 0.4, 0.45) && !(p.dsCd > w.t)) {
+          p.dsCd = w.t + 0.4; p.vx = 15.5; p.vy = 15.5; p.ground = false; p.on = null; p.ballistic = true; p.face = 1;
+          p.airMove = false; p.airSp = false; p.airUses = 0; p.jumping = false; p.flyLeft = p.c.flyTime || 0;
+          p.curl = true; if (p.state !== "roll") p.state = "run"; e.sq = 1; SFX.spring();
+        }
+        continue;
+      }
       if (e.t === "spring") {
         if (p.vy <= 0.5 && touches(e.x, e.y + 0.3, 0.42) && p.y >= e.y - 0.1) {
           p.vy = 21; p.ground = false; p.y = Math.max(p.y, e.y + 0.5); p.airMove = false; p.airSp = false; p.airUses = 0; p.jumping = false;
@@ -5424,7 +5727,7 @@
     if (w.goal && p.x >= w.goal.x && mode === "play") { if (!w.def.story) w.goal.spin = 2.6; if (p.cpu) cpuHome(p.cpuQ); else finish(p); }
     // thorns
     const shell = p.c.id === "mighty" && p.curl;             // Mighty's shell shrugs off spikes (Sonic Mania Plus)
-    for (const z of w.hazards) if (bx1 > z.x0 && bx0 < z.x1 && by0 < z.y1 && by1 > z.y0 && !shell) hurt(p, p.x + p.face);
+    if (!riding) for (const z of w.hazards) if (bx1 > z.x0 && bx0 < z.x1 && by0 < z.y1 && by1 > z.y0 && !shell) hurt(p, p.x + p.face);
     // badniks
     for (const e of w.enemies) {
       if (!e.alive || e.hidden) continue;
@@ -5443,6 +5746,7 @@
       }
       const armoured = p.star <= 0 && (e.B.armor === "ball" ? !(stomp || p.curl) : e.B.armor === "front" ? !stomp && sgn(p.x - e.x) === e.face :
                                          e.B.armor === "shell" ? e.mode !== "open" : false);
+      if (riding) { if (!armoured) { defeat(e, { vx: (sgn(p.vx) || 1) * 9, vy: 7 }); hitSpark(e.x, e.y + e.h / 2, 1.1, 0xffffff); SFX.hit(); } continue; }   // (carried: through it, or by it)
       if (armoured && stomp && e.B.armor === "shell") { glance(e); p.vy = input.J ? 12 : 9; p.ground = false; continue; }   // a shut shell: off it
       /* a blow that meets it lands -- in its wind-up too, so a heavy's step never carries the
          runner into a hurt -- and so does the aim attack's dash */
@@ -5688,7 +5992,7 @@
     p.landT = Math.max(0, p.landT - dt); p.dblT = Math.max(0, (p.dblT || 0) - dt);
     p.balT = Math.max(0, (p.balT || 0) - dt); p.catchT = Math.max(0, (p.catchT || 0) - dt); p.grabT = Math.max(0, (p.grabT || 0) - dt);
     const count = nm => framesOf(id, nm).length;
-    let name, fps = 10, loop = true, face = p.face, pick = null;
+    let name, fps = 10, loop = true, face = p.face, pick = null, spin = 0;   // (spin: turned with a loop's track, its feet on it)
     if (p.ko && battle) {
       /* KO'd: thrown, tumbling; down on the ground, flat out (the hitting-the-ground frames, held on
          the last; for one whose sheet has none, getting up's first, lying there) */
@@ -5743,6 +6047,14 @@
         else { name = "fall"; fps = p.flyLeft > 0 ? 14 : 6; }
         break;
       case "jet": name = "jet"; fps = 14; break;
+      case "ride": {                                       // carried: hanging from a cable, crouched on a rail, or a ball (a loop, a pipe, a cannon)
+        const k = p.ride && p.ride.R.k, ball = framesOf(id, "spin") ? "spin" : framesOf(id, "fly") ? "fly" : "jump";   // (no ball for Gamma or Eggman: flying, or a jump)
+        if (k === "zip") { name = framesOf(id, "jump") ? "jump" : "idle"; loop = false; }
+        else if (k === "loop" && framesOf(id, "run")) { name = "run"; fps = 22; face = 1; spin = Math.atan2(p.vy, p.vx); }   // (round a loop on its feet, as Sonic does: up the side, over the top upside down)
+        else if (k === "rail" && framesOf(id, "land")) { name = "land"; const L = framesOf(id, "land"); let kk = 0; L.forEach((f, j) => { if (f[3] < L[kk][3]) kk = j; }); pick = () => kk; }
+        else { name = ball; fps = 24; }
+        break;
+      }
       case "psy": name = "airdash"; pick = t => Math.min(count("airdash") - 1, Math.floor(t * 18)); break;
       case "teleport": name = "teleport"; fps = 20; loop = false; break;
       case "dive":
@@ -5756,6 +6068,7 @@
         break;
       }
       default:
+        if (p.drillT > 0 && framesOf(id, "spin")) { name = "spin"; fps = 32; break; }   // a Yellow Wisp's drill: a ball, boring on
         if (!p.ground) {
           if (p.launchT > 0 && framesOf(id, "launch")) { name = "launch"; pick = t => t < 0.3 ? Math.floor(t * 20) % 3 : Math.min(5, 3 + Math.floor((t - 0.3) * 14)); }
           else if (p.dblT > 0) { name = "double"; fps = 12; loop = false; }
@@ -5779,6 +6092,7 @@
       const seq = name === "fly" ? EGG_JETS : EGG_FLAME, n = count(name);
       pick = () => seq[((Math.floor(world.t * 30) % seq.length) + seq.length) % seq.length] % n;
     }
+    if (!framesOf(id, name)) { name = !p.ground && framesOf(id, "jump") ? "jump" : "idle"; pick = null; }   // (a pose this sheet doesn't draw -- a ball, for Gamma or Eggman: the nearest it has)
     const key = name + "|" + p.state;
     if (a.key !== key) { a.key = key; a.t = 0; } else a.t += dt;
     const i = pick ? pick(a.t) : frameAt(count(name), a.t, fps, loop);
@@ -5788,6 +6102,11 @@
        drawn from the jets' tips, which are longer in some than others) */
     const jets = id === "eggman" && /^(fly|jump|fall)$/.test(name) ? -((framesOf(id, name)[i] || [0, 0, 0, 36])[3] - 36) * PX : 0;
     setFrame(p.spr, name, i, face, p.x, p.y + lift + jets);
+    if (spin) {                                                     // (turned about its feet)
+      const dx = p.spr.position.x - p.x, dy = p.spr.position.y - p.y, cs = Math.cos(spin), sn = Math.sin(spin);
+      p.spr.position.x = p.x + dx * cs - dy * sn; p.spr.position.y = p.y + dx * sn + dy * cs;
+    }
+    p.spr.rotation.z = spin;
     /* struck: white for an instant, shaking through the freeze-frame */
     const wm = p.whiteT > 0 ? whiteMat(p.spr.userData.who) : null;
     p.whiteT = Math.max(0, (p.whiteT || 0) - dt);
@@ -5878,6 +6197,8 @@
     for (const f of battle ? battle.fs : [p].concat(CPUS.filter(q => Math.abs(q.p.x - camX) < 30).map(q => q.p))) {
       if (f.out || f.ko) continue;
       if (f.star > 0 && Math.random() < (ITEMS ? 0.15 : 0.5)) burst(f.x, f.y + Math.random() * f.hh, [0xffffff, 0x9ad8ff, 0xfff070], 1, 1);
+      if (f.drillT > 0 && Math.random() < 0.8) burst(f.x + f.face * 0.55, f.y + 0.45, [0xffd23a, 0xffffff, 0xc89a0a], 1, 3);    // drilling: sparks off the point
+      if (f.slowT > 0 && Math.random() < 0.3) burst(f.x, f.y + Math.random() * f.hh, [0xb060f0, 0x6a20b0], 1, 1);             // slowed by a void
       if ((Math.abs(f.vx) > 13 || f.speedT > 0) && f.ground && Math.random() < (f.speedT > 0 ? 0.8 : 0.4)) burst(f.x - f.face * 0.3, f.y + 0.05, [0xd8d0c0, 0xffffff], 1, 1.5);
     }
     // the rings spin, all together, as they do
@@ -5890,8 +6211,9 @@
     }
     w.carrotMesh.instanceMatrix.needsUpdate = true;
     for (const k of w.checks) if (k.spin > 0) { k.spin = Math.max(0, k.spin - dt); k.m.rotation.y = (1 - k.spin) * PI * 4; }
+    if (w.zones && w.zones.length) zonesDraw(w, dt);
     if (w.goal && w.goal.spin > 0) { w.goal.spin = Math.max(0, w.goal.spin - dt); w.goal.m.rotation.y += dt * (2 + w.goal.spin * 14); if (!w.goal.spin) w.goal.m.rotation.y = 0; }
-    for (const e of w.ents) if (e.t === "spring") { e.sq = Math.max(0, e.sq - dt * 2.6); springPose(e); }
+    for (const e of w.ents) if (e.t === "spring" || e.t === "dspring") { e.sq = Math.max(0, e.sq - dt * 2.6); springPose(e); }
       else if (e.t === "bumper") { e.sq = Math.max(0, e.sq - dt * 5); e.m.scale.set(1 + e.sq * 0.3, 1 + e.sq * 0.3, 1); }
       else if (e.t === "balloon") { e.m.position.y = e.y + Math.sin(w.t * 2.2 + e.x) * 0.12; e.m.rotation.z = Math.sin(w.t * 1.3 + e.x) * 0.12; }
     for (const s of w.shoes) if (!s.got) { s.m.rotation.y = w.t * 2.6; s.m.position.y = s.y + Math.sin(w.t * 2.5 + s.x) * 0.12; }
@@ -9324,12 +9646,19 @@
      by the ledges; a fall, a hit it can't take, or no way past, and the run is "fail" (a CPU in a
      race gets up again from its Star Post, as you do). */
   const newBot = (p, skill) => ({ t: 0, best: p.x, still: 0, hold: 0, jt: 0, zt: 0, back: 0, tries: 0, airUsed: false, done: 0, goal: null, gt: 0, tried: [], dashT: 0,
-                                  rev: 0, revTap: 0, skill: skill || {}, inp: newInput() });
+                                  rev: 0, revTap: 0, skill: skill || {}, inp: newInput(), tr: !!(skill && skill.trace) });   // (tr: noting why it does what it does, for a trace)
   /* a jump's time to rise `hgt` metres over the feet, and to come back down past it again (null:
      out of its reach) */
-  function riseFall(c, hgt, mud) {
-    const v0 = c.jump * (mud ? 0.82 : 1), d = v0 * v0 - 2 * GRAV * hgt;
-    return d <= 0 ? null : [(v0 - Math.sqrt(d)) / GRAV, (v0 + Math.sqrt(d)) / GRAV];
+  function riseFall(c, hgt, mud, gk) {
+    const v0 = c.jump * (mud ? 0.82 : 1), G = GRAV * (gk || 1), d = v0 * v0 - 2 * G * hgt;
+    return d <= 0 ? null : [(v0 - Math.sqrt(d)) / G, (v0 + Math.sqrt(d)) / G];
+  }
+  /* the gravity where a point is: a course's low gravity (its lowg zones), or the usual */
+  function gravAt(x, y) {
+    const w = world; if (!w) return 1;
+    const L = w.lowgZ || (w.lowgZ = (w.zones || []).filter(z => z.k === "lowg"));
+    let g = 1; for (const z of L) if (x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1) g = Math.min(g, z.g);
+    return g;
   }
   /* badniks it mustn't touch at all, however it's going: spikes out, spinning shut, crackling, spike
      balls going round */
@@ -9365,7 +9694,7 @@
       let k = 0; if (s0) while (k < 12 && solid(tile(i, fy + k))) k++;
       let g = -99;
       if (s0) g = fy + k - p.y;
-      else for (let j = fy; j >= Math.max(0, fy - 10); j--) { const t = tile(i, j); if (t === "~") break; if (t === "/" || t === "\\") { g = j + 0.5 - p.y; break; } if (solid(t) || t === "-") { g = j + 1 - p.y; break; } }
+      else for (let j = fy; j >= Math.max(0, fy - 26); j--) { const t = tile(i, j); if (t === "~") break; if (t === "/" || t === "\\") { g = j + 0.5 - p.y; break; } if (solid(t) || t === "-") { g = j + 1 - p.y; break; } }
       /* a column standing up from its feet: a wall, or a step -- not the ground under a slope
          running up, nor what it leads onto, nor a lip the runner just runs up onto */
       const top = fy + k - p.y;
@@ -9379,6 +9708,18 @@
       if (up || top <= 0.55) { wall = null; continue; }
       if (wall && wall.x1 === dx) { wall.x1 = dx + 1; wall.top = Math.max(wall.top, top); wall.rock = wall.rock && botBrk(t0); }
       else wall = ob(dx, dx + 1, top, "wall", botBrk(t0) && k >= 2);
+    }
+    /* a trench: a sheer drop, and its far side standing up out of it again -- a jump across it, as
+       over a gap (down in it, a wall to climb out) */
+    if (!gap) for (let k = 0; k < fl.length; k++) {
+      const dx = i0 + k - front, prev = k ? fl[k - 1] : 0;
+      if (dx > R) break;
+      if (fl[k] > -50 && fl[k] < prev - 2.5 && prev > -0.6 && !(k && rp[k - 1]) && !rp[k]) {
+        const bed = fl[k];
+        let m = k + 1; while (m < fl.length && m - k <= 18 && fl[m] > -50 && fl[m] < bed + 1.5 && fl[m] > bed - 1) m++;
+        if (m < fl.length && m - k <= 18 && fl[m] >= bed + 1.5) { gap = B.gap; gap[0] = Math.max(0, dx); gap[1] = i0 + m - front; }
+        break;
+      }
     }
     for (const b of w.solids) { const x0 = b.x0 - front; if (b.alive && x0 > -1.2 && x0 < R && b.y0 < p.y + 0.6 && b.y1 > p.y + 0.05) ob(x0, b.x1 - front, b.y1 - p.y, "hurdle"); }
     for (const e of w.ents) {
@@ -9402,27 +9743,85 @@
     return B;
   }
   const botByX = (a, b) => a.x0 - b.x0;
+  /* whether the ground falls away (more than a step) before x ahead of the runner's front */
+  function botDropBefore(A, x) {
+    for (let k = 0; k < A.fl.length; k++) { if (A.i0 + k - A.front >= x) break; if (A.fl[k] < -0.6) return true; }
+    return false;
+  }
+  /* how far ahead (from where it is) the next ride's mouth is that it runs into at the height it's
+     at -- a cable's handle, a pipe, a cannon -- or 99: one it takes, not one to jump over */
+  /* (a ride's mouth, as rideCheck takes a runner in: where it is, how near it catches, and
+     whether a runner at x, y is caught by it) */
+  const botMouth = R => R.k === "zip" ? [R.x0, 1.0] : R.k === "tube" ? [R.p[0][0], 1.2] : [R.x, 0.75];
+  function botCaught(R, x, y, hh) {
+    if (R.k === "zip") return Math.abs(x - R.x0) < 1.0 && y + hh > R.y0 - 1.8 && y < R.y0 + 0.2;
+    if (R.k === "tube") { const q = R.p[0]; return Math.abs(x - q[0]) < 1.2 && y > q[1] - 0.6 && y < q[1] + 1.4; }
+    if (R.k === "cannon") return Math.abs(x - R.x) < 0.75 && y > R.y - 0.3 && y < R.y + 1.2;
+    return false;
+  }
+  function botRideAt(p, w) {
+    let best = 99;
+    for (const R of w.rides || []) {
+      if (R.k !== "zip" && R.k !== "tube" && R.k !== "cannon") continue;
+      const [mx, near] = botMouth(R), x = mx - near;
+      if (x - p.x > -0.4 && x - p.x < best && botCaught(R, mx, p.y, p.hh)) best = Math.max(0, x - p.x);
+    }
+    return best;
+  }
+  /* A fall from where a runner is, as it's going (holding on ahead, no more presses): where it
+     comes down -- "ground", "wall" (into one too high to land on), "pit" (nothing under it, or
+     water), or "far" (past what it can see: ground there, it's taken as ground) */
+  function botLanding(p, A, top) {
+    const c = p.c, dt = 1 / 40;
+    let x = 0, y = 0, vx = Math.max(0, p.vx), vy = p.vy;
+    const col = xx => { const k = Math.floor(A.front + xx) - A.i0; return k < 0 ? 0 : k < A.fl.length ? A.fl[k] : undefined; };
+    const rides = (world.rides || []).filter(R => (R.k === "zip" || R.k === "tube" || R.k === "cannon") && botMouth(R)[0] > p.x - 1 && botMouth(R)[0] < p.x + 40);
+    for (let t = 0; t < 3; t += dt) {
+      if (vx < top) vx = Math.min(top, vx + c.airAccel * dt); else if (vx > top && !p.ballistic) vx = Math.max(top, vx - 9 * dt);
+      const xp = x, yp = y;
+      vy = Math.max(vy - GRAV * gravAt(A.front + x, p.y + y) * dt, -22); x += (vx + windAt(A.front + x, p.y + y) * 0.7) * dt; y += vy * dt;
+      for (const R of rides) if (!(R === p.rideLast && t < p.rideCd) && botCaught(R, p.x + x, p.y + y, p.hh)) return "ground";   // (down into a cable's handle, a pipe, a cannon: taken on -- not the one just left, for a moment)
+      const g = col(x);
+      if (g === undefined) { const last = A.fl[A.fl.length - 1]; return last > -50 && last > y - 26 ? "far" : "pit"; }
+      if (g > -50 && y < g - 0.45 && vy > -14) { const k = Math.floor(A.front + x) - A.i0; if (!(A.rp[k])) return "wall"; }
+      if (vy < 0) for (const xx of [x - 0.02, x - c.w + 0.06]) {
+        const lv = col(xx);
+        if (lv === undefined || lv <= -50 || y > lv) continue;
+        if (yp <= lv) return "ground";                                  // (in at the side, within its lip: up onto it)
+        /* down through that height this step: just where -- a foot over the ground then (as the
+           game lands it: any of its feet), or past the edge already */
+        const f = (yp - lv) / (yp - y), xc = xp + (x - xp) * f, a = col(xc - 0.02), b = col(xc - c.w + 0.06);
+        if ((a !== undefined && a > -50 && a >= lv - 0.01) || (b !== undefined && b > -50 && b >= lv - 0.01)) return "ground";
+      }
+      if (y < -26) return "pit";
+    }
+    return "far";
+  }
   /* A jump planned before it's made: how long to hold Jump. Flown out step by step, the shortest
      hold that takes it over everything in its way -- walls by their top lip, the rest clear -- and
      down again on ground, far enough short of the next thing to run and jump again (or past it
      too); none will, and the full jump. Returns seconds (9: all the way up). */
-  function botPlan(p, A, v, mud, roofH) {
+  /* the wind where a point is (the course's gales): a jump goes on further in a tailwind */
+  function windAt(x, y) { let v = 0; for (const z of world.zones || []) if (z.k === "wind" && x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1) v += z.vx; return v; }
+  function botPlan(p, A, v, mud, roofH, top) {
     const c = p.c, half = c.w / 2, v0 = c.jump * (mud ? 0.82 : 1), dt = 1 / 60;
     const ground = x => { const k = Math.floor(A.front + x) - A.i0; return k < 0 ? 0 : k < A.fl.length ? A.fl[k] : -99; };
     const rampAt = x => { const k = Math.floor(A.front + x) - A.i0; return k >= 0 && k < A.rp.length && A.rp[k]; };
     const needOf = o => Math.max(0.3, o.top + (BOT_NEED[o.kind] != null ? BOT_NEED[o.kind] : o.spiky ? 0.5 : 0.3));
     let fallback = 9, far = -1, farHold = null;
     for (const hold of [0.05, 0.09, 0.13, 0.18, 0.24, 0.31, 0.4, 9]) {
-      let t = 0, y = 0, vy = v0, cut = false, ok = true, land = null;
+      let t = 0, y = 0, vy = v0, cut = false, ok = true, land = null, xw = 0, vh = v;
       while (t < 1.8 && ok) {
+        if (!cut && t >= hold - 1e-6) { cut = true; if (vy > 5) vy = 5; }   // (let go after `hold` seconds held, as the game steps it)
         t += dt;
-        if (!cut && t >= hold) { cut = true; if (vy > 5) vy = 5; }
-        vy -= GRAV * dt; y += vy * dt;
+        vy -= GRAV * gravAt(A.front + xw, p.y + y) * dt; y += vy * dt;
         if (y + p.hh > roofH && vy > 0) vy = 0;                    // (a roof: it bumps its head)
-        const x = v * t, g = ground(x + 0.02);                      // (its front, over the ground there)
-        if (g > -50 && y < g - 0.45 && !rampAt(x + 0.02)) { ok = false; break; }   // into a wall too high to run up onto
+        if (top && vh > top) vh = Math.max(top, vh - 9 * dt);      // (faster than it runs -- off a dash strip -- it slows in the air)
+        xw += (vh + windAt(A.front + xw, p.y + y) * 0.7) * dt;
+        const x = xw, g = ground(x + 0.02);                         // (its front, over the ground there; a gale carrying it on)
+        if (g > -50 && y < g - 0.15 && !rampAt(x + 0.02)) { ok = false; break; }   // into a wall too high to run up onto (a plan keeps the lip it could catch in hand)
         for (const o of A.obs) if (o.kind !== "wall" && x > o.x0 - 0.05 && x - c.w < o.x1 + 0.05 && y < needOf(o)) { ok = false; break; }
-        const gb = Math.max(ground(x - 0.05), ground(x - c.w + 0.05));
+        const gb = Math.max(ground(x - 0.35), ground(x - c.w + 0.35));      // (a foot well on it, not just a toe on its edge)
         if (vy < 0 && gb > -50 && y <= gb) { land = x; break; }
       }
       if (!ok || land == null) { if (ok && fallback === 9) fallback = hold; continue; }
@@ -9431,19 +9830,24 @@
       const next = A.obs.find(o => o.x0 > land - c.w - 0.1);
       const gapNext = A.gapOn && A.gapOn[1] > land ? A.gapOn[0] - land : 99;
       if (gapNext < 0) continue;                                    // (down into the gap)
-      if (!next) return hold;
+      if (!next) { A.why = "clear@" + land.toFixed(1); return hold; }
       const rf = riseFall(c, needOf(next), mud), room = next.x0 - land;
-      if (room >= v * (rf ? rf[0] : 0.2) + 0.5) return hold;
+      if (room >= v * (rf ? rf[0] : 0.2) + 0.5) { A.why = "room@" + land.toFixed(1) + "/" + next.kind + next.x0.toFixed(1); return hold; }
     }
+    A.why = farHold != null ? "far@" + far.toFixed(1) : "fallback";
     return farHold != null ? farHold : fallback;
   }
   /* stuck: a way up -- a ledge or a plank higher than it is, within a jump (its own, and its air
      action's), back the way it came or just ahead, with room over it to jump (not up into a roof) */
   /* how many rows up a runner really gets: its jump (about three), and what its air action adds
      (flight a good deal, a double jump some, a hover or a glide hardly any) */
-  const jumpRows = c => (c.jump * c.jump) / (2 * GRAV * 0.7) + ({ fly: 2.6, ballet: 1.2, double: 1.2, hop: 1 }[c.air] || 0.3);
+  const AIR_UP = { fly: 2.6, ballet: 1.2, double: 1.2, hop: 1 };
+  const jumpRows = c => (c.jump * c.jump) / (2 * GRAV * 0.7) + (AIR_UP[c.air] || 0.3);
+  /* (and how high its air action really takes it over a wall's lip: a jump's top, and what flight,
+     a double jump or a hop adds -- a hover or a glide holds it up, never higher) */
+  const airRows = c => (c.jump * c.jump) / (2 * GRAV) + (AIR_UP[c.air] || 0);
   function stepUp(p, tried) {
-    const c = p.c, reach = jumpRows(c), x0 = Math.floor(p.x), y0 = Math.floor(p.y + 0.01);
+    const c = p.c, reach = Math.min(jumpRows(c), airRows(c) + 0.4), x0 = Math.floor(p.x), y0 = Math.floor(p.y + 0.01);   // (as high as it truly gets)
     const open = (i, j) => { const t = tile(i, j); return !solid(t) || t === "-"; };
     let best = null, bs = 1e9;
     for (let i = x0 - 24; i <= x0 + 4; i++) for (let j = y0 + 1; j <= y0 + reach; j++) {        // (as high as it really gets: one step at a time)
@@ -9464,6 +9868,7 @@
     I.R = 1; I.L = 0; I.U = 0; I.D = 0; I.Z = I.X = I.C = 0;
     D.t += h; D.jt -= h; D.hold -= h; D.back -= h; D.zt -= h; D.dashT -= h;
     if (p.demoFell || p.dead || p.y < 0.3) return "fail";
+    if (p.state === "ride" || (p.ballistic && !p.ground)) { I.R = 1; I.J = 0; D.hold = 0; D.still = 0; D.best = Math.max(D.best, p.x); return; }   // (carried, or flying true: nothing to do but hold on)
     if (p.x > D.best + 0.4) { D.best = p.x; D.still = 0; } else D.still += h;
     if (p.ground) D.airUsed = false;
     if (D.t > 220) return "fail";
@@ -9481,16 +9886,17 @@
       if (p.ground && p.y >= g.y - 0.3 && (Math.abs(dx) < 1.6 || dx < 0)) { D.goal = null; D.best = p.x; D.still = 0; D.tries = 0; }
       else if (dx < -3 && p.y >= g.y - 0.3 && p.ground) { D.goal = null; D.still = 0; }           // (up there already, past it, another way)
       else if (D.gt > 4.5) { D.tried.push(g); D.goal = null; D.still = 0; }                      // (it gave that one a fair go)
+      else if (p.state === "dash" && c.steer) { I.R = I.L = 0; I.J = 0; return; }                // (Gamma's Drive Mode: let go of it first, and it stops)
       else {
         I.R = dx > 0.35 ? 1 : 0; I.L = dx < -0.35 ? 1 : 0;
-        /* coming in fast for a ledge a plain jump reaches (or faster than it runs: a dash, a dash
-           pad): braking, so as not to fly past it; a ledge it needs its air action for, it keeps
-           its speed for */
+        /* coming in fast for a ledge: braking, so as not to fly past it (a plank is only a few
+           tiles wide) -- hardest for one a plain jump reaches, a little less for one it needs its
+           air action for */
         const lowLedge = g.y - p.y <= (c.jump * c.jump) / (2 * GRAV);
-        const fast = Math.abs(p.vx) > (lowLedge ? 7 : c.run * 1.15) && Math.abs(dx) < 3 + Math.abs(p.vx) * 0.3 && sgn(p.vx) === sgn(dx);
+        const fast = Math.abs(p.vx) > (lowLedge ? 7 : 9) && Math.abs(dx) < 3 + Math.abs(p.vx) * 0.3 && sgn(p.vx) === sgn(dx);
         if (fast) { I.R = p.vx < 0 ? 1 : 0; I.L = p.vx > 0 ? 1 : 0; }
         if (p.ground && Math.abs(dx) < 2.4 && D.jt <= 0 && !fast) { I.jp = 1; D.hold = 0.5; D.jt = 0.4; }
-        else if (!p.ground && !D.airUsed && p.vy < 1 && p.y < g.y + 0.2 && D.jt <= 0) { I.jp = 1; D.airUsed = true; D.hold = 0.7; D.jt = 0.25; }
+        else if (!p.ground && !D.airUsed && p.vy < 1 && p.y < g.y + 0.2 && D.jt <= 0 && c.air !== "hover" && c.air !== "glide") { I.jp = 1; D.airUsed = true; D.hold = 0.7; D.jt = 0.25; }   // (an air action that takes it higher: not a hover, nor a glide)
         else if (p.state === "fly" && p.y < g.y + 0.5 && D.jt <= 0) { I.jp = 1; D.jt = 0.22; }
         I.J = D.hold > 0 || I.jp ? 1 : 0;
         return;
@@ -9507,10 +9913,9 @@
        in good time -- never with a move that stops it -- from the nearest thing on */
     if (p.state === "climb") { I.U = 1; return; }          // Knuckles, on a wall: up and over
     const v = Math.max(0, p.vx), half = c.w / 2, S = D.skill;
-    const A = botAhead(p, w, half + 1.4 + v * 0.5, D.buf || (D.buf = { obs: [], pool: [], fl: [], rp: [], gap: [0, 0] })), obs = A.obs, gap = A.gapOn;
+    const A = botAhead(p, w, Math.max(6.5, half + 1.4 + v * 0.5), D.buf || (D.buf = { obs: [], pool: [], fl: [], rp: [], gap: [0, 0] })), obs = A.obs, gap = A.gapOn;
     const mud = p.ground && surfaceAt(p.x, p.y) === "m";
     const topNow = c.run * (p.star > 0 ? 1.22 : 1) * (p.speedT > 0 ? 1.35 : 1) * (p.paceK || 1);
-    const floorAt = dx => { const i = Math.floor(p.x + dx); for (let j = Math.floor(p.y + 0.5); j >= Math.max(1, Math.floor(p.y) - 9); j--) { const t = tile(i, j - 1); if (t === "~") return false; if (solid(t) || t === "-" || t === "/" || t === "\\") return true; } return false; };
     let roofH = 99;                                                    // (a low roof over it: as high as a jump goes there)
     for (let k = 1; k <= 4; k++) if (solid(tile(Math.floor(p.x), Math.floor(p.y + 0.05) + k)) || solid(tile(Math.floor(p.x + half + 0.4), Math.floor(p.y + 0.05) + k))) { roofH = Math.floor(p.y + 0.05) + k - p.y; break; }
     const clearTo = d => !obs.some(o => o.x0 < d && o.x1 > -0.3) && !(gap && gap[0] < d);   // (nothing in the way for d metres)
@@ -9525,41 +9930,57 @@
         /* how high its feet must get: onto a wall (its top lip it runs up onto), a monitor; over
            a hurdle, thorns, a badnik (one with spikes out, well over) */
         const need = Math.max(0.3, o.top + (BOT_NEED[o.kind] != null ? BOT_NEED[o.kind] : o.spiky ? 0.5 : 0.3));
-        const rf = riseFall(c, need, mud);
+        const rf = riseFall(c, need, mud, gravAt(p.x, p.y));
+        /* a tall wall past a drop (the plank it's on ends short of it): up the next step from
+           here, not down off the end and back to the foot of it */
+        if (o.kind === "wall" && o.top > 1.2 && !D.goal && botDropBefore(A, o.x0)) {
+          const g = stepUp(p, D.tried);
+          if (g && g.y > Math.floor(p.y + 0.01)) { D.goal = g; D.gt = 0; if (D.tr) D.why = "up-drop"; return; }
+        }
         if (!rf || need > roofH - 0.2) {
-          if (o.kind === "wall" && o.top <= jumpRows(c) - 0.4 && roofH > o.top + 1) { if (o.x0 <= v * 0.3 + 0.6) jumpFor = o; break; }   // (its air action takes it the rest of the way)
-          if (o.top > 1.2 && !D.goal) { const g = stepUp(p, D.tried); if (g) { D.goal = g; D.gt = 0; return; } }   // too tall: up it by its steps, starting now
+          if (o.kind === "wall" && o.top - 0.4 <= airRows(c) && AIR_UP[c.air] && roofH > o.top + 1) { if (o.x0 <= v * 0.3 + 0.6) jumpFor = o; break; }   // (its air action takes it the rest of the way)
+          if (o.top > 1.2 && !D.goal) { const g = stepUp(p, D.tried); D.why = "up:" + o.kind + o.top.toFixed(1) + (g ? "" : "-none"); if (g) { D.goal = g; D.gt = 0; return; } }   // too tall: up it by its steps, starting now
           if (o.top <= 1.2 && o.x0 <= v * 0.12 + 0.5) jumpFor = o;      // (a low thing under a roof: hop it anyway)
           break;
         }
         if (o.x0 <= v * rf[0] + 0.35 + (o.kind === "foe" ? 0.6 : 0)) jumpFor = o;
         break;
       }
-      /* the end of the road: off the very edge, held all the way */
-      const atEdge = gap && gap[0] <= Math.max(0.3, v * 0.05);
+      /* the end of the road: off the very edge, held all the way -- unless a ride takes it on
+         first (a cable's handle at the edge, a cannon at a wall's foot): into that */
+      const rideD = botRideAt(p, w);
+      if (jumpFor && rideD < jumpFor.x0 + half) jumpFor = null;
+      const atEdge = gap && gap[0] <= Math.max(0.3, v * 0.05) && !(rideD <= gap[0] + half + 0.3);
       if (rolling && !jumpFor && !atEdge && D.jt <= 0) {                 // out of a roll once it's as slow as running: up, and running again
         const rock = obs.find(o => o.rock && o.x0 < 2.5);
         if (!rock && v <= topNow + 0.4 && roofH > 2.4) { I.jp = 1; D.jt = 0.25; D.hold = 0.1; }
       }
       if (D.jt <= 0 && (atEdge || jumpFor)) {                        // a jump: held as long as its plan says
         I.jp = 1; D.jt = 0.22;
-        D.hold = atEdge ? 9 : botPlan(p, A, v, mud, roofH);
+        D.hold = botPlan(p, A, v, mud, roofH, topNow);                 // (a gap too: no further than the next stone)
+        if (D.tr) D.why = (atEdge ? "edge" + gap[0].toFixed(1) + "-" + gap[1].toFixed(1) : "for:" + jumpFor.kind + jumpFor.x0.toFixed(1)) + " " + A.why;
       } else if (!I.jp && !rolling && p.state === "run" && D.jt <= 0) {
         /* stopped (by a hit, a wall, the start): a Spin Dash, if the road's clear for it */
         if (c.spinDash && v < 3.5 && !p.inWater && clearTo(7) && roofH > 1.2 && D.t > 0.02) { D.rev = 0.34; D.revTap = 0; I.R = 0; I.D = 1; return; }
-        if (v < 1.5 && D.t > 0.6) { I.jp = 1; D.hold = 0.42; D.jt = 0.3; }          // (stuck at something low)
+        if (v < 1.5 && D.t > 0.6 && D.still > 0.35) { I.jp = 1; D.hold = 0.42; D.jt = 0.3; D.why = "low"; }          // (stuck at something low)
         /* a clear road: its own dash, now and then */
         else if (S.dash && D.dashT <= 0 && v >= topNow * 0.9 && !p.inWater && !mud && clearTo(v * 0.9 + 2.5) && roofH > 2) { I.dash = 1; D.dashT = S.dash; }
         /* Chaos: a Chaos Dive under badniks and across thorns -- nothing touches him */
         else if (c.dashInv && D.dashT <= 0 && obs.some(o => (o.kind === "foe" || o.kind === "thorns") && o.x0 < 3.5) && !(gap && gap[0] < 4)) { I.dash = 1; D.dashT = 1.1; }
       }
     } else {
-      /* in the air: its air action for a wall in the way or nowhere to come down; flying, a beat
-         at a time (over water too); gliding, on over it */
-      const wallA = obs.some(o => o.kind === "wall" && o.x0 < 1 + v * 0.1 && o.top > 0.3);
-      if (!D.airUsed && p.vy < 1.5 && D.jt <= 0 && (wallA || !floorAt(0.8) || !floorAt(1.8)) && !obs.some(o => o.spiky && o.x0 < 3)) { I.jp = 1; D.airUsed = true; D.hold = 0.6; D.jt = 0.25; }
-      else if (p.state === "fly" && (wallA || !floorAt(1) || !floorAt(2.2)) && D.jt <= 0) { I.jp = 1; D.jt = 0.22; }
-      if (p.state === "glide" && (!floorAt(0.8) || !floorAt(2))) D.hold = Math.max(D.hold, 0.1);
+      /* in the air: where this jump comes down, as it's going. On ground, nothing to do -- it
+         never flies or glides when a plain jump will do (flight is slower than running). Into
+         water, a pit or a wall: its air action, as late as it can; flying, a beat at a time to
+         hold its height, and the moment a drop from there would land, it lets go (Down) and runs
+         on; gliding, it keeps on over the trouble and lets go once it's past */
+      const land = botLanding(p, A, topNow), safe = land === "ground";
+      if (D.tr) D.why = "air:" + land;
+      if (p.state === "fly") {
+        if (safe) I.D = 1;
+        else if (D.jt <= 0 && (p.vy < 0.2 || land === "wall")) { I.jp = 1; D.jt = 0.2; }
+      } else if (p.state === "glide") { if (!safe) D.hold = Math.max(D.hold, 0.1); }
+      else if (!safe && !D.airUsed && D.jt <= 0 && (p.vy < 1.5 || land === "wall") && !obs.some(o => o.spiky && o.x0 < 3)) { I.jp = 1; D.airUsed = true; D.hold = 0.6; D.jt = 0.25; }
     }
     I.J = D.hold > 0 || I.jp ? 1 : 0;
   }
@@ -9602,13 +10023,15 @@
         const ps = p.state, pvx = p.vx;
         step(h); worldStep(h);
         if (p.state === "hurt" && ps !== "hurt") { st.hurt++; st.ev.push(["hurt", +p.x.toFixed(1), +p.y.toFixed(1)]); }
+        if (p.state === "ride" && ps !== "ride") { st.rides = (st.rides || 0) + 1; st.ev.push(["ride", p.ride.R.k, +p.x.toFixed(1)]); }
+        if (p.state === "fly" && ps !== "fly") st.ev.push(["fly", +p.x.toFixed(1), +p.y.toFixed(1)]);
         if (p.state === "stumble" && ps !== "stumble") { st.stumble++; st.ev.push(["stumble", +p.x.toFixed(1), +p.y.toFixed(1)]); }
         if (Math.abs(pvx) > 5 && Math.abs(p.vx) < 1 && p.state !== "hurt" && p.state !== "stumble") { st.bump++; st.ev.push(["bump", +p.x.toFixed(1), +p.y.toFixed(1), +pvx.toFixed(1)]); }
         if (p.inWater) { if (!st.wet) st.ev.push(["water", +p.x.toFixed(1), +p.y.toFixed(1)]); st.water += h; st.wet = 1; } else st.wet = 0;
-        if (skill && skill.trace && p.x >= skill.trace[0] && p.x <= skill.trace[1]) (res.trace = res.trace || []).push([+world.t.toFixed(3), +p.x.toFixed(2), +p.y.toFixed(2), +p.vx.toFixed(1), +p.vy.toFixed(1), p.state, p.ground ? 1 : 0, D.inp.J, D.inp.jp, D.inp.D, +D.hold.toFixed(2), D.goal ? "goal" + D.goal.x.toFixed(1) + "," + D.goal.y + " gt" + D.gt.toFixed(1) : "", "st" + D.still.toFixed(1), "tr" + D.tries, D.inp.R, D.inp.L].join(" "));
+        if (skill && skill.trace && p.x >= skill.trace[0] && p.x <= skill.trace[1]) (res.trace = res.trace || []).push([+world.t.toFixed(3), +p.x.toFixed(2), +p.y.toFixed(2), +p.vx.toFixed(1), +p.vy.toFixed(1), p.state, p.ground ? 1 : 0, D.inp.J, D.inp.jp, D.inp.D, +D.hold.toFixed(2), D.goal ? "goal" + D.goal.x.toFixed(1) + "," + D.goal.y + " gt" + D.gt.toFixed(1) : "", "st" + D.still.toFixed(1), "tr" + D.tries, D.inp.R, D.inp.L, D.why || ""].join(" ")); D.why = "";
         input.jp = input.zp = input.xp = input.cp = 0; input.dash = 0;
         if (world.t >= rec) { rec += 1 / 30; drawRunner(p, 1 / 30); const f = p._rf || ["idle", 0, 1]; res.track.push([+world.t.toFixed(3), +p.spr.position.x.toFixed(3), +p.spr.position.y.toFixed(3), f[0], f[1], f[2]]); }
-        if (world.goal && p.x >= world.goal.x) { res.ok = true; break; }
+        if ((world.goal && p.x >= world.goal.x) || (!world.goal && world.arena && p.x >= world.arena.x0)) { res.ok = true; break; }   // (to the post; an Act 2, to the boss's arena)
       }
       res.time = world.t; res.st.dist = (world.goal ? world.goal.x : world.W) - world.start.x; res.st.ideal = res.st.dist / p.c.run; res.st.endX = p.x;
     } catch (e) { console.error(e); }
@@ -9618,34 +10041,34 @@
   /* Who the robot gets through each Act 1 and Act 3 fairly: measured with simRun, every runner on
      every one (_debug.botStats; Act 3 with its dash, as a race's CPU runs it), 2026-11-18. */
   const CLEAN = {
-    "seabreeze-1": "sonic tails knuckles rouge shadow cream gamma eggman metal", "seabreeze-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "seabreeze-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "seabreeze-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "airstrip-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "airstrip-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "parlour-1": "sonic tails knuckles amy rouge cream eggman metal mighty emerl", "parlour-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "peak-1": "tails knuckles rouge eggman", "peak-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
-    "club-1": "sonic tails knuckles amy rouge shadow cream chaos gamma metal silver", "club-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
-    "expressway-1": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver", "expressway-3": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver",
-    "museum-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "museum-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
-    "springs-1": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver", "springs-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "canyon-1": "sonic tails knuckles rouge cream eggman metal emerl", "canyon-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "ruins-1": "sonic knuckles amy shadow chaos gamma metal mighty silver", "ruins-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
-    "depot-1": "cream chaos gamma silver", "depot-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
-    "stars-1": "tails knuckles cream gamma eggman mighty", "stars-3": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver",
-    "station-1": "sonic tails knuckles rouge shadow cream chaos gamma eggman metal mighty silver", "station-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
+    "parlour-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman mighty emerl", "parlour-3": "sonic tails knuckles amy rouge shadow cream chaos eggman mighty emerl",
+    "peak-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "peak-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl",
+    "club-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "club-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "expressway-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "expressway-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "museum-1": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver", "museum-3": "tails knuckles amy rouge shadow cream chaos gamma eggman metal silver",
+    "springs-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "springs-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "canyon-1": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver", "canyon-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "ruins-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "ruins-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "depot-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "depot-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "stars-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "stars-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
+    "station-1": "sonic tails knuckles amy rouge shadow cream chaos gamma metal mighty emerl silver", "station-3": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver",
   };
   const cleanRunners = id => (CLEAN[id] || "").split(" ").filter(Boolean);
   /* the same for the grand prix's courses: who gets round each fairly (a cup's rivals are drawn
      from those who get round all four) */
-  const GP_CLEAN = {                                 // (measured 2026-11-18 with _debug.botStats, the CPUs' dash and all)
+  const GP_CLEAN = {                                 // (measured 2026-11-18 with _debug.botStats, the CPUs' dash and all, on the redrawn courses)
     "gp-checker": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-coral": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-grove": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-lagoon": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-pinball": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-funfair": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "gp-sweets": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver", "gp-pier": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "gp-slopes": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-crystal": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
+    "gp-sweets": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-pier": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "gp-slopes": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-crystal": "sonic tails amy rouge shadow cream chaos metal mighty emerl silver",
     "gp-floes": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-tundra": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "gp-dunes": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-town": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
-    "gp-foundry": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-volcano": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
+    "gp-dunes": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-town": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "gp-foundry": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-volcano": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-temple": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-windmills": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "gp-fleet": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-spires": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver",
+    "gp-fleet": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-spires": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-refinery": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-metro": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-fortress": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-orbit": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
   };
@@ -9777,9 +10200,15 @@
      the rings and Red Rings they run through and light the Star Posts, as you do.
      Red Rings stand across every road at the power points: run into one and the box spins up a
      power, used with its own button (V or Shift; a pad's left shoulder; Power on a touch screen).
-       Speed Shoes, a bubble Shield (one hit), Invincibility (and anyone touched goes down), a
-       Homing Bomb (at the next runner ahead), an Eggman Monitor (left behind: a fake), a Thunder
-       Shield (everyone close goes down), and Chaos Control (time stops for everyone else).
+       Speed Shoes; a Bubble Shield (one hit, for 4.5 s); Invincibility (and anyone touched goes
+       down); a Buzz Bomber (after the runner ahead; with nobody ahead, it hovers where you left
+       it, a trap); an Eggman Monitor (a fake, left behind); Grey Quake (the ground shakes: anyone
+       standing on it near you goes down); Chaos Control (3.5 s of stopped time for everyone else);
+       and from the Wisps, a Cyan Laser (a beam straight ahead), an Orange Rocket (along the road
+       ahead), a Yellow Drill (2.5 s of drilling on, fast and untouchable) and a Purple Void (the
+       ones near pulled back and slowed); Orbinaut Orbs (three spike balls round you); a Spring
+       Trap (whoever hits it is thrown back); the Giant Ring (out just behind the runner ahead);
+       and a Red Spring (straight up, to the high road).
      The further back you are, the better the powers. Classes: Breeze, Gale and Storm (the rivals'
      pace, and how keen they are on powers). Cups open one after another (a trophy in the one
      before, any class), and Storm once you've won a gold at Gale. */
@@ -9789,23 +10218,32 @@
   const GP_CUP_NAMES = ["Flicky Cup", "Carnival Cup", "Aurora Cup", "Ember Cup", "Skyward Cup", "Emerald Cup"];
   const POWERS = {
     shoes: { name: "Speed Shoes", say: "Speed Shoes!" },
-    shield: { name: "Bubble Shield", say: "Shield up" },
+    shield: { name: "Bubble Shield", say: "Bubble Shield: it takes one hit" },
     star: { name: "Invincibility", say: "Invincible!" },
-    bomb: { name: "Homing Bomb", say: "Homing Bomb away" },
+    buzz: { name: "Buzz Bomber", say: "Buzz Bomber, after the one ahead" },
     monitor: { name: "Eggman Monitor", say: "A fake monitor, left behind" },
-    thunder: { name: "Thunder Shield", say: "Thunder!" },
+    quake: { name: "Grey Quake", say: "Grey Quake!" },
     chaos: { name: "Chaos Control", say: "Chaos Control!" },
+    laser: { name: "Cyan Laser", say: "Cyan Laser!" },
+    rocket: { name: "Orange Rocket", say: "Orange Rocket away" },
+    drill: { name: "Yellow Drill", say: "Yellow Drill!" },
+    void: { name: "Purple Void", say: "Purple Void!" },
+    orbs: { name: "Orbinaut Orbs", say: "Orbinaut Orbs" },
+    spring: { name: "Spring Trap", say: "A spring, left behind" },
+    ring: { name: "Giant Ring", say: "Giant Ring: on ahead!" },
+    redspring: { name: "Red Spring", say: "Red Spring!" },
   };
-  /* what a Red Ring gives, by place: the leaders a defence, the back of the pack the big ones */
+  /* what a Red Ring gives, by place: the leaders traps and a defence, the middle things to throw,
+     the back of the pack the big ones that bring you back into it */
   const POWER_ODDS = [
-    { monitor: 40, shield: 34, bomb: 16, shoes: 10 },
-    { bomb: 30, shoes: 26, monitor: 18, shield: 16, thunder: 10 },
-    { bomb: 28, shoes: 28, thunder: 16, shield: 14, monitor: 8, star: 6 },
-    { shoes: 30, bomb: 24, thunder: 20, star: 12, shield: 8, chaos: 6 },
-    { shoes: 30, star: 22, thunder: 20, bomb: 16, chaos: 12 },
-    { shoes: 28, star: 26, thunder: 18, chaos: 16, bomb: 12 },
-    { star: 32, shoes: 26, chaos: 22, thunder: 20 },
-    { star: 36, chaos: 28, shoes: 24, thunder: 12 },
+    { monitor: 24, spring: 22, shield: 22, buzz: 14, orbs: 10, shoes: 8 },
+    { buzz: 18, laser: 16, rocket: 14, shoes: 14, orbs: 10, monitor: 10, spring: 10, shield: 8 },
+    { buzz: 16, laser: 14, rocket: 14, shoes: 14, quake: 10, orbs: 10, redspring: 8, shield: 6, star: 4, void: 4 },
+    { shoes: 16, rocket: 12, quake: 12, laser: 10, buzz: 10, redspring: 10, orbs: 8, void: 8, star: 8, drill: 6 },
+    { shoes: 16, drill: 12, quake: 12, star: 12, void: 10, redspring: 10, rocket: 8, ring: 8, chaos: 6, buzz: 6 },
+    { drill: 16, star: 16, shoes: 14, ring: 12, chaos: 10, void: 10, quake: 10, redspring: 6, rocket: 6 },
+    { star: 20, ring: 18, drill: 16, chaos: 14, shoes: 12, void: 10, redspring: 10 },
+    { star: 22, ring: 22, chaos: 18, drill: 16, shoes: 12, void: 10 },
   ];
   function rollPower(place, rnd) {
     const o = POWER_ODDS[clamp(place, 0, 7)], tot = Object.values(o).reduce((a, b) => a + b, 0);
@@ -9987,7 +10425,7 @@
   function gpGo(def) {
     const G = GP, cid = def.id, runsHere = !G.online || NP.host;
     GPR = { def, cid, t0: 0, count: G.online && !G.goEarly ? Infinity : 4.2, said: 5, hfin: {}, seen: {}, gT: 0, tid: 0, go: false, over: false, fin: [], rivals: [], rows: [], freeze: 0, freezeBy: null,
-            power: null, spin: 0, roll: 0, bombs: [], traps: [], shieldS: null, rnd: mulberry32(7 + G.race * 101), myFin: null, lastV: 0, endT: 0 };
+            power: null, spin: 0, roll: 0, bombs: [], traps: [], rockets: [], beams: [], voids: [], myOrbs: null, myShield: 0, shieldS: null, rnd: mulberry32(7 + G.race * 101), myFin: null, lastV: 0, endT: 0 };
     loadDef(def);
     play();
     world.played = true;
@@ -10026,14 +10464,48 @@
     if (!k) return;
     g.save(); g.translate(24, 24);
     const px = (c, x, y, w, h) => { g.fillStyle = c; g.fillRect(x, y, w, h); };
+    const disc = (c, x, y, r) => { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, PI * 2); g.fill(); };
+    const poly = (c, line, pts) => { g.fillStyle = c; g.beginPath(); pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.fill(); if (line) { g.strokeStyle = line; g.lineWidth = 2; g.stroke(); } };
+    const wisp = (c, dark) => { disc(dark, 0, 1, 13); disc(c, 0, 0, 12); disc("#ffffff", -4, -2, 3.2); disc("#ffffff", 4, -2, 3.2); disc("#1a1a2a", -4, -1.5, 1.6); disc("#1a1a2a", 4, -1.5, 1.6); };   // a Wisp's face
+    const spring = c => { px("#3a3a44", -12, 10, 24, 5); for (let k = 0; k < 4; k++) px(k % 2 ? "#c8ccd8" : "#8a8e9a", -8, 6 - k * 4, 16, 3); px(c, -14, -12, 28, 6); px("#ffffff", -12, -11, 8, 2); };
     switch (k) {
       case "shoes": px("#1a1a2a", -15, -2, 30, 14); px("#e8303a", -13, -1, 26, 9); px("#ffffff", -13, 6, 26, 3); px("#ffffff", -4, -1, 3, 6); px("#f2c030", 8, -1, 4, 3); break;
       case "shield": g.fillStyle = "rgba(106,200,255,.45)"; g.beginPath(); g.arc(0, 0, 17, 0, PI * 2); g.fill(); g.strokeStyle = "#e6f8ff"; g.lineWidth = 3; g.stroke(); px("#ffffff", -9, -11, 5, 4); break;
       case "star": { g.fillStyle = "#ffd23a"; g.strokeStyle = "#7a4a00"; g.lineWidth = 3; g.beginPath(); for (let i = 0; i < 10; i++) { const a = i / 10 * PI * 2 - PI / 2, r = i % 2 ? 7 : 17; g.lineTo(Math.cos(a) * r, Math.sin(a) * r); } g.closePath(); g.stroke(); g.fill(); break; }
-      case "bomb": g.fillStyle = "#1a1a2a"; g.beginPath(); g.arc(-2, 4, 13, 0, PI * 2); g.fill(); px("#5a5a6a", -8, -4, 5, 5); px("#8a6a4a", 6, -14, 3, 8); px("#ffd23a", 7, -18, 5, 5); px("#e8303a", 4, 0, 6, 6); break;
+      case "buzz":                                         // Sonic 1's wasp: striped body, wings, the stinger
+        poly("#bfe8ff", "#5a8ab0", [[-6, -4], [-14, -16], [-1, -9]]); poly("#bfe8ff", "#5a8ab0", [[2, -4], [-2, -17], [9, -8]]);
+        g.fillStyle = "#1a1a2a"; g.beginPath(); g.ellipse(0, 3, 15, 7, 0, 0, PI * 2); g.fill();
+        for (let k = -9; k <= 9; k += 6) px("#f2c030", k, -3, 3, 12);
+        disc("#e8303a", -11, 1, 3); poly("#c8ccd8", "#5a5a6a", [[12, 6], [19, 12], [10, 9]]); break;
       case "monitor": px("#1a1a2a", -15, -15, 30, 30); px("#c8ccd8", -13, -13, 26, 26); px("#2a3a6a", -10, -10, 20, 16); px("#ffc890", -6, -8, 12, 10); px("#d8762a", -7, -2, 14, 3); px("#1a1a1a", -4, -6, 2, 2); px("#1a1a1a", 2, -6, 2, 2); break;
-      case "thunder": g.fillStyle = "rgba(255,230,90,.35)"; g.beginPath(); g.arc(0, 0, 17, 0, PI * 2); g.fill(); g.fillStyle = "#ffd23a"; g.strokeStyle = "#7a4a00"; g.lineWidth = 2; g.beginPath(); g.moveTo(3, -17); g.lineTo(-9, 2); g.lineTo(-1, 2); g.lineTo(-4, 17); g.lineTo(9, -3); g.lineTo(1, -3); g.closePath(); g.fill(); g.stroke(); break;
+      case "quake":                                        // a stone slab breaking, the ground shaking away from it
+        px("#5a5a66", -16, 6, 32, 10); px("#8a8a96", -16, 6, 32, 3);
+        poly("#a0a0ac", "#3a3a44", [[-9, 6], [-4, -12], [5, -10], [9, 6]]);
+        g.strokeStyle = "#2a2a30"; g.lineWidth = 2; g.beginPath(); g.moveTo(0, -10); g.lineTo(-2, -2); g.lineTo(2, 2); g.lineTo(-1, 6); g.stroke();
+        px("#d8d0c0", -20, 0, 4, 2); px("#d8d0c0", 16, 0, 4, 2); px("#d8d0c0", -19, -6, 3, 2); px("#d8d0c0", 16, -6, 3, 2); break;
       case "chaos": g.fillStyle = "#3ad88a"; g.strokeStyle = "#0a4a2a"; g.lineWidth = 3; g.beginPath(); g.moveTo(-14, -4); g.lineTo(-7, -14); g.lineTo(7, -14); g.lineTo(14, -4); g.lineTo(0, 16); g.closePath(); g.stroke(); g.fill(); px("#c8ffe8", -6, -11, 6, 4); break;
+      case "laser": px("#bff8ff", 4, -3, 20, 6); px("#ffffff", 4, -1, 20, 2); g.save(); g.translate(-6, 0); wisp("#3ad8f0", "#0a6a8a"); g.restore(); break;
+      case "rocket":                                       // an Orange Wisp's rocket, nose on
+        poly("#ffd23a", null, [[-18, 0], [-10, -5], [-10, 5]]); poly("#f04a1a", null, [[-15, 0], [-10, -3], [-10, 3]]);
+        poly("#ff8a2a", "#8a3a0a", [[-10, -7], [8, -7], [17, 0], [8, 7], [-10, 7]]); disc("#ffffff", 3, 0, 3.2); disc("#1a6ad8", 3, 0, 1.8);
+        poly("#c8501a", null, [[-8, -7], [-3, -7], [-9, -13]]); poly("#c8501a", null, [[-8, 7], [-3, 7], [-9, 13]]); break;
+      case "drill":                                        // a Yellow Wisp's drill, spinning
+        poly("#ffd23a", "#8a6a00", [[-12, -11], [16, 0], [-12, 11]]);
+        g.strokeStyle = "#c89a0a"; g.lineWidth = 2; for (let k = -6; k <= 8; k += 5) { g.beginPath(); g.moveTo(k, -9 + (k + 12) * 0.38); g.lineTo(k - 4, 9 - (k + 12) * 0.38); g.stroke(); }
+        px("#8a8e9a", -17, -8, 6, 16); px("#c8ccd8", -16, -6, 3, 12); break;
+      case "void":                                         // a Purple Wisp's void: rings closing on a dark heart
+        for (let r = 17; r > 4; r -= 4) { g.strokeStyle = r % 8 ? "#b060f0" : "#6a20b0"; g.lineWidth = 2.5; g.beginPath(); g.arc(0, 0, r, r * 0.3, r * 0.3 + PI * 1.5); g.stroke(); }
+        disc("#1a0a2a", 0, 0, 5); disc("#e8c8ff", -1.5, -1.5, 1.4); break;
+      case "orbs":                                         // three of Orbinaut's spike balls, round and round
+        for (const [x, y] of [[0, -11], [-10, 7], [10, 7]]) { for (let a = 0; a < 8; a++) { const t = a / 8 * PI * 2; px("#c8ccd8", x + Math.cos(t) * 7 - 1, y + Math.sin(t) * 7 - 1, 2, 2); } disc("#2a3a7a", x, y, 5.5); disc("#6a8ad8", x - 2, y - 2, 2); }
+        g.strokeStyle = "rgba(255,255,255,.35)"; g.lineWidth = 1.5; g.beginPath(); g.arc(0, 1, 11, 0, PI * 2); g.stroke(); break;
+      case "spring": spring("#f2c030"); g.fillStyle = "#e8303a"; g.beginPath(); g.moveTo(-18, -2); g.lineTo(-11, -7); g.lineTo(-11, 3); g.closePath(); g.fill(); break;
+      case "ring":                                         // the Giant Ring that takes you to the Special Stage
+        g.strokeStyle = "#7a4a00"; g.lineWidth = 9; g.beginPath(); g.arc(0, 0, 14, 0, PI * 2); g.stroke();
+        g.strokeStyle = "#ffd23a"; g.lineWidth = 6; g.beginPath(); g.arc(0, 0, 14, 0, PI * 2); g.stroke();
+        g.strokeStyle = "#fff6c0"; g.lineWidth = 2; g.beginPath(); g.arc(0, 0, 14, PI * 1.1, PI * 1.6); g.stroke();
+        px("#ffffff", 11, -15, 3, 7); px("#ffffff", 8.5, -12.5, 8, 2); break;
+      case "redspring": spring("#e8303a"); poly("#ffffff", null, [[0, -21], [-7, -14], [7, -14]]); break;
     }
     g.restore();
     if (spin) { g.fillStyle = "rgba(255,255,255,.18)"; g.fillRect(0, 0, 48, 48); }
@@ -10146,9 +10618,9 @@
   /* places: home first by time, then by how far along */
   function gpOrder() {
     const Rr = GPR, p = player, list = [];
-    if (!(GP && GP.watch)) list.push({ id: "you", x: p ? p.x : 0, fin: Rr.myFin });   // (a spectator isn't in the race)
-    for (const v of Rr.rivals) list.push({ id: v.r.id, x: v.x, fin: v.fin });
-    if (GP && GP.online) for (const r of GP.runners) if (r.human && !r.me) { const g = NP.ghosts.get(r.netId); list.push({ id: r.id, x: g ? g.tx : (world ? world.start.x : 0), fin: Rr.seen[r.netId] != null ? Rr.seen[r.netId] : null }); }
+    if (!(GP && GP.watch)) list.push({ id: "you", x: p ? p.x : 0, y: p ? p.y : 0, fin: Rr.myFin });   // (a spectator isn't in the race)
+    for (const v of Rr.rivals) list.push({ id: v.r.id, x: v.x, y: v.y, fin: v.fin });
+    if (GP && GP.online) for (const r of GP.runners) if (r.human && !r.me) { const g = NP.ghosts.get(r.netId); list.push({ id: r.id, x: g ? g.tx : (world ? world.start.x : 0), y: g ? g.ty : 0, fin: Rr.seen[r.netId] != null ? Rr.seen[r.netId] : null }); }
     return list.sort((a, b) => (a.fin == null) - (b.fin == null) || (a.fin != null ? a.fin - b.fin : b.x - a.x));
   }
   const gpPlace = id => Math.max(0, gpOrder().findIndex(o => o.id === id));
@@ -10182,65 +10654,154 @@
   }
   /* a CPU's power: when it makes sense to use it */
   function gpCpuUse(v) {
-    const Rr = GPR, k = v.pow, T = v.powT, ord = gpOrder(), me = ord.findIndex(o => o.id === v.r.id);
-    const ahead = me > 0 ? ord[me - 1] : null, behind = ord[me + 1] || null;
+    const Rr = GPR, k = v.pow, T = v.powT, ord = gpOrder(), me = ord.findIndex(o => o.id === v.r.id), cp = v.q && v.q.p;
+    if (!cp) return;
+    const ahead = me > 0 ? ord[me - 1] : null, behind = ord[me + 1] || null, live = o => o && o.fin == null && o.id !== v.r.id;
+    const near = (r, dy) => ord.some(o => live(o) && Math.abs(o.x - v.x) < r && Math.abs((o.y || 0) - v.y) < (dy || 99));
     let go = false;
-    if (k === "shoes") go = T > 0.6;
-    else if (k === "shield" || k === "star" || k === "chaos") go = T > 0.4 + (v.r.skill || 1) * 0.3;
-    else if (k === "bomb") go = (ahead && ahead.fin == null && ahead.x - v.x < 70 && T > 0.6) || T > 6;
-    else if (k === "monitor") go = (behind && behind.fin == null && v.x - behind.x < 22 && T > 0.8) || T > 5;
-    else if (k === "thunder") go = ord.some(o => o.id !== v.r.id && o.fin == null && Math.abs(o.x - v.x) < 12) && T > 0.5 || T > 6;
+    switch (k) {
+      case "shoes": case "drill": go = T > 0.6 && cp.ground; break;
+      case "star": case "orbs": case "chaos": go = T > 0.4 + (v.r.skill || 1) * 0.3; break;
+      case "shield": go = (live(behind) && v.x - behind.x < 15) || T > 3; break;
+      case "buzz": go = (live(ahead) && ahead.x - v.x < 70 && T > 0.6) || T > 6; break;
+      case "rocket": go = (live(ahead) && ahead.x - v.x < 45 && T > 0.6) || T > 6; break;
+      case "laser": go = (ord.some(o => live(o) && o.x > v.x && o.x - v.x < 35 && Math.abs((o.y || 0) - v.y) < 1.1) && T > 0.5) || T > 7; break;
+      case "monitor": case "spring": go = (live(behind) && v.x - behind.x < 22 && T > 0.8) || T > 5; break;
+      case "quake": go = (near(12, 3) && T > 0.5) || T > 6; break;
+      case "void": go = (near(12, 6) && T > 0.5) || T > 6; break;
+      case "ring": go = (live(ahead) && ahead.x - v.x > 15 && T > 0.5) || T > 4; break;
+      case "redspring": go = cp.ground && T > 0.5 && !solid(tile(Math.floor(cp.x), Math.floor(cp.y) + 3)) && !solid(tile(Math.floor(cp.x), Math.floor(cp.y) + 5)); break;
+    }
     if (go) { v.pow = null; gpUse(v.r.id, k); }
   }
   const gpRunner = id => id === "you" ? null : GPR.rivals.find(v => v.r.id === id);
+  const gpBody = id => id === "you" ? player : ((gpRunner(id) || {}).q || {}).p || null;    // (the runner itself, if it's run here)
   const gpPos = id => { if (id === "you") return { x: player.x, y: player.y + 1 }; const v = gpRunner(id); if (v) return { x: v.x, y: v.y + 1 };
     const g = NP.ghosts && NP.ghosts.get(id); return g ? { x: g.x, y: g.y + 1 } : { x: 0, y: 0 }; };
   /* a power used, by you ("you") or a rival (its id) */
   function gpUse(id, k) {
-    const Rr = GPR, p = player, v = gpRunner(id), mine = id === "you", at = gpPos(id);
+    const Rr = GPR, p = player, v = gpRunner(id), mine = id === "you", at = gpPos(id), me = gpBody(id), host = mine || (v && v.q);
+    const send = msg => { if (mine) gpSend(msg); else if (v && v.q) gpSend(Object.assign({ by: id }, msg)); };   // (to the others online: yours, or the host's CPU's)
     if (mine) hudToast(POWERS[k].say);
+    const ord = () => gpOrder(), ahead = () => { const o = ord(), i = o.findIndex(x => x.id === id); return i > 0 && o[i - 1].fin == null ? o[i - 1] : null; };
     switch (k) {
-      case "shoes": if (mine) { p.speedT = 4.5; SFX.dash(); } else if (v && v.q) v.q.p.speedT = 4.5; break;
-      case "shield": if (mine) { Rr.myShield = true; SFX.set(); } else if (v) v.shield = true; break;
-      case "star": if (mine) { p.star = 7; SFX.star(); } else if (v && v.q) v.q.p.star = 7; break;
-      case "bomb": {
-        const ord = gpOrder(), me = ord.findIndex(o => o.id === id), tgt = me > 0 ? ord[me - 1] : null;
-        const m = new THREE.Mesh(vox(vx => { for (let a = -3; a <= 3; a++) for (let b = -3; b <= 3; b++) for (let c = -3; c <= 3; c++) if (Math.hypot(a, b, c) <= 3.2) vx.set(a, b, c, (a + b) % 3 ? 0x1a1a2a : 0x3a3a4a); vx.box(0, 4, 0, 0, 5, 0, 0xffd23a); }, 0.09), materials().vox);
-        world.group.add(m); m.position.set(at.x + 0.6, at.y, 0.2);
-        Rr.bombs.push({ from: id, to: tgt && tgt.fin == null ? tgt.id : null, x: at.x + 0.6, y: at.y, t: 0, m });
+      case "shoes": if (me) me.speedT = 4.5; if (mine) SFX.dash(); break;
+      case "shield": if (mine) { Rr.myShield = 4.5; SFX.set(); } else if (v) v.shield = 4.5; break;          // (four and a half seconds, or one hit)
+      case "star": if (me) me.star = 7; if (mine) SFX.star(); break;
+      case "drill": if (me) { me.drillT = 2.5; me.speedT = 0; } burst(at.x, at.y - 0.4, [0xffd23a, 0xffffff], 10, 5); SFX.dash(); break;
+      case "redspring": if (me) { me.vy = 24; me.ground = false; me.on = null; me.jumping = false; me.ballistic = false; me.curl = true; if (me.state !== "fly") me.state = "run"; } burst(at.x, at.y - 0.8, [0xe8303a, 0xffffff], 10, 5); SFX.spring(); break;
+      case "buzz": {                                       // Sonic 1's Buzz Bomber: after the one ahead -- or, with nobody ahead, hovering where you left it, for whoever comes
+        const tgt = ahead(), m = gpTrapMesh("buzz");
+        if (tgt) Rr.bombs.push({ kind: "buzz", from: id, to: tgt.id, x: at.x + 0.6, y: at.y, t: 0, m });
+        else gpTrap("buzz", id, at.x - 1.8, at.y + 0.3, m, send);
         SFX.homing ? SFX.homing() : SFX.dash(); break;
       }
-      case "monitor": {
-        const m = new THREE.Mesh(vox(vx => { vx.box(-5, 0, -4, 5, 11, 4, 0xc8ccd8); vx.box(-4, 3, 5, 4, 9, 5, 0x2a3a6a); vx.box(-2, 4, 6, 2, 8, 6, 0xffc890); vx.box(-3, 4, 6, 3, 4, 6, 0xd8762a); vx.set(-1, 7, 7, 0x1a1a1a); vx.set(1, 7, 7, 0x1a1a1a); vx.box(-2, 8, 6, 2, 8, 6, 0xd8302a); }, 0.08), materials().vox);
-        let gy = at.y - 1; for (let j = Math.floor(gy) + 1; j >= 0; j--) if (solid(tile(Math.floor(at.x - 1.6), j)) || tile(Math.floor(at.x - 1.6), j) === "-") { gy = j + 1; break; }
-        world.group.add(m); m.position.set(at.x - 1.6, gy, 0.1);
-        const tid = (mine ? (NP.me || "me") : id) + ":" + (++Rr.tid);
-        Rr.traps.push({ from: id, x: at.x - 1.6, y: gy, m, t: 0, life: 40, tid });
-        if (mine) gpSend({ k: "trap", x: at.x - 1.6, y: gy, tid }); else if (v && v.q) gpSend({ k: "trap", by: id, x: at.x - 1.6, y: gy, tid });   // (online, the host's CPU's: on everyone's course)
-        SFX.pop(); break;
+      case "monitor": case "spring": {                     // left on the ground behind you: a fake monitor, or a spring that throws back whoever runs into it
+        const x = at.x - 1.6; let gy = at.y - 1; for (let j = Math.floor(gy) + 1; j >= 0; j--) if (solid(tile(Math.floor(x), j)) || tile(Math.floor(x), j) === "-") { gy = j + 1; break; }
+        gpTrap(k, id, x, gy, gpTrapMesh(k), send); SFX.pop(); break;
       }
-      case "thunder": {
-        burst(at.x, at.y, [0xffe060, 0xffffff, 0x9ad8ff], 26, 9); flash(at.x, at.y, 7, 0xffe060); SFX.impact();
-        for (const o of gpOrder()) if (o.id !== id && o.fin == null && (gpRunner(o.id) || o.id === "you")) { const q = gpPos(o.id); if (Math.abs(q.x - at.x) < 13 && Math.abs(q.y - at.y) < 8) gpHit(o.id, id); }
-        if (mine) gpSend({ k: "thunder", x: at.x, y: at.y }); else if (v && v.q) gpSend({ k: "thunder", by: id, x: at.x, y: at.y });
-        break;
+      case "quake": {                                      // the ground shakes out both ways: everyone standing on it near you goes down (in the air, you're safe)
+        for (let d = -14; d <= 14; d += 2) burst(at.x + d, at.y - 0.9, [0xd8d0c0, 0x8a8a96, 0xffffff], 2, 4);
+        if (mine) shakeCam(0.3); SFX.impact(); SFX.boom();
+        for (const o of ord()) if (o.id !== id && o.fin == null) {
+          const b = gpBody(o.id), q = gpPos(o.id), card = !b && gpRunner(o.id);            // (the host's CPU, on a guest's screen: the host's game decides; near enough, it's told)
+          if ((b ? b.ground : card) && Math.abs(q.x - at.x) < 15 && Math.abs(q.y - at.y) < 3) gpHit(o.id, id);
+        }
+        send({ k: "quake", x: at.x, y: at.y }); break;
       }
       case "chaos": {
-        Rr.freeze = 2.0; Rr.freezeBy = id; caption("Chaos Control!"); SFX.star();
-        if (mine) gpSend({ k: "chaos" }); else if (v && v.q) gpSend({ k: "chaos", by: id });
+        Rr.freeze = 3.5; Rr.freezeBy = id; caption("Chaos Control!"); SFX.star();
+        send({ k: "chaos" });
         if (!mine) hudToast(castOf(v.who).name + ": Chaos Control!");
+        break;
+      }
+      case "laser": {                                      // a Cyan Wisp's beam, straight ahead at your height, till a wall stops it: everyone in it goes down
+        const y = at.y - 0.4; let x1 = at.x + 40;
+        for (let i = Math.floor(at.x + 0.6); i < at.x + 40; i++) if (solid(tile(i, Math.floor(y)))) { x1 = i; break; }
+        gpBeam(at.x + 0.4, x1, y);
+        for (const o of ord()) if (o.id !== id && o.fin == null) { const q = gpPos(o.id); if (q.x > at.x + 0.3 && q.x < x1 && Math.abs(q.y - 0.4 - y) < 1.0) gpHit(o.id, id); }
+        send({ k: "laser", x: at.x, x1, y }); SFX.charge ? SFX.charge(0.3) : SFX.dash(); break;
+      }
+      case "rocket": {                                     // an Orange Wisp's rocket, along the road ahead: the first one it meets goes down
+        const m = new THREE.Mesh(vox(vx => { vx.box(-6, -2, -2, 4, 2, 2, 0xff8a2a); vx.box(5, -1, -1, 7, 1, 1, 0xffd23a); vx.box(-7, -3, -1, -5, 3, 1, 0xc8501a); vx.set(2, 0, 3, 0xffffff); }, 0.09), materials().vox);
+        world.group.add(m);
+        Rr.rockets.push({ from: id, x: at.x + 0.8, y: at.y - 0.6, t: 0, m });
+        SFX.dash(); break;
+      }
+      case "void": {                                       // a Purple Wisp's void opens: everyone near is pulled back toward it, and slowed
+        gpVoidFx(at.x, at.y - 0.4);
+        for (const o of ord()) if (o.id !== id && o.fin == null) {
+          const q = gpPos(o.id), b = gpBody(o.id); if (Math.abs(q.x - at.x) >= 14 || Math.abs(q.y - at.y) >= 6) continue;
+          if (b) { b.slowT = 3; moveX(b, -sgn(q.x - at.x) * 1.5); }
+          else if (gpRunner(o.id) && GP && GP.online) gpSend({ k: "cpuSlow", id: o.id, x: at.x });      // (the host's CPU: the host slows it)
+        }
+        send({ k: "void", x: at.x, y: at.y }); SFX.boom(); break;
+      }
+      case "orbs": {                                       // three of Orbinaut's spike balls, round you ten seconds: whoever touches one goes down
+        const o = { n: 3, t: 10, a: 0, ms: [0, 1, 2].map(() => gpTrapMesh("orb")) };
+        if (mine) Rr.myOrbs = o; else if (v) v.orbs = o;
+        SFX.set(); break;
+      }
+      case "ring": {                                       // the Giant Ring: through it, and out again just behind the one ahead
+        const tgt = ahead();
+        burst(at.x, at.y, [0xffd23a, 0xffffff], 18, 6); flash(at.x, at.y, 3, 0xffe060); SFX.ring();
+        if (tgt && me) {
+          const q = gpPos(tgt.id); let x = q.x - 2.5, y = q.y - 1;
+          if (solid(tile(Math.floor(x), Math.floor(y + 0.5)))) x = q.x;
+          me.x = x; me.y = y + 0.05; me.vy = Math.max(me.vy, 2); me.ground = false; me.on = null;
+          if (mine) snapCamera();
+          burst(x, y + 1, [0xffd23a, 0xffffff], 18, 6); flash(x, y + 1, 3, 0xffe060);
+        }
         break;
       }
     }
   }
-  /* a runner hit (a bomb, a fake monitor, the thunder, someone invincible): down a moment; a
-     shield takes it instead; invincible, nothing */
+  /* a trap left on the course (and, online, on everyone's) */
+  function gpTrap(kind, from, x, y, m, send) {
+    const Rr = GPR, tid = (from === "you" ? (NP.me || "me") : from) + ":" + (++Rr.tid);
+    m.position.set(x, y, 0.1);
+    Rr.traps.push({ kind, from, x, y, m, t: 0, life: 40, tid });
+    if (send) send({ k: "trap", kind, x, y, tid });
+  }
+  function gpTrapMesh(kind) {
+    let m;
+    if (kind === "monitor") m = new THREE.Mesh(vox(vx => { vx.box(-5, 0, -4, 5, 11, 4, 0xc8ccd8); vx.box(-4, 3, 5, 4, 9, 5, 0x2a3a6a); vx.box(-2, 4, 6, 2, 8, 6, 0xffc890); vx.box(-3, 4, 6, 3, 4, 6, 0xd8762a); vx.set(-1, 7, 7, 0x1a1a1a); vx.set(1, 7, 7, 0x1a1a1a); vx.box(-2, 8, 6, 2, 8, 6, 0xd8302a); }, 0.08), materials().vox);
+    else if (kind === "spring") { m = new THREE.Group(); const part = n => { const q = new THREE.Mesh(propGeo(n), materials().vox); m.add(q); return q; }; part("springBase"); const coil = part("springCoil"), cap = part("springCap"); m.userData.sp = { coil, cap, sq: 0 }; springPose(m.userData.sp); }
+    else if ((kind === "buzz" || kind === "orb") && BADS && BADS.f[kind === "buzz" ? "buzzbomber" : "orbinaut"]) { m = badCard(); m.castShadow = false; }
+    else m = new THREE.Mesh(vox(vx => { for (let a = -3; a <= 3; a++) for (let b = -3; b <= 3; b++) for (let c = -3; c <= 3; c++) if (Math.hypot(a, b, c) <= 3.2) vx.set(a, b, c, kind === "orb" ? 0x2a3a7a : 0x1a1a2a); }, 0.09), materials().vox);
+    world.group.add(m);
+    return m;
+  }
+  /* a beam, for a moment */
+  function gpBeam(x0, x1, y) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.5, x1 - x0), 0.35, 0.35), new THREE.MeshBasicMaterial({ color: 0x9af4ff, transparent: true, opacity: 0.85, depthWrite: false }));
+    m.position.set((x0 + x1) / 2, y, 0.4); m.renderOrder = 5; world.group.add(m);
+    GPR.beams.push({ m, t: 0 });
+    for (let x = x0; x < x1; x += 3) burst(x, y, [0xffffff, 0x9af4ff], 1, 2);
+  }
+  function gpVoidFx(x, y) {
+    const ms = [0, 1, 2].map(k => { const m = new THREE.Mesh(new THREE.TorusGeometry(1.4 + k * 0.9, 0.12, 6, 20), new THREE.MeshBasicMaterial({ color: k % 2 ? 0x6a20b0 : 0xb060f0, transparent: true, opacity: 0.7, depthWrite: false })); m.position.set(x, y, 0.4); m.renderOrder = 5; world.group.add(m); return m; });
+    GPR.voids.push({ ms, t: 0 });
+  }
+  /* thrown back the way they came, by a spring left in the road */
+  function gpBounce(id) {
+    const Rr = GPR;
+    if (id === "you") { if (player.star > 0 || Rr.myFin != null || (GP && GP.watch)) return; bounceBack(player); return; }
+    const v = gpRunner(id);
+    if (!v) { if (GP && GP.online) gpSend({ k: "bounce", to: id }); return; }
+    if (!v.q) { if (GP && GP.online) gpSend({ k: "cpuBounce", id }); return; }
+    if (v.q.p.star <= 0) bounceBack(v.q.p);
+  }
+  function bounceBack(b) { b.vx = -(sgn(b.vx) || 1) * Math.max(9, Math.abs(b.vx) * 0.8); b.vy = 13; b.ground = false; b.on = null; b.state = "run"; b.ballistic = true; b.curl = true; b.jumping = false; b.mv = null; b.sp = null; const k = cpuNow; cpuNow = b.cpuQ || null; SFX.spring(); cpuNow = k; }
+  /* a runner hit (a Buzz Bomber, a fake monitor, the quake, a laser, a rocket, an orb, someone
+     invincible): down a moment; a shield takes it instead; invincible (or drilling), nothing */
   function gpHit(id, by, k) {
     const Rr = GPR;
     if (id === "you") {
       const p = player;
       if (p.star > 0 || Rr.myFin != null || (GP && GP.watch)) return;
-      if (Rr.myShield) { Rr.myShield = false; burst(p.x, p.y + p.hh / 2, [0x6ac8ff, 0xffffff], 14, 5); SFX.pop(); return; }
+      if (p.drillT > 0) return;
+      if (Rr.myShield) { Rr.myShield = 0; burst(p.x, p.y + p.hh / 2, [0x6ac8ff, 0xffffff], 14, 5); SFX.pop(); return; }
       p.vx = 0; p.vy = 6; p.ground = false; p.state = "hurt"; p.st = 0.55; p.curl = false; p.mv = null; p.sp = null; p.inv = 1.2;
       Rr.spin = 0.9; SFX.hurt(); flashHud(); burst(p.x, p.y + 1, [0xffffff, 0xf2d040], 10, 5);
       if (p.carrots > 0) scatterRings(p);
@@ -10259,41 +10820,83 @@
       return;
     }
     const q = v.q, cp = q.p;
-    if (cp.star > 0 || cp.dead) return;
-    if (v.shield) { v.shield = false; burst(v.x, v.y + 1, [0x6ac8ff, 0xffffff], 12, 5); return; }
+    if (cp.star > 0 || cp.dead || cp.drillT > 0) return;
+    if (v.shield) { v.shield = 0; burst(v.x, v.y + 1, [0x6ac8ff, 0xffffff], 12, 5); return; }
     /* down, as you go down: thrown up, its rings flying out (for anyone to catch) */
     cp.vx = 0; cp.vy = 6; cp.ground = false; cp.state = "hurt"; cp.st = 0.55 * (k || 1) + 0.25; cp.curl = false; cp.mv = null; cp.sp = null; cp.inv = 1.2;
     burst(cp.x, cp.y + 1, [0xffffff, 0xf2d040], 10, 5);
     cpuNow = q; SFX.hurt(); if (cp.carrots > 0) scatterRings(cp); cpuNow = null;
     if (by === "you") hudToast(castOf(v.who).name + " goes down!");
   }
-  /* bombs flying, fake monitors lying in wait */
+  /* what's flying (Buzz Bombers, rockets, beams, voids) and what's lying in wait (fake monitors,
+     springs, Buzz Bombers hovering), the shields running down and the orbs going round */
   function gpStepShots(dt) {
-    const Rr = GPR, p = player;
-    for (const b of Rr.bombs) {
+    const Rr = GPR, p = player, w = world;
+    const runners = () => { const l = []; if (!(GP && GP.watch) && Rr.myFin == null) l.push({ id: "you", x: p.x, y: p.y }); for (const v of Rr.rivals) if (v.fin == null) l.push({ id: v.r.id, x: v.x, y: v.y, cpu: !!v.q }); if (GP && GP.online) for (const r of GP.runners) if (r.human && !r.me) { const g = NP.ghosts.get(r.netId); if (g && !g.fin) l.push({ id: r.id, x: g.x, y: g.y, ghost: true }); } return l; };
+    Rr.myShield = Math.max(0, (Rr.myShield || 0) - dt);
+    for (const v of Rr.rivals) if (v.q) v.shield = Math.max(0, (v.shield || 0) - dt);
+    for (const b of Rr.bombs) {                            // Buzz Bombers, after their mark
       if (b.gone) continue;
       b.t += dt;
       const tgt = b.to ? gpPos(b.to) : { x: b.x + 30, y: b.y };
-      const dx = tgt.x - b.x, dy = tgt.y - b.y, d = Math.hypot(dx, dy) || 1, sp = 26;
+      const dx = tgt.x - b.x, dy = tgt.y - b.y, d = Math.hypot(dx, dy) || 1, sp = 24;
       b.x += dx / d * sp * dt; b.y += dy / d * sp * dt;
-      b.m.position.set(b.x, b.y, 0.2); b.m.rotation.z += dt * 8;
-      if (Math.random() < 0.6) burst(b.x - dx / d * 0.4, b.y, [0xffd23a, 0xff8a2a], 1, 1);
-      if ((b.to && d < 0.9) || b.t > 4) {
-        b.gone = true; world.group.remove(b.m); burst(b.x, b.y, [0xff8a2a, 0xffd23a, 0x3a3a3a], 22, 7); SFX.impact();
+      if (b.m.userData.bad) setBad(b.m, "buzzbomber", "fly", Math.floor(b.t * 14), dx < 0 ? -1 : 1, b.x, b.y - 0.4);
+      else b.m.position.set(b.x, b.y, 0.2);
+      if ((b.to && d < 0.9) || b.t > 5) {
+        b.gone = true; world.group.remove(b.m); burst(b.x, b.y, [0xff8a2a, 0xffd23a, 0x3a3a3a], 20, 7); SFX.impact();
         if (b.to && d < 0.9) gpHit(b.to, b.from);
       }
     }
     Rr.bombs = Rr.bombs.filter(b => !b.gone);
+    for (const r of Rr.rockets) {                          // rockets, along the ground ahead
+      if (r.gone) continue;
+      r.t += dt;
+      const nx = r.x + 30 * dt, f = mechFloor(w, nx, r.y + 1.6);
+      if (f > r.y + 1.4 || r.t > 4) r.gone = true;        // (a wall: it goes off there)
+      else { r.x = nx; r.y = f > r.y - 3 ? lerp(r.y, f + 0.35, Math.min(1, dt * 12)) : r.y; }
+      if (!r.gone) for (const o of runners()) if (o.id !== r.from && Math.abs(o.x - r.x) < 0.8 && r.y > o.y - 0.4 && r.y < o.y + 1.4) { gpHit(o.id, r.from); r.gone = true; break; }
+      r.m.position.set(r.x, r.y, 0.3);
+      if (Math.random() < 0.7) burst(r.x - 0.6, r.y, [0xffd23a, 0xff8a2a], 1, 1);
+      if (r.gone) { world.group.remove(r.m); burst(r.x, r.y, [0xff8a2a, 0xffd23a, 0xffffff], 18, 6); SFX.impact(); }
+    }
+    Rr.rockets = Rr.rockets.filter(r => !r.gone);
+    for (const b of Rr.beams) { b.t += dt; b.m.material.opacity = Math.max(0, 0.85 - b.t * 3); b.m.scale.y = b.m.scale.z = 1 + b.t * 2; if (b.t > 0.3) { world.group.remove(b.m); b.gone = true; } }
+    Rr.beams = Rr.beams.filter(b => !b.gone);
+    for (const vd of Rr.voids) { vd.t += dt; vd.ms.forEach((m, k) => { const s2 = Math.max(0.05, 1 - vd.t * 1.2); m.scale.set(s2, s2, 1); m.rotation.z = vd.t * (6 + k * 3) * (k % 2 ? -1 : 1); }); if (vd.t > 0.8) { vd.ms.forEach(m => world.group.remove(m)); vd.gone = true; } }
+    Rr.voids = Rr.voids.filter(v => !v.gone);
+    /* the orbs, round whoever has them: each one that touches someone takes them down, and goes */
+    const orbOf = [];
+    if (Rr.myOrbs) orbOf.push(["you", Rr.myOrbs, p.x, p.y, () => { Rr.myOrbs = null; }]);
+    for (const v of Rr.rivals) if (v.orbs) orbOf.push([v.r.id, v.orbs, v.x, v.y, () => { v.orbs = null; }]);
+    for (const [id, o, x, y, done] of orbOf) {
+      o.t -= dt; o.a += dt * 5;
+      o.ms.forEach((m, k) => {
+        m.visible = k < o.n;
+        const a = o.a + k * PI * 2 / 3, ox = x + Math.cos(a) * 1.05, oy = y + 0.6 + Math.sin(a) * 1.05;
+        if (m.userData.bad) setBad(m, "orbinaut", "shot", 0, 1, ox, oy - 0.21, 0.8); else m.position.set(ox, oy, 0.3);
+        if (k < o.n) for (const r of runners()) if (r.id !== id && Math.abs(r.x - ox) < 0.6 && oy > r.y - 0.2 && oy < r.y + 1.3 && !(o.cd > 0)) { gpHit(r.id, id); o.n--; o.cd = 0.25; break; }
+      });
+      o.cd = Math.max(0, (o.cd || 0) - dt);
+      if (o.t <= 0 || o.n <= 0) { o.ms.forEach(m => world.group.remove(m)); done(); }
+    }
+    /* what's lying in wait */
     for (const tp of Rr.traps) {
       if (tp.gone) continue;
       tp.t += dt; tp.life -= dt;
       if (tp.life <= 0) { tp.gone = true; world.group.remove(tp.m); continue; }
-      const armed = tp.t > 0.6;
+      if (tp.kind === "buzz" && tp.m.userData.bad) setBad(tp.m, "buzzbomber", "fly", Math.floor(tp.t * 14), -1, tp.x, tp.y - 0.4 + Math.sin(tp.t * 3) * 0.15);
+      if (tp.kind === "spring" && tp.m.userData.sp) { const sp = tp.m.userData.sp; sp.sq = Math.max(0, sp.sq - dt * 2.6); springPose(sp); }
+      const armed = tp.t > 0.6, reach = tp.kind === "buzz" ? 1.0 : 0.8;
       const hitBy = [];
-      if (armed && Math.abs(p.x - tp.x) < 0.8 && Math.abs(p.y - tp.y) < 1.4 && Rr.myFin == null && !(GP && GP.watch)) hitBy.push("you");
-      for (const v of Rr.rivals) if (armed && v.q && v.fin == null && Math.abs(v.x - tp.x) < 0.8 && Math.abs(v.y - tp.y) < 1.4 && Rr.rnd() < 0.85) hitBy.push(v.r.id);
+      if (armed && Math.abs(p.x - tp.x) < reach && p.y > tp.y - 1.4 && p.y < tp.y + 1.2 && Rr.myFin == null && !(GP && GP.watch)) hitBy.push("you");
+      for (const v of Rr.rivals) if (armed && v.q && v.fin == null && Math.abs(v.x - tp.x) < reach && v.y > tp.y - 1.4 && v.y < tp.y + 1.2 && Rr.rnd() < 0.85) hitBy.push(v.r.id);
+      if (!hitBy.length) continue;
       /* (set off by you, or by the host's CPU: gone for everyone) */
-      if (hitBy.length) { if (tp.tid && (hitBy.includes("you") || (GP && GP.online && NP.host))) gpSend({ k: "trapGone", tid: tp.tid }); tp.gone = true; world.group.remove(tp.m); burst(tp.x, tp.y + 0.5, [0xff8a2a, 0xffd23a, 0xc8ccd8], 18, 6); SFX.impact(); hitBy.forEach(id => gpHit(id, tp.from)); }
+      if (tp.tid && (hitBy.includes("you") || (GP && GP.online && NP.host))) gpSend({ k: "trapGone", tid: tp.tid });
+      tp.gone = true; world.group.remove(tp.m);
+      if (tp.kind === "spring") { hitBy.forEach(id => gpBounce(id)); burst(tp.x, tp.y + 0.5, [0xf2c030, 0xffffff], 10, 5); }
+      else { burst(tp.x, tp.y + 0.5, [0xff8a2a, 0xffd23a, 0xc8ccd8], 18, 6); SFX.impact(); hitBy.forEach(id => gpHit(id, tp.from)); }
     }
     Rr.traps = Rr.traps.filter(tp => !tp.gone);
   }
@@ -10399,7 +11002,11 @@
     host.classList.remove("gp-frozen");
     const h = host.querySelector(".gp-hud"); if (h) h.remove();
     const pb = host.querySelector(".gp-pwrap"); if (pb) pb.remove();
-    if (Rr && world) { for (const v of Rr.rivals) { if (v.card) world.group.remove(v.card); world.group.remove(v.bub); } }
+    if (Rr && world) {
+      for (const v of Rr.rivals) { if (v.card) world.group.remove(v.card); world.group.remove(v.bub); if (v.orbs) v.orbs.ms.forEach(m => world.group.remove(m)); }
+      for (const l of [Rr.bombs, Rr.traps, Rr.rockets]) for (const b of l) if (b.m) world.group.remove(b.m);
+      if (Rr.myOrbs) Rr.myOrbs.ms.forEach(m => world.group.remove(m));
+    }
     cpuClear();
   }
   /* the award ceremony: the top three on the podium; a trophy for you if you're there */
@@ -10469,20 +11076,21 @@
     msg = Object.assign({ t: "np.pw", by: NP.me }, msg);
     if (NP.host) Online.toAll(msg, true); else Online.toHost(msg);
   }
-  /* a power from another player, here */
+  /* a power from another player (or the host's CPU), here */
   function gpNetPw(d) {
     const Rr = GPR; if (!Rr || !GP || d.by === NP.me) return;
-    const p = player;
+    const p = player, near = (r, dy) => p && Math.abs(p.x - d.x) < r && Math.abs(p.y + 1 - d.y) < dy;
     switch (d.k) {
       case "hit": if (d.to === NP.me) gpHit("you", d.by); break;
+      case "bounce": if (d.to === NP.me) gpBounce("you"); break;
       case "cpuHit": { const v = gpRunner(d.id); if (v && v.q) gpHit(d.id, d.by, +d.kk || 1); break; }   // (a player's hit on the host's CPU: the host's game takes it)
-      case "thunder": if (p && Math.abs(p.x - d.x) < 13 && Math.abs(p.y + 1 - d.y) < 8) gpHit("you", d.by); burst(d.x, d.y, [0xffe060, 0xffffff], 14, 7); break;
-      case "chaos": Rr.freeze = 2.0; Rr.freezeBy = d.by; caption("Chaos Control!"); SFX.star(); break;
-      case "trap": {
-        const m = new THREE.Mesh(vox(vx => { vx.box(-5, 0, -4, 5, 11, 4, 0xc8ccd8); vx.box(-4, 3, 5, 4, 9, 5, 0x2a3a6a); vx.box(-2, 4, 6, 2, 8, 6, 0xffc890); vx.box(-3, 4, 6, 3, 4, 6, 0xd8762a); vx.set(-1, 7, 7, 0x1a1a1a); vx.set(1, 7, 7, 0x1a1a1a); vx.box(-2, 8, 6, 2, 8, 6, 0xd8302a); }, 0.08), materials().vox);
-        world.group.add(m); m.position.set(d.x, d.y, 0.1);
-        Rr.traps.push({ from: d.by, x: d.x, y: d.y, m, t: 0, life: 40, tid: d.tid }); break;
-      }
+      case "cpuBounce": { const v = gpRunner(d.id); if (v && v.q) gpBounce(d.id); break; }
+      case "cpuSlow": { const v = gpRunner(d.id); if (v && v.q) { v.q.p.slowT = 3; moveX(v.q.p, -sgn(v.q.p.x - d.x) * 1.5); } break; }
+      case "quake": if (p && p.ground && near(15, 3)) gpHit("you", d.by); for (let k = -14; k <= 14; k += 3) burst(d.x + k, d.y - 0.9, [0xd8d0c0, 0x8a8a96], 2, 4); break;
+      case "laser": gpBeam(d.x + 0.4, d.x1, d.y); if (p && p.x > d.x + 0.3 && p.x < d.x1 && Math.abs(p.y + 0.6 - d.y) < 1.0) gpHit("you", d.by); break;
+      case "void": gpVoidFx(d.x, d.y - 0.4); if (near(14, 6)) { p.slowT = 3; moveX(p, -sgn(p.x - d.x) * 1.5); } break;
+      case "chaos": Rr.freeze = 3.5; Rr.freezeBy = d.by; caption("Chaos Control!"); SFX.star(); break;
+      case "trap": { const kind = d.kind || "monitor", m = gpTrapMesh(kind); m.position.set(d.x, d.y, 0.1); Rr.traps.push({ kind, from: d.by, x: d.x, y: d.y, m, t: 0, life: 40, tid: d.tid }); break; }
       case "trapGone": { const tp = Rr.traps.find(q => q.tid === d.tid); if (tp && !tp.gone) { tp.gone = true; world.group.remove(tp.m); burst(tp.x, tp.y + 0.5, [0xff8a2a, 0xffd23a], 12, 5); } break; }
     }
   }
@@ -11995,7 +12603,7 @@
                 const near = o => Math.abs((o.x != null ? o.x : o.x0) - x) < r && Math.abs((o.y != null ? o.y : o.y0) - y) < 6;
                 const out = { rows, hz: w.hazards.filter(near).map(z => [z.t || "hz", z.x0, z.x1, z.y0, z.y1]), en: w.enemies.filter(near).map(e => [e.key, e.x, e.y]), ents: w.ents.filter(near).map(e => [e.t, e.x, e.y]), sol: w.solids.filter(near).map(b => [b.t, b.x0, b.y0]) };
                 disposeWorld(); world = null; return out; },
-              botStats: (where, who, skill) => { const def = typeof where === "number" ? raceDef(where) : /^a\d+$/.test(where) ? actDef(+where.slice(1), 0) : gpDef(where); const r = simRun(def, who, 1000, skill); return { trace: r.trace, ok: r.ok, time: +r.time.toFixed(1), ideal: +r.st.ideal.toFixed(1), hurt: r.st.hurt, bump: r.st.bump, stumble: r.st.stumble, water: +r.st.water.toFixed(1), endX: Math.round(r.st.endX), dist: Math.round(r.st.dist), ev: r.st.ev }; },
+              botStats: (where, who, skill) => { const def = typeof where === "number" ? raceDef(where) : /^[ab]\d+$/.test(where) ? actDef(+where.slice(1), where[0] === "b" ? 1 : 0) : /^s\d+$/.test(where) ? storyStages()[+where.slice(1)] : gpDef(where); const r = simRun(def, who, 1000, skill); return { trace: r.trace, ok: r.ok, time: +r.time.toFixed(1), ideal: +r.st.ideal.toFixed(1), hurt: r.st.hurt, rides: r.st.rides || 0, bump: r.st.bump, stumble: r.st.stumble, water: +r.st.water.toFixed(1), endX: Math.round(r.st.endX), dist: Math.round(r.st.dist), ev: r.st.ev }; },
               raceStart: o => raceStart(o), get race() { return RACE; }, actDef: (i, a) => actDef(i, a), storyStages: () => storyStages(),
               get tut() { return TUT; }, tutorialStart, trainingMenu, tutLessons: () => tutLessons().map(l => l.id),
               tutJump: id => { if (!TUT) return; TUT.i = LESSONS.findIndex(l => l.id === id) - 1; TUT.ok = null; tutNext(); },
