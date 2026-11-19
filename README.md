@@ -244,10 +244,13 @@ off its side, flight, a double jump, and Knuckles a glide onto its wall and the 
 whole field along the course on a strip, and the power box.
 
 **The Chao Garden** (main menu) is a mode of its own: a voxel garden where Chao and animals live,
-and you keep them. The first visit makes your keeper -- an original person, made the way Post
-Parade makes its trainers: build, height, skin, eyes, hair, clothes, hat and an extra, each a row
-of words or colours, the figure turning beside them as you pick (up and down between rows, left
-and right through each). Hazel, the garden's warden, meets you at the Garden Hall with two Chao
+and you keep them. Everything in it is drawn the way Post Parade draws its own: hand-placed blocks on a
+sixteenth-of-a-metre grain (the ground on a quarter metre, as Post Parade's lobby is built),
+faces a few pixels each -- eyes with a lid and a glint, a blush, a two-voxel mouth -- flat
+colours shaded by pattern, corners cut off boxes for the round. The first visit makes your
+keeper, who is Post Parade's own trainer figure: man or woman, skin, a cut and its colour, eyes,
+attire and its colour, bottoms and glasses, each a row of words or swatches, the figure turning
+beside them as you pick (up and down between rows, left and right through each). Hazel, the garden's warden, meets you at the Garden Hall with two Chao
 eggs and a Flicky's. The Central Garden is half-metre voxels: the hall and its plaza with the
 fountain, the orchard of fruit trees, the flower meadow, the pond under the waterfall cliff
 (stepping stones to the palm island), a ramp up the cliff, and gates round the rim to the other
@@ -290,8 +293,33 @@ card shows it all: its picture, care, bond and leaning, temperaments, the seven 
 far. The encyclopedias (the lectern by the hall, or the menu) list every form and species, found
 or not. The garden plays Sonic Adventure 2 Battle's own Chao Garden music, looped where the game
 loops it; an egg hatching, a Chao changing, their jingles. Its save is its own, beside the
-account's (`<account save>.chao`). Breeding, battles, the other gardens, races and training,
-the shop and quests come in the stages after this one.
+account's (`<account save>.chao`).
+
+**Breeding.** Close friends, grown and content, fall in love as they spend time together (Heart
+Fruit hurries it); two in love dance, and an egg comes between them. The Society's pens at the
+Garden Hall pair two grown creatures (a Chao with a Chao, an animal with its own kind, fond of
+each other, a day since their last egg) and show what the egg will be, each aptitude's range
+from its parents, the quirks that might come down, and a hint when the two carry something hidden
+between them, as the FF7 ranch's rancher does; a pair that keeps missing a rare form gets closer
+to it. A child takes its aptitudes, colouring, temperaments, quirks, techniques and hidden alleles
+from its parents, with variation and mutations, and joins its family line; a card's **Family**
+shows the line, the parents and grandparents, brothers and sisters and children, everyone who
+ever lived kept in the family book.
+
+**Duels** are built the way Pallet to Pewter builds its battles, not as a copy of any other
+game's: real time, on a voxel ring, one, two or three a side. Every creature fights on its own,
+as its temperament and its Instinct tell it -- picking its techniques, circling, closing in or
+keeping off, guarding, covering a friend -- and the fight holds still while you call to them
+(Z): cheer one on, call for a technique, swap who's in front, or launch a team technique when
+the gauge (filled by blows landed together) is full. Velocity sets how soon it acts again,
+Agility its dodging, Power and Chaos its blows and specials, Resilience what they take off it,
+Vitality its health, Instinct its aim, criticals, counters and how well it chooses. Friends side
+by side hit harder and cover each other; the front row takes the blows. Keepers from round about
+visit the hall, a different one each day with their own kinds of team (a forest ranger, a sea
+captain, a Chao researcher, two village children, an old gardener, someone who only comes after
+dark, a coach, a bird-watcher); what each creature did in a fight it gets better at, and fighting
+side by side makes friends. The other gardens, races and training, the shop and quests come in
+the stages after this one.
 
 **Story** is *The Red Star Rings*, told the way Sonic Battle tells its story: one plot, an
 episode for each of the fourteen. Eggman means to set every Red Star Ring in his Star Engine

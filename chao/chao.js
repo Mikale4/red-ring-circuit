@@ -94,7 +94,7 @@
     G.sun.shadow.bias = -0.0008; G.sun.shadow.normalBias = 0.03;
     scene.add(G.sun); scene.add(G.sun.target);
     G.amb = new THREE.AmbientLight(0xffffff, 0.12); scene.add(G.amb);
-    scene.fog = new THREE.Fog(0x9ad0f0, 40, 120);
+    scene.fog = new THREE.Fog(0x9ad0f0, 30, 70);
     scene.background = new THREE.Color(0x9ad0f0);
     /* the stars, for the night */
     const sg = new THREE.BufferGeometry(), sp = [];
@@ -146,7 +146,7 @@
     shadowsOn(G.keeper.rig.g); G.scene.add(G.keeper.rig.g);
     G.cam.userData.yaw = G.keeper.a + PI;
     /* the warden: the garden's own keeper of old, at the hall */
-    G.npc = { rig: G.M.avatar({ build: 1, height: 0, skin: 2, eyes: 2, eyeCol: 3, hair: 8, hairCol: 11, top: 3, topCol: 3, legs: 2, legCol: 2, shoes: 1, shoeCol: 3, hat: 6, hatCol: 0, extra: 3 }), x: P.hall[0] + 3.2, z: P.hall[1] - 5.2, a: PI * 0.9, name: "Hazel" };
+    G.npc = { rig: G.M.avatar({ sex: "f", skin: 2, hair: 6, style: "bun", eyes: 2, attire: "sweater", colour: 3, bottoms: "long", glasses: true, custom: { apron: 0x8a6a3a, hat: { c: 0xd8c08a, band: 0x3a6a3a, sun: true, flower: 0xf05a7a }, shoes: 0x6a4a2a } }), x: P.hall[0] + 3.2, z: P.hall[1] - 5.2, a: PI * 0.9, name: "Hazel" };
     G.npc.y = W.ground(G.npc.x, G.npc.z); place(G.npc); shadowsOn(G.npc.rig.g); G.scene.add(G.npc.rig.g);
     /* everyone who lives here */
     for (const c of [...S.chao, ...S.animals]) spawn(c);
@@ -785,6 +785,7 @@
     const dt = Math.min(0.05, Math.max(0, (now - (G.last || now)) / 1000)); G.last = now;
     resize(); pollPad();
     if (!G.keeper) { G.R.render(G.scene, G.cam); return; }
+    if (G.battle) { G.battle.frame(dt); return; }
     step(dt);
     G.R.render(G.scene, G.cam);
   }
@@ -1059,7 +1060,8 @@
   function hallMenu() {
     music("hall");
     const el = menuOpen(sec("The Garden Hall", "door", `<p class="cg-text">Hazel's hall: the warden's desk, the Society's notices, a kettle always on. Its shop and the breeding pens are being made ready.</p>
-      <div class="cg-mm"><button class="cg-mi" data-f data-focus data-go="pens">${ico("heart")}<b>The Society's pens</b><i>Pair two grown creatures who are fond of each other</i></button>
+      <div class="cg-mm"><button class="cg-mi" data-f data-focus data-go="duel">${ico("trophy")}<b>Today's visitor</b><i>${esc(visitor().name)} is here, and wants a duel</i></button>
+      <button class="cg-mi" data-f data-go="pens">${ico("heart")}<b>The Society's pens</b><i>Pair two grown creatures who are fond of each other</i></button>
       <button class="cg-mi" data-f data-go="rest">${ico("moon")}<b>Rest till morning</b><i>Sleep here; the garden goes on through the night</i></button>
       <button class="cg-mi" data-f data-go="look">${ico("person")}<b>The mirror</b><i>Change how you look</i></button>
       <button class="cg-mi" data-f data-go="save">${ico("check")}<b>Save</b><i>Write the garden down</i></button></div>
@@ -1068,6 +1070,7 @@
     el.querySelectorAll("[data-go]").forEach(b => b.onclick = () => {
       const k = b.dataset.go;
       if (k === "pens") { pens(); return; }
+      if (k === "duel") { duelMenu(); return; }
       if (k === "rest") { const t = tod(), add = (t < 0.27 ? 0.27 - t : 1.27 - t); for (const e of G.ents) { G.L.tick(e.c, add * DAY * 0.25, { dayLen: DAY, asleep: true }); e.c.care.energy = 100; e.task = null; } G.save.day += add; menuClose(); toast("Morning", "sun"); persist(); }
       else if (k === "look") creator(false);
       else if (k === "save") { persist(); menuClose(); toast("Saved", "check"); }
@@ -1121,6 +1124,126 @@
       <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`), () => { menuClose(); card(c, back); }, "cg-wide");
     el.querySelector("[data-back]").onclick = () => { menuClose(); card(c, back); };
     el.querySelectorAll("[data-c]").forEach(bt => bt.onclick = () => { const x = [...G.save.chao, ...G.save.animals].find(y => y.id === bt.dataset.c); if (x && x !== c) card(x, back); });
+  }
+
+  /* ---------------------------------------------------------------- duels
+     Keepers from round about drop by the garden, a different one each day, each with their own
+     kind of team and their own way of fighting; the Garden Hall is where they wait. */
+  const VISITORS = [
+    { id: "juniper", name: "Juniper Vale", what: "a ranger from the woods past the rim", pool: ["an-fox", "an-squirrel", "an-owl", "an-fawn", "an-hedgehog", "an-badger", "an-raccoon"], chao: 0.15,
+      look: { sex: "f", skin: 3, hair: 2, style: "ponytail", eyes: 2, attire: "tracksuit", colour: 3, bottoms: "trousers", glasses: false, custom: { hat: { c: 0x6a8a4a, band: 0x3a5a2a }, shoes: 0x5a3a22 } },
+      hi: "The woods' animals are tougher than they look. Shall we see?", win: "Ha! Well fought. The forest will hear of you.", lose: "My lot won this time. Come back when yours have grown." },
+    { id: "marlow", name: "Captain Marlow Reef", what: "an old sailor who keeps a menagerie aboard", pool: ["an-seal", "an-otter", "an-penguin", "an-crab", "an-seaturtle", "an-pelican", "an-walrus"], chao: 0.2,
+      look: { sex: "m", skin: 3, hair: 6, style: "shaggy", eyes: 1, attire: "sweater", colour: 0, bottoms: "trousers", glasses: false, custom: { hat: { c: 0x2a3150, band: 0xf2efe6 }, shoes: 0x2a2420 } },
+      hi: "Ahoy! My crew could use the exercise.", win: "Shiver me -- you've a fine crew yourself.", lose: "Back to the briny with you! Next time, eh?" },
+    { id: "ada", name: "Professor Ada Quill", what: "a Chao researcher with a notebook full of numbers", pool: ["chao-mech-spark", "chao-neutral-spark", "chao-mech-normal", "chao-hero-spark", "chao-neutral-fly"], chao: 1,
+      look: { sex: "f", skin: 0, hair: 4, style: "bob", eyes: 3, attire: "suit", colour: 7, bottoms: "pleated", glasses: true, custom: { tie: 0x5a8ac8 } },
+      hi: "For science! I'd like to observe your Chao under pressure.", win: "Fascinating. Your upbringing methods are clearly sound.", lose: "As predicted. But the data says yours are improving." },
+    { id: "rowan", name: "Rowan and Fen", what: "two children from the village, very serious about it", pool: ["chao-neutral-child", "chao-hero-child", "chao-dark-child", "an-pocky", "an-flicky", "an-puppy"], chao: 0.6, easy: 0.75,
+      look: { sex: "m", skin: 1, hair: 5, style: "spiky", eyes: 1, attire: "polo", colour: 6, bottoms: "shorts", glasses: false },
+      hi: "We've been practising ALL week. Prepare yourself!", win: "Aww. Okay, you're really good. Can we come again?", lose: "We WON! Fen, we won!" },
+    { id: "tobias", name: "Old Tobias Moss", what: "a gardener who has kept Chao for fifty years", pool: ["chao-neutral-normal", "chao-hero-normal", "chao-wild-normal", "an-tortoise", "an-sheep", "an-goat"], chao: 0.7, hard: 1.1,
+      look: { sex: "m", skin: 2, hair: 6, style: "buzz", eyes: 0, attire: "sweater", colour: 5, bottoms: "trousers", glasses: true, custom: { hat: { c: 0xd8c08a, band: 0x7a2232, sun: true } } },
+      hi: "Slow and steady, young keeper. Let's see what yours are made of.", win: "Heh. You've a gift for this. Treat them well.", lose: "Patience wins more than you'd think." },
+    { id: "sable", name: "Sable Night", what: "who only ever comes after dark, it seems", pool: ["chao-dark-normal", "chao-dark-fly", "chao-dark-power", "an-bat", "an-blackcat", "an-crow", "an-raven"], chao: 0.6, hard: 1.1,
+      look: { sex: "f", skin: 0, hair: 0, style: "long", eyes: 3, attire: "suit", colour: 2, bottoms: "long", glasses: false, custom: { tie: 0x7a2232, legs: 0x1e1e22, shoes: 0x1e1e22 } },
+      hi: "Your garden's very bright. Let's dim it a little.", win: "...Hm. You're stronger than you look.", lose: "The dark always wins in the end." },
+    { id: "brick", name: "Coach Brick Maddox", what: "who runs a training camp in the hills", pool: ["chao-neutral-power", "chao-dark-power", "chao-hero-power", "an-bear", "an-ram", "an-gorilla", "an-kangaroo"], chao: 0.5, hard: 1.15,
+      look: { sex: "m", skin: 3, hair: 1, style: "buzz", eyes: 4, attire: "tracksuit", colour: 4, bottoms: "shorts", glasses: false, custom: { shoes: 0xf2f2f2 } },
+      hi: "Drop and give me twenty! ...Or a duel. A duel's fine.", win: "That's what I like to see! Hustle!", lose: "Again! From the top! Train harder!" },
+    { id: "lark", name: "Lark Featherstone", what: "a bird-watcher who's befriended half the sky", pool: ["an-hawk", "an-parrot", "an-swallow", "an-kingfisher", "an-toucan", "chao-neutral-fly", "chao-hero-fly"], chao: 0.35,
+      look: { sex: "f", skin: 4, hair: 1, style: "pixie", eyes: 2, attire: "polo", colour: 3, bottoms: "jeans", glasses: false, custom: { satchel: true } },
+      hi: "Oh! A garden full of friends. Mine would love to meet yours.", win: "Wonderful! What a lovely fight that was.", lose: "Up, up and away! Better luck next time." },
+  ];
+  const visitor = () => VISITORS[Math.floor(G.save.day) % VISITORS.length];
+  function duelMenu() {
+    const v = visitor(), S = G.save, all = [...S.chao, ...S.animals].filter(c => !G.ents.find(e => e.c === c && e.rig.aquatic));
+    S.duels = S.duels || {};
+    const rec = S.duels[v.id] || { w: 0, l: 0 };
+    const el = menuOpen(sec("Today's visitor", "trophy", `
+      <div class="cg-visit"><canvas class="cg-prev" width="200" height="260"></canvas><div>
+        <h3>${esc(v.name)}</h3><p class="cg-meta">${esc(v.what)}${rec.w + rec.l ? ` &middot; you've won ${rec.w}, lost ${rec.l}` : ""}</p>
+        <p class="cg-say">"${esc(v.hi)}"</p>
+        <div class="cg-mm">${[1, 2, 3].map(n => `<button class="cg-mi" data-f ${n === 1 ? "data-focus" : ""} data-n="${n}" ${all.length < n ? "disabled" : ""}>${ico(n === 1 ? "person" : "heart")}<b>${n} against ${n}</b><i>${n === 1 ? "One of yours, one of theirs" : n === 2 ? "Two a side: friends fight better side by side" : "Three a side, and a team technique for all three"}</i></button>`).join("")}</div>
+      </div></div>
+      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`), () => { menuClose(); hallMenu(); }, "cg-wide");
+    el.querySelector("[data-back]").onclick = () => { menuClose(); hallMenu(); };
+    el.querySelectorAll("[data-n]").forEach(b => b.onclick = () => duelParty(v, +b.dataset.n, []));
+    livePreview(el.querySelector(".cg-prev"), () => G.M.avatar(v.look));
+  }
+  function duelParty(v, n, sel, rows) {
+    const S = G.save, D = G.D, L = G.L, all = [...S.chao, ...S.animals].filter(c => { const e = G.ents.find(x => x.c === c); return !(e && e.rig.aquatic); });
+    rows = rows || {};
+    const party = sel.map(id => all.find(c => c.id === id)).filter(Boolean);
+    const el = menuOpen(sec(`${n} against ${n}: your team`, "heart", `
+      <p class="cg-text">Pick ${n === 1 ? "one" : n === 2 ? "two" : "three"}.${n > 1 ? " Tap a picked one again to set it in front or behind: the front takes the blows, the back is harder to reach." : ""} Friends side by side hit harder, and cover each other.</p>
+      <div class="cg-grid cg-pick">${all.map(c => { const i = sel.indexOf(c.id); return `<button class="cg-crow ${i >= 0 ? "sel" : ""}" data-f data-c="${c.id}"><canvas width="96" height="96" data-thumb="${c.id}"></canvas><span><b>${esc(c.name)}</b><i>${esc(D.species(c.sp).name)}</i><em>${i >= 0 && n > 1 ? (rows[c.id] === "back" ? "Behind" : "In front") : `Lv ${L.lvSum(c)} &middot; ${esc(D.TEMPERS[c.genes.temper[0]].name)}`}</em></span></button>`; }).join("")}</div>
+      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button><button class="btn" data-f data-go ${party.length === n ? "" : "disabled"}>${ico("trophy")}Duel!</button></div>`), () => duelMenu(), "cg-wide");
+    el.querySelector("[data-back]").onclick = () => duelMenu();
+    el.querySelectorAll("[data-c]").forEach(b => b.onclick = () => {
+      const id = b.dataset.c, i = sel.indexOf(id);
+      if (i >= 0 && n > 1 && rows[id] !== "back") { rows[id] = "back"; duelParty(v, n, sel, rows); return; }
+      if (i >= 0) { delete rows[id]; duelParty(v, n, sel.filter(x => x !== id), rows); return; }
+      if (sel.length >= n) return;
+      duelParty(v, n, [...sel, id], rows);
+    });
+    el.querySelector("[data-go]").onclick = () => { if (party.length === n) duel(v, party, rows); };
+    thumbs(el, id => all.find(c => c.id === id));
+  }
+  /* the other side: from the visitor's kinds, grown to about your team's strength */
+  function foeTeam(v, mine) {
+    const L = G.L, D = G.D, n = mine.length, avg = mine.reduce((s, c) => s + L.lvSum(c), 0) / n;
+    const S = G.save, rec = (S.duels && S.duels[v.id]) || { w: 0 };
+    const want = Math.max(7, avg * (v.easy || 1) * (v.hard || 1) * (1 + rec.w * 0.06) * rnd(0.9, 1.08));
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const id = v.pool[Math.floor(Math.random() * v.pool.length)], c = L.make(id, { name: L.NAMES[Math.floor(Math.random() * L.NAMES.length)] });
+      if (c.kind === "animal") c.grown = 1;
+      let guard = 0;
+      while (L.lvSum(c) < want && guard++ < 400) { const a = D.ATTRS[Math.floor(Math.random() * 7)].id; L.train(c, a, 40 + c.genes.apt[a] * 60); }
+      out.push(c);
+    }
+    return out;
+  }
+  function duel(v, party, rows) {
+    menuClose();
+    const foes = foeTeam(v, party);
+    G.hud.style.display = "none"; G.tagBox.style.display = "none";
+    const touch = G.el.querySelector(".cg-touch"); if (touch) touch.dataset.was = touch.className;
+    G.battle = root.ChaoBattle.start({
+      R: G.R, el: G.el, M: G.M, L: G.L, D: G.D, ico, esc, sfx, jingle, music, sec, menuOpen, menuClose, isMenu: () => !!G.menu,
+    }, { mine: party, foes, rows, foeRows: { [foes[2] && foes[2].id]: "back" }, foeKeeper: { name: v.name, look: v.look }, keeperLook: G.save.avatar,
+      title: `${v.name}`, sub: `${party.length} against ${party.length}`, intro: `${v.name}: "${v.hi}"` }, res => duelOver(v, party, foes, res));
+  }
+  function duelOver(v, party, foes, res) {
+    const S = G.save, L = G.L, D = G.D;
+    G.battle = null; G.hud.style.display = ""; G.tagBox.style.display = "";
+    S.duels = S.duels || {}; const rec = S.duels[v.id] = S.duels[v.id] || { w: 0, l: 0 };
+    const won = res.winner === 0;
+    if (won) rec.w++; else rec.l++;
+    const rings = won ? 40 * party.length + 20 * rec.w : res.quit ? 0 : 10;
+    S.rings += rings;
+    const names = foes.map(c => c.name).join(", ");
+    for (const f of res.fighters.filter(x => x.side === 0)) {
+      const c = f.c;
+      /* what it did in the fight, it got better at */
+      for (const id of f.used) { const t = D.tech(id); if (t && t.attr) L.train(c, t.attr, 14); }
+      L.train(c, "vel", 6); L.train(c, "res", Math.min(30, f.taken / 4));
+      c.care.energy = clamp(c.care.energy - 25, 0, 100);
+      c.care.mood = clamp(c.care.mood + (won ? 12 : -8), 0, 100);
+      c.bond = clamp(c.bond + (won ? 2.5 : 1), 0, 100);
+      if (!won && c.genes.temper.includes("competitive")) c.care.mood = clamp(c.care.mood - 6, 0, 100);
+      c.log.push([S.day, won ? `Won a duel against ${v.name}'s ${names}.` : `Lost a duel to ${v.name}'s ${names}.`]);
+      c.wins = (c.wins || 0) + (won ? 1 : 0);
+      G.L.raise(c, won ? "hero" : "dark", 1);
+    }
+    /* fighting side by side makes friends */
+    for (let i = 0; i < party.length; i++) for (let j = i + 1; j < party.length; j++) L.meet(party[i], party[j], "share", won ? 3 : 2);
+    for (const c of party) { const e = G.ents.find(x => x.c === c); if (e) { const t = G.tags.get(e); if (t) t._h = null; } }
+    S.ach.duels = (S.ach.duels || 0) + 1; if (won) S.ach.duelWins = (S.ach.duelWins || 0) + 1;
+    persist();
+    music(gardenTune());
+    talk([[v.name, won ? v.win : v.lose], ["", won ? `You won ${rings} rings.` : rings ? `${rings} rings for trying.` : "No rings for giving up."]]);
   }
 
   /* ---------------------------------------------------------------- the encyclopedias */
@@ -1196,35 +1319,55 @@
   }
 
   /* ---------------------------------------------------------------- the keeper's look
-     Post Parade's way: a row per choice, words or colours, the figure changing as you pick;
-     up and down between rows, left and right through each one's choices. */
+     Post Parade's trainer screen: a man or a woman, skin, a cut and its colour, eyes, what
+     they wear and its colour, bottoms, glasses -- words as a segmented row, colours as
+     swatches, the figure turning beside them as you pick; up and down between rows, left and
+     right through a row's choices. */
   function creator(first) {
-    const M = G.M, A = Object.assign(M.avDefault(), G.save.avatar || {});
-    const rows = M.AVATAR.rows;
-    const rowHtml = r => `<div class="cg-crow2" data-f data-row="${r.id}"><label>${esc(r.name)}</label><div class="cg-seg">${r.words ? r.words.map((w, i) => `<button data-v="${i}" class="${A[r.id] === i ? "sel" : ""}">${esc(w)}</button>`).join("") : r.swatch.map((c, i) => `<button data-v="${i}" class="sw ${A[r.id] === i ? "sel" : ""}" style="background:#${c.toString(16).padStart(6, "0")}"></button>`).join("")}</div></div>`;
+    const M = G.M, O = M.AVATAR.OPTIONS, rows = M.AVATAR.rows;
+    const c = Object.assign(M.avDefault(G.save.avatar && G.save.avatar.sex), G.save.avatar || {});
+    const vals = r => r.sw ? O[r.sw].map((col, i) => [i, col]) : r.seg(c);
+    const rowHtml = r => `<div class="cg-crow2" data-f data-row="${r.key}"><label>${esc(r.label)}</label><div class="cg-seg">${r.sw
+      ? O[r.sw].map((col, i) => `<button data-v="${i}" class="sw" style="background:#${col.toString(16).padStart(6, "0")}"></button>`).join("")
+      : r.seg(c).map(([v, t]) => `<button data-v='${esc(JSON.stringify(v))}'>${esc(t)}</button>`).join("")}</div></div>`;
     const el = menuOpen(`<div class="panel cg-panel cg-creator"><div class="panel-hd gold">${ico("person")}${first ? "Who's the new keeper?" : "The keeper"}</div>
-      <div class="cg-cr-body"><div class="cg-cr-l"><canvas class="cg-prev" width="320" height="420"></canvas><label class="cg-lab">Your name</label><input maxlength="14" value="${esc(A.name || "")}" placeholder="A name" spellcheck="false"></div>
-      <div class="cg-cr-r">${rows.map(rowHtml).join("")}</div></div>
-      <div class="cg-foot">${first ? "" : `<button class="btn ghost" data-f data-back>${ico("back")}Back</button>`}<button class="btn" data-f data-done>${ico("check")}${first ? "Into the garden" : "Done"}</button></div></div>`, first ? () => {} : () => menuClose(), "cg-cardwrap");
-    let rig = null;
+      <div class="cg-cr-body"><div class="cg-cr-l"><canvas class="cg-prev" width="320" height="420"></canvas><label class="cg-lab">Your name</label><input maxlength="14" value="${esc(c.name || "")}" placeholder="A name" spellcheck="false"></div>
+      <div class="cg-cr-r"><p class="cg-text">This is you: the one who walks the garden, and keeps its Chao and animals.</p>${rows.map(rowHtml).join("")}</div></div>
+      <div class="cg-foot">${first ? "" : `<button class="btn ghost" data-f data-back>${ico("back")}Back</button>`}<button class="btn ghost" data-f data-rand>${ico("swap")}Surprise me</button><button class="btn" data-f data-done>${ico("check")}${first ? "Into the garden" : "Done"}</button></div></div>`, first ? () => {} : () => menuClose(), "cg-cardwrap");
     const cv = el.querySelector(".cg-prev");
-    const rebuild = () => { const P = prevR(); PREV.live = PREV.live.filter(i => i.cv !== cv); livePreview(cv, () => (rig = M.avatar(A))); };
-    rebuild();
-    const setRow = (id, v) => { A[id] = v; el.querySelectorAll(`[data-row="${id}"] [data-v]`).forEach(b => b.classList.toggle("sel", +b.dataset.v === v)); rebuild(); };
-    el.querySelectorAll("[data-row]").forEach(r => r.querySelectorAll("[data-v]").forEach(b => b.onclick = ev => { ev.stopPropagation(); setRow(r.dataset.row, +b.dataset.v); }));
-    G.menu.row = (rowEl, dx) => { const r = rows.find(x => x.id === rowEl.dataset.row), n = (r.words || r.swatch).length; setRow(r.id, (A[r.id] + dx + n) % n); };
+    const rebuild = () => { PREV.live = PREV.live.filter(i => i.cv !== cv); livePreview(cv, () => M.avatar(c)); };
+    const valOf = (r, b) => r.sw ? +b.dataset.v : JSON.parse(b.dataset.v);
+    const bind = () => el.querySelectorAll("[data-row]").forEach(rw => { const r = rows.find(x => x.key === rw.dataset.row); rw.querySelectorAll("[data-v]").forEach(b => b.onclick = ev => { ev.stopPropagation(); set(r, valOf(r, b)); }); });
+    const sync = () => {
+      for (const r of rows) {
+        const rw = el.querySelector(`[data-row="${r.key}"]`);
+        if (r.bySex) rw.querySelector(".cg-seg").innerHTML = r.seg(c).map(([v, t]) => `<button data-v='${esc(JSON.stringify(v))}'>${esc(t)}</button>`).join("");
+        rw.querySelectorAll("[data-v]").forEach(b => b.classList.toggle("sel", valOf(r, b) === c[r.key]));
+      }
+      bind(); rebuild();
+    };
+    /* a change of body brings that body's own cuts and bottoms, starting from its usual ones */
+    const set = (r, v) => { if (r.key === "sex" && v !== c.sex) { const d = M.avDefault(v); c.style = d.style; c.bottoms = d.bottoms; } c[r.key] = v; sync(); };
+    G.menu.row = (rowEl, dx) => { const r = rows.find(x => x.key === rowEl.dataset.row), vs = vals(r).map(x => x[0]), i = Math.max(0, vs.findIndex(v => v === c[r.key])); set(r, vs[(i + dx + vs.length) % vs.length]); };
+    el.querySelector("[data-rand]").onclick = () => {
+      const n = k => Math.floor(Math.random() * k), any = a => a[n(a.length)];
+      c.sex = Math.random() < 0.5 ? "m" : "f"; c.skin = n(O.skins.length); c.hair = n(O.hairs.length); c.eyes = n(O.eyes.length);
+      c.style = any(O.styles[c.sex]); c.attire = any(O.attires); c.bottoms = any(O.bottoms[c.sex]); c.colour = n(O.colours.length); c.glasses = Math.random() < 0.25;
+      sync();
+    };
     const inp = el.querySelector("input");
     inp.onkeydown = ev => { ev.stopPropagation(); if (ev.key === "Enter") inp.blur(); };
     if (first) setTimeout(() => inp.focus(), 60);
     const done = () => {
-      A.name = inp.value.trim().slice(0, 14) || "Keeper";
-      G.save.avatar = A; persist();
+      c.name = inp.value.trim().slice(0, 14) || "Keeper";
+      G.save.avatar = c; persist();
       menuClose();
       if (first) arrive();
-      else if (G.keeper) { G.scene.remove(G.keeper.rig.g); G.keeper.rig = M.avatar(A); shadowsOn(G.keeper.rig.g); G.scene.add(G.keeper.rig.g); }
+      else if (G.keeper) { G.scene.remove(G.keeper.rig.g); G.keeper.rig = M.avatar(c); shadowsOn(G.keeper.rig.g); G.scene.add(G.keeper.rig.g); }
     };
     el.querySelector("[data-done]").onclick = done;
     const b = el.querySelector("[data-back]"); if (b) b.onclick = menuClose;
+    sync();
   }
 
   /* ---------------------------------------------------------------- input */
@@ -1246,6 +1389,7 @@
       return;
     }
     if (!G.keeper) return;
+    if (G.battle) { if (G.battle.key(k)) ev.preventDefault(); return; }
     if (k === "KeyZ") actZ(); else if (k === "KeyC") actC(); else if (k === "KeyX") actX(); else if (k === "KeyV") actV();
     else if (k === "Space") { G.jump = true; ev.preventDefault(); }
     else if (k === "Enter" || k === "Escape") mainMenu();
@@ -1271,6 +1415,8 @@
       if (G.talking && (press(0) || press(1))) G.talkNext && G.talkNext();
       else if (G.menu) { if (press(12) || (P.ly < -0.6 && !P.navY)) moveFocus(0, -1); if (press(13) || (P.ly > 0.6 && !P.navY)) moveFocus(0, 1); if (press(14) || (P.lx < -0.6 && !P.navX)) moveFocus(-1, 0); if (press(15) || (P.lx > 0.6 && !P.navX)) moveFocus(1, 0); if (press(0)) { G.kbUsed = true; G.focus && G.focus.isConnected ? (G.focus.dataset.row != null && G.menu.row ? G.menu.row(G.focus, 1) : G.focus.click()) : moveFocus(0, 1); } if (press(1) || press(9)) G.menu.back && G.menu.back(); }
       P.navY = Math.abs(P.ly) > 0.6; P.navX = Math.abs(P.lx) > 0.6;
+    } else if (G.battle) {
+      if (press(0) || press(9)) G.battle.key("KeyZ");
     } else if (G.keeper) {
       if (press(0)) actZ(); if (press(2)) actC(); if (press(1)) actX(); if (press(3)) actV(); if (press(9)) mainMenu();
     }
@@ -1295,7 +1441,7 @@
     st.addEventListener("pointermove", mv);
     const up = ev => { if (ev.pointerId !== sid) return; sid = null; G.touch.x = G.touch.y = 0; G.touch.run = false; knob.style.transform = ""; };
     st.addEventListener("pointerup", up); st.addEventListener("pointercancel", up);
-    box.querySelectorAll("[data-t]").forEach(b => b.addEventListener("pointerdown", ev => { ev.preventDefault(); const t = b.dataset.t; if (G.talking) { G.talkNext && G.talkNext(); return; } if (G.menu) return; if (t === "Z") actZ(); else if (t === "C") actC(); else if (t === "X") actX(); else if (t === "V") actV(); else if (t === "J") G.jump = true; }));
+    box.querySelectorAll("[data-t]").forEach(b => b.addEventListener("pointerdown", ev => { ev.preventDefault(); const t = b.dataset.t; if (G.talking) { G.talkNext && G.talkNext(); return; } if (G.menu) return; if (G.battle) { G.battle.key("KeyZ"); return; } if (t === "Z") actZ(); else if (t === "C") actC(); else if (t === "X") actX(); else if (t === "V") actV(); else if (t === "J") G.jump = true; }));
   }
 
   /* ---------------------------------------------------------------- music
@@ -1345,6 +1491,6 @@
   }
   if (root.Settings && Settings.onChange) Settings.onChange(() => { if (MUS.gain) MUS.gain.gain.value = mvol() * 0.75; });
   /* for tests: run the garden n steps of dt seconds without waiting for frames, then draw */
-  function _step(n, dt) { if (!G || !G.keeper) return; for (let i = 0; i < n; i++) step(dt || 1 / 60); G.R.render(G.scene, G.cam); }
+  function _step(n, dt) { if (!G || !G.keeper) return; for (let i = 0; i < n; i++) { if (G.battle) G.battle.frame(dt || 1 / 60); else step(dt || 1 / 60); } if (!G.battle) G.R.render(G.scene, G.cam); }
   root.ChaoGarden = { ok: true, open, close, _g: () => G, _step, _act: { z: () => actZ(), c: () => actC(), x: () => actX(), v: () => actV() } };
 })(typeof globalThis !== "undefined" ? globalThis : this);

@@ -228,3 +228,51 @@ button.cg-fbox{cursor:pointer}
 .cg-fbox.me i{color:var(--sx-navy)}
 .cg-fbox em{font:600 11px/1 var(--sx-pix);font-style:normal;color:var(--sx-pale)}
 .cg-fbox.me em{color:var(--sx-navy)}
+
+/* -- duels: the two teams' cards, the team gauge, the log, the call */
+.cg-bhud{position:absolute;inset:0;z-index:4;pointer-events:none}
+.cg-bside{position:absolute;display:flex;gap:8px;flex-wrap:wrap}
+.cg-bside.foe{right:14px;top:12px;justify-content:flex-end}
+.cg-bside.mine{left:14px;bottom:62px}
+.cg-bcard{width:170px;padding:6px 10px 7px;background:var(--sx-navy);border:3px solid var(--sx-ink);border-radius:10px;box-shadow:inset 0 0 0 2px var(--sx-blue),0 4px 0 rgba(5,10,34,.5);transform:skewX(-8deg)}
+.cg-bside.foe .cg-bcard{box-shadow:inset 0 0 0 2px var(--sx-red),0 4px 0 rgba(5,10,34,.5)}
+.cg-bcard>*{transform:skewX(8deg)}
+.cg-bcard b{display:inline-block;font:700 14px/1 var(--sx-pix);text-shadow:var(--sx-out1)}
+.cg-bcard i{float:right;font:600 11px/1.2 var(--sx-pix);font-style:normal;color:var(--sx-cyan)}
+.cg-bcard .hp{display:block;height:10px;margin-top:5px;background:rgba(5,10,34,.7);border:2px solid var(--sx-ink);border-radius:5px;overflow:hidden}
+.cg-bcard .hp>span{display:block;height:100%;background:linear-gradient(#7af06a,#2fb844);transition:width .2s}
+.cg-bcard .hp>span.low{background:linear-gradient(#ff9a6a,#e42630)}
+.cg-bcard .en{display:flex;gap:3px;margin-top:4px;height:8px}
+.cg-bcard .en i,.cg-bcard .en u{flex:1;max-width:14px;border-radius:3px;border:1px solid var(--sx-ink)}
+.cg-bcard .en i{float:none;background:var(--sx-cyan)}
+.cg-bcard .en u{background:rgba(5,10,34,.6)}
+.cg-bcard.out{opacity:.45;filter:grayscale(1)}
+.cg-bmid{position:absolute;left:50%;top:14px;transform:translateX(-50%)}
+.cg-bgauge{position:relative;width:200px;height:18px;background:rgba(5,10,34,.7);border:3px solid var(--sx-ink);border-radius:9px;overflow:hidden;transform:skewX(-12deg)}
+.cg-bgauge>span{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--sx-org),var(--sx-yel));transition:width .25s}
+.cg-bgauge b{position:absolute;inset:0;display:grid;place-items:center;font:700 11px/1 var(--sx-pix);color:#fff;text-shadow:var(--sx-out1);transform:skewX(12deg)}
+.cg-bgauge.full{animation:cgPulse .6s ease-in-out infinite alternate}
+@keyframes cgPulse{to{box-shadow:0 0 14px 3px var(--sx-yel)}}
+.cg-blog{position:absolute;left:14px;top:12px;display:flex;flex-direction:column;gap:3px;max-width:44%}
+.cg-blog div{font:700 14px/1.25 var(--sx-pix);text-shadow:var(--sx-out);color:#fff}
+.cg-blog div.old{opacity:.6;font-size:12.5px}
+.cg-bfloat{position:absolute;inset:0;overflow:hidden}
+.cg-float.big{font-size:26px}
+.cg-bcmd{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);pointer-events:auto;cursor:pointer}
+.cg-bintro{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) skewX(-10deg);display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 40px;background:var(--sx-red);border:4px solid var(--sx-ink);box-shadow:0 6px 0 var(--sx-ink)}
+.cg-bintro b{font:900 italic 34px/1 var(--sx-big);color:var(--sx-yel);-webkit-text-stroke:7px var(--sx-ink);paint-order:stroke fill;transform:skewX(10deg)}
+.cg-bintro i{font:700 15px/1 var(--sx-pix);font-style:normal;color:#fff;text-shadow:var(--sx-out1);transform:skewX(10deg)}
+.cg-bend{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%) skewX(-10deg);padding:16px 54px;border:4px solid var(--sx-ink);box-shadow:0 6px 0 var(--sx-ink);animation:cgIn .3s ease-out}
+.cg-bend.win{background:var(--sx-blue)}.cg-bend.lose{background:#4a3a6a}
+.cg-bend b{display:block;font:900 italic 46px/1 var(--sx-big);color:var(--sx-yel);-webkit-text-stroke:8px var(--sx-ink);paint-order:stroke fill;transform:skewX(10deg)}
+.cg-visit{display:grid;grid-template-columns:200px 1fr;gap:16px;padding:14px}
+.cg-visit .cg-prev{aspect-ratio:200/260}
+.cg-visit h3{margin:4px 0;font:700 22px/1.1 var(--sx-pix);color:var(--sx-yel);text-shadow:var(--sx-out1)}
+.cg-say{margin:6px 0 4px;font:600 15px/1.4 var(--sx-pix);color:#fff}
+.cg-visit .cg-mm{padding:8px 0 0}
+@media (max-width:760px){
+  .cg-visit{grid-template-columns:1fr}
+  .cg-bcard{width:130px}
+  .cg-bside.mine{bottom:130px}
+  .cg-blog{top:auto;bottom:220px;max-width:70%}
+}

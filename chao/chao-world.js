@@ -13,7 +13,7 @@
   const THREE = root.THREE, M = root.ChaoModels;
   if (!THREE || !M || !M.ok) { root.ChaoWorld = { ok: false }; return; }
   const { Vox, meshVox, mixC, mulC, hash, grain, part, ell, cap, blk, shape, chain } = M;
-  const PI = Math.PI, VS = 0.5, CH = 16;            // voxel size (m), chunk size (columns)
+  const PI = Math.PI, VS = 0.25, CH = 32;           // voxel size (m: Post Parade's building grain), chunk size (columns)
 
   /* ---------------------------------------------------------------- noise */
   const vn = (x, z, s) => {
@@ -116,8 +116,8 @@
     if (Math.hypot(x - PLAN.hall[0], z - PLAN.hall[1]) < 8) h = 2;
     /* the rim: hills all round, broken only where the gates are */
     const gc = gateCorridor(x, z);
-    if (r > 43 && z > PLAN.cliffZ + 2) h += (r - 43) * 0.9 * sm(3.5, 7, gc);
-    if (r > 47 && z <= PLAN.cliffZ + 2) h += (r - 47) * 0.9 * sm(3.5, 7, gc);
+    if (r > 43 && z > PLAN.cliffZ + 2) h += Math.min(9, (r - 43) * 0.9) * sm(3.5, 7, gc);
+    if (r > 47 && z <= PLAN.cliffZ + 2) h += Math.min(7, (r - 47) * 0.9) * sm(3.5, 7, gc);
     /* paths settle a little into the ground */
     if (pathD(x, z) < 1.4 && pd > 1.1 && rd > 3) h -= 0.12;
     return h;
@@ -133,13 +133,13 @@
     return "grass";
   }
   const COL = {
-    grass: (x, z, y) => { const n = fbm(x * 0.2, z * 0.2, 4); return grain(mixC(0x4a9a3a, 0x7ac455, n), x * 2, y, z * 2, 0.06); },
-    high: (x, z, y) => grain(mixC(0x5a9a48, 0x8ab866, fbm(x * 0.2, z * 0.2, 6)), x * 2, y, z * 2, 0.06),
-    meadow: (x, z, y) => { const h = hash(x * 2 | 0, z * 2 | 0, 77); return h < 0.08 ? [0xf8f070, 0xf87aa0, 0xf8f8f8, 0xb08af0][(h * 50 | 0) % 4] : grain(mixC(0x5aaa44, 0x86cc5a, fbm(x * 0.25, z * 0.25, 4)), x * 2, y, z * 2, 0.06); },
-    path: (x, z, y) => grain(mixC(0xc8a878, 0xa88a5a, hash(x * 2 | 0, z * 2 | 0, 5) * 0.6), x * 2, y, z * 2, 0.05),
+    grass: (x, z, y) => { const n = fbm(x * 0.2, z * 0.2, 4); return grain(mixC(0x4a9a3a, 0x7ac455, n), x * 4, y, z * 4, 0.05); },
+    high: (x, z, y) => grain(mixC(0x5a9a48, 0x8ab866, fbm(x * 0.2, z * 0.2, 6)), x * 4, y, z * 4, 0.05),
+    meadow: (x, z, y) => { const h = hash(x * 2 | 0, z * 2 | 0, 77); return h < 0.08 ? [0xf8f070, 0xf87aa0, 0xf8f8f8, 0xb08af0][(h * 50 | 0) % 4] : grain(mixC(0x5aaa44, 0x86cc5a, fbm(x * 0.25, z * 0.25, 4)), x * 4, y, z * 4, 0.05); },
+    path: (x, z, y) => grain(mixC(0xc8a878, 0xa88a5a, hash(x * 2 | 0, z * 2 | 0, 5) * 0.6), x * 4, y, z * 4, 0.04),
     stone: (x, z, y) => { const tx = Math.floor(x * 2), tz = Math.floor(z * 2), row = tz >> 1, h = hash((tx + (row & 1)) >> 1, row, 3); const c = h < 0.3 ? 0xcfc2a6 : h < 0.6 ? 0xc2b597 : h < 0.85 ? 0xd8ccb2 : 0xb3a68a; return grain(hash(tx, tz, 11) < 0.012 ? mixC(c, 0x6a9a4a, 0.45) : c, tx, y, tz, 0.035); },
-    sand: (x, z, y) => grain(mixC(0xe8d8a8, 0xd8c890, hash(x * 2 | 0, z * 2 | 0, 8)), x * 2, y, z * 2, 0.04),
-    bed: (x, z, y) => grain(mixC(0x7a8a5a, 0x9a9a6a, hash(x * 2 | 0, z * 2 | 0, 9)), x * 2, y, z * 2, 0.06),
+    sand: (x, z, y) => grain(mixC(0xe8d8a8, 0xd8c890, hash(x * 2 | 0, z * 2 | 0, 8)), x * 4, y, z * 4, 0.04),
+    bed: (x, z, y) => grain(mixC(0x7a8a5a, 0x9a9a6a, hash(x * 2 | 0, z * 2 | 0, 9)), x * 4, y, z * 4, 0.05),
   };
   const dirt = (x, y, z) => grain(((y & 3) === 0) ? 0x7a5a3a : 0x8a6a44, x, y, z, 0.06);
   const rock = (x, y, z) => grain(((y + (hash(x >> 1, 0, z >> 1) * 3 | 0)) % 4 === 0) ? 0x7a7468 : mixC(0x9a9484, 0x8a8478, hash(x >> 1, y >> 1, z >> 1)), x, y, z, 0.06);
@@ -159,7 +159,7 @@
       const fx = x / VS - 0.5, fz = z / VS - 0.5, i = Math.floor(fx), k = Math.floor(fz), u = fx - i, w = fz - k;
       const a = colH(i, k), b = colH(i + 1, k), c = colH(i, k + 1), d = colH(i + 1, k + 1);
       const mx = Math.max(a, b, c, d), mn = Math.min(a, b, c, d);
-      if (mx - mn > 1) return W.ground(x, z);                                // a cliff edge: no ramp down it
+      if (mx - mn > 2) return W.ground(x, z);                                // a cliff edge: no ramp down it
       return (a * (1 - u) * (1 - w) + b * u * (1 - w) + c * (1 - u) * w + d * u * w) * VS;
     };
     const F = PLAN.fall;
@@ -193,7 +193,7 @@
         const i = i0 + di, k = k0 + dk, h = colH(i, k);
         const mn = Math.min(h, colH(i + 1, k), colH(i - 1, k), colH(i, k + 1), colH(i, k - 1)) - 1;
         const x = (i + 0.5) * VS, z = (k + 0.5) * VS, surf = surfaceAt(x, z, h * VS), top = COL[surf] || COL.grass;
-        const cliff = h - mn > 3;
+        const cliff = h - mn > 6;
         /* the column's voxels lie under its height: the top one's upper face is the ground the
            walkers stand on (h voxels up) */
         for (let y = mn; y < h; y++) {
@@ -215,13 +215,13 @@
     }
     /* build the chunks round the keeper, and drop the ones far behind */
     W.update = (x, z, rad) => {
-      rad = rad || 46;
+      rad = rad || 38;
       const ci0 = Math.floor((x - rad) / (CH * VS)), ci1 = Math.floor((x + rad) / (CH * VS)), ck0 = Math.floor((z - rad) / (CH * VS)), ck1 = Math.floor((z + rad) / (CH * VS));
       let built = 0;
       const want = [];
       for (let ci = ci0; ci <= ci1; ci++) for (let ck = ck0; ck <= ck1; ck++) {
         const cx = (ci + 0.5) * CH * VS, cz = (ck + 0.5) * CH * VS, d = Math.hypot(cx - x, cz - z);
-        if (d > rad + 6 || Math.hypot(cx, cz) > 70) continue;
+        if (d > rad + 6 || Math.hypot(cx, cz) > 58) continue;
         const key = ci + "," + ck; if (!W.chunks.has(key)) want.push([d, ci, ck, key]);
       }
       want.sort((a, b) => a[0] - b[0]);
@@ -305,11 +305,11 @@
     /* grass: tufts of blades all over the lawns (one mesh, drawn many times) */
     {
       const tuft = M.part("tuft", 1 / 16, v => {
-        for (const [x, z, h, c] of [[0, 0, 5, 0x5aa83a], [2, 1, 4, 0x6ab84a], [-1, 2, 3, 0x4a9a34], [1, -2, 4, 0x6ac050], [-2, -1, 3, 0x5aa840]])
-          for (let y = 0; y < h; y++) v.set(x + (y > 2 ? Math.sign(x || 1) : 0), y, z, M.mixC(c, 0xb8e070, y / (h + 2)));
+        for (const [x, z, h, c] of [[0, 0, 3, 0x5aa83a], [1, 1, 2, 0x6ab84a], [-1, 1, 2, 0x4a9a34]])
+          for (let y = 0; y < h; y++) v.set(x, y, z, M.mixC(c, 0xb8e070, y / (h + 1)));
       });
       const geo = tuft.children[0].geometry, at = [];
-      for (let n = 0; n < 5200 && at.length < 2600; n++) {
+      for (let n = 0; n < 4000 && at.length < 1500; n++) {
         const x = (hash(n, 5, 41) - 0.5) * 90, z = (hash(n, 6, 43) - 0.5) * 90;
         if (Math.hypot(x, z) > 45) continue;
         const h = W.ground(x, z), sf = surfaceAt(x, z, h);
