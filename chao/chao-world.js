@@ -510,8 +510,10 @@
       let built = 0;
       const want = [];
       for (let ci = ci0; ci <= ci1; ci++) for (let ck = ck0; ck <= ck1; ck++) {
-        const cx = (ci + 0.5) * CH * VS, cz = (ck + 0.5) * CH * VS, d = Math.hypot(cx - x, cz - z);
-        if (d > rad + 6 || Math.hypot(cx, cz) > RG.bound) continue;
+        const cx = (ci + 0.5) * CH * VS, cz = (ck + 0.5) * CH * VS, d = Math.hypot(cx - x, cz - z), hw = CH * VS / 2;
+        /* (every chunk that reaches inside the edge and a little past it: the walkable land is
+           never the last of the drawn land) */
+        if (d > rad + 6 || Math.hypot(Math.max(0, Math.abs(cx) - hw), Math.max(0, Math.abs(cz) - hw)) > RG.edge + 6) continue;
         const key = ci + "," + ck; if (!W.chunks.has(key)) want.push([d, ci, ck, key]);
       }
       want.sort((a, b) => a[0] - b[0]);
@@ -534,6 +536,28 @@
       for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), z = pos.getZ(i); if (RG.heightAt(x, z) > RG.sea + 0.25 && !(RG.waterAt && RG.waterAt(x, z, RG.heightAt(x, z)) != null)) pos.setY(i, -3); }
       if (RG.waterCol) waterMat.color.setHex(RG.waterCol);
       const m = new THREE.Mesh(g, waterMat); m.position.y = RG.sea - 0.06; m.renderOrder = 2; W.group.add(m); W.water.push(m);
+      /* and the open sea beyond, out to the horizon (the hills beyond the rim cover it on land) */
+      const far = new THREE.Mesh(new THREE.RingGeometry(RG.edge + 4, RG.edge + 320, 64, 1), new THREE.MeshLambertMaterial({ color: RG.waterCol || 0x3a9ad8 }));
+      far.rotation.x = -PI / 2; far.position.y = RG.sea - 0.1; W.group.add(far);
+    }
+    /* the land beyond the rim: hills on a coarse grain running out into the fog, so a garden
+       never ends at an edge (the Sky Garden's islands float, and have none) */
+    if (!RG.bottom) {
+      const SK = 2.5, R0 = RG.edge + 5, R1 = RG.edge + 85, n = Math.ceil(R1 / SK);
+      const skirt = part("skirt:" + RG.id, SK, v => {
+        for (let i = -n; i < n; i++) for (let k = -n; k < n; k++) {
+          const x = (i + 0.5) * SK, z = (k + 0.5) * SK, r = Math.hypot(x, z);
+          if (r < R0 - SK || r > R1) continue;
+          const base = RG.heightAt(x, z);
+          if (RG.sea != null && (base < RG.sea + 0.4 || RG.heightAt(x * (RG.edge - 2) / r, z * (RG.edge - 2) / r) < RG.sea + 0.6)) continue;   // (the sea, that way)
+          /* (under the fine land where the two meet; rising, and rougher, further out) */
+          const out = clamp01((r - (RG.edge + 14)) / 20), h = base + Math.max(0, r - (RG.edge + 14)) * 0.28 + (fbm(x * 0.03, z * 0.03, 404) - 0.5) * 6 * out;
+          const top = Math.floor(h / SK) - (out <= 0 ? 1 : 0);
+          for (let y = -2; y < top; y++) v.set(i, y, k, y === top - 1 ? grain(mixC(0x4a9a3a, 0x6ab84a, fbm(x * 0.05, z * 0.05, 405)), i, y, k, 0.08) : grain(((y + i + k) & 3) === 0 ? 0x7a6a52 : 0x8a7a5e, i, y, k, 0.06));
+        }
+      });
+      skirt.traverse(o => { if (o.isMesh) { o.receiveShadow = false; o.castShadow = false; } });
+      W.group.add(skirt);
     }
     if (central) {
       const P = PLAN.pond, g = new THREE.PlaneGeometry(P.rx * 2.6, P.rz * 2.6, 40, 40);
