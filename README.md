@@ -79,14 +79,23 @@ grass covers an open top, a cliff's left face is lit and its right face shaded, 
 has a ragged underside, and the soil stands in pillars with a seam down between them. Slopes
 carry the hill's own grass down them, and now and then the soil has Neo Green Hill's carved
 octagon. The stages start on the beach, sand with palms and parasols, as Act 1 does (Act 2
-picks up on the grass). The grass has palms, sunflowers, little flowers, hedges in flower and
-boulders on it, kept clear of anything that stands on the ground. Ledges are the beach's
-boardwalk, its deck on posts with a brace and a railing at its ends, cut from the map where it
-stands assembled. Water is the soil seen blue through it. Breakable rock and the stepping
+picks up on the grass). Where the beach runs to a hill, its sand piles up over the slope's foot
+and thins into the grass, and the hill's flank runs on down under the sand at the slope's own
+angle (against a wall, the sand banks up in a curve and the wall's lit face goes on down, as at
+Neo Green Hill's cliff). The grass has palms, sunflowers, little flowers, hedges in flower and
+boulders on it, kept clear of anything that stands on the ground and out of caves. Caves (only
+those shut in) have the soil behind in shadow, behind what can be broken too, so a broken wall
+shows the room it hid. Ledges are the beach's boardwalk, its deck on posts with a brace and a
+railing at its ends, cut from the map where it stands assembled. Water is drawn as the GBA
+games draw it: what's behind it seen through a tint, Sonic Advance 3's ripple strip along its
+top scrolling left, its bubbles carried along by a current. Breakable rock and the stepping
 stones are Sonic Advance 3's stone blocks; crumbling ledges and moving platforms are Neo Green
-Hill's floating ground. Loops and corkscrews are its soil and paved kerb, drawn round the ride.
-Geysers are its falling water and spray. The zip line is its wooden posts, Sunset Hill's chain
-and anchor block (Sonic Advance 3) and Neo Green Hill's red grab bar. Behind is Neo Green
+Hill's floating ground. Loops and corkscrews are its soil and paved kerb drawn round the ride, a
+loop's grass over its top thinning away down its sides. Geysers are its falling water and spray.
+The zip line is a steel cable between its wooden posts (an anchor block on each, Sunset Hill's,
+from Sonic Advance 3), a pulley wheel on it and a rod down to Neo Green Hill's red grab bar.
+Speed boosters are set into the ground, only their arrows showing. A runner leans with a slope
+as they run, as the Advance games draw them. Behind is Neo Green
 Hill's own sky and sea, at the ground's pixel size: the clouds drift left, the sea's rows slide
 faster the lower they are, and its ripples cycle through their four sets of blues as on the
 GBA. The rings, springs, Star Posts and goal post are Sonic Advance's, the dash panels and

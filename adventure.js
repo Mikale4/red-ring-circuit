@@ -1809,7 +1809,7 @@
     const pic = new Image(); pic.src = Z.img + ver;          // (its pixels, for the rides drawn from them)
     return (ART[id] = { Z, tex, bg, pic,
       mat: new THREE.MeshBasicMaterial({ map: tex, alphaTest: 0.5, side: THREE.DoubleSide }),
-      water: new THREE.MeshBasicMaterial({ color: 0x48b8f0, transparent: true, opacity: 0.3, depthWrite: false }) });
+      water: new THREE.MeshBasicMaterial({ color: 0x38a8f0, transparent: true, opacity: 0.38, depthWrite: false }) });
   }
   /* quads from the atlas as one geometry: [x0, y0, x1, y1, z, piece, flip, sub] -- sub, a part of
      the piece [x, y, w, h] in its own pixels */
@@ -1862,33 +1862,44 @@
   }
   /** The ground, a chunk at a time, in the zone's art. */
   function artChunk(S, T, i0, i1) {
-    const A = artOf(T), Z = A.Z, at = (i, j) => artAt(S, i, j), sol = (i, j) => artSolid(at(i, j));
-    const Q = [], WQ = [], m3 = n => ((n % 3) + 3) % 3, open = c => c === "." || c === "^";
-    /* a cave: shut in -- a roof of ground within three tiles over it, a wall within eight either side
+    /* (what can go -- cracked rock, a crate, a crumbling ledge -- counts as open when the ground is
+       laid: the grass is there under it, the cave's wall behind it, for when it's gone) */
+    const A = artOf(T), Z = A.Z, at = (i, j) => artAt(S, i, j), sol = (i, j) => { const c = at(i, j); return artSolid(c) && "XBC".indexOf(c) < 0; };
+    const Q = [], WQ = [], SURF = [], m3 = n => ((n % 3) + 3) % 3, open = c => c === "." || c === "^";
+    /* a cave: shut in -- a roof of ground within three tiles over it, a wall within twelve either side
        (a corridor under a floating mass, open at its ends, shows the sky behind, as Neo Green Hill's do) */
     const cave = (i, j) => {
       let roof = false;
       for (let k = 1; k <= 3 && !roof; k++) { const r = at(i, j + k); if (SOLIDS.indexOf(r) >= 0) roof = true; else if (r !== "." && r !== "^" && r !== "-") break; }
       if (!roof) return false;
-      const wall = d => { for (let k = 1; k <= 8; k++) if (sol(i + d * k, j)) return true; return false; };
+      const wall = d => { for (let k = 1; k <= 12; k++) if (artSolid(at(i + d * k, j))) return true; return false; };   // (cracked rock walls it in too)
       return wall(-1) && wall(1);
     };
     for (let i = i0; i < i1; i++) for (let j = -12; j < S.H; j++) {
       const c = at(i, j);
-      if (c === "#" && S.beach && i < S.beach) {                // the beach a stage starts on (and the ground off its left end): sand, the dunes' edge on top
+      const fk = S.flank && j < S.beachH ? (i - S.flank) - (j - S.beachH) : null;      // (under a beach that runs to a slope: <0 sand, 0 the flank's own tile, >0 the hill's soil)
+      const sandy = c === "#" && S.beach > 0 && (fk !== null ? fk < 0 : i < S.beach);
+      if (c === "#" && fk === 0 && Z.c.flank) {
+        Q.push([i, j + GLIFT, i + 1, j + 1 + GLIFT, 0, !sol(i, j + 1) ? "flankT" : "flank"]);
+      } else if (sandy) {                                        // the beach a stage starts on (and the ground off its left end): sand, the dunes' edge on top
         const t = !sol(i, j + 1);
         Q.push([i, j + GLIFT, i + 1, j + 1 + GLIFT, 0, t ? "stop" + m3(i) : "sand"]);
-        if (t && open(at(i, j + 1))) artDecor(A, S, i, j, Q, at, true);
+        if (t && open(at(i, j + 1))) {
+          artDecor(A, S, i, j, Q, at, true, cave(i, j + 1));
+          /* the beach's last metres before a wall: its sand banked up in a curve against it */
+          if (!S.flank && i === S.beach - 1 && Z.c.drift && artSolid(at(i + 1, j + 1))) { const d = Z.c.drift, w = d[2] * APX, h = d[3] * APX; Q.push([i + 1.4 - w, j + 1 - 4 * APX, i + 1.4, j + 1 - 4 * APX + h, 0.01, "drift"]); }
+        }
       } else if (c === "#") {
         /* the soil stands in pillars, as Neo Green Hill's does: now and then a seam down through it,
-           the next pillar's lit face against the last one's shaded side */
+           the next pillar's lit face against the last one's shaded side -- and where a beach meets
+           a wall of it, its lit face all the way down, as Neo Green Hill's cliff stands in its sand */
         const seam = n => n > 0 && n < S.W && (hash2(n, 77) % 11) === 0;
-        const t = !sol(i, j + 1), b = j > -12 && !sol(i, j - 1), l = !sol(i - 1, j) || seam(i), r = !sol(i + 1, j) || seam(i + 1);
+        const t = !sol(i, j + 1), b = j > -12 && !sol(i, j - 1), l = !sol(i - 1, j) || seam(i) || (S.beach > 0 && !S.flank && i === S.beach), r = !sol(i + 1, j) || seam(i + 1);
         Q.push([i, j + GLIFT, i + 1, j + 1 + GLIFT, 0, "g" + (t ? "t" : "") + (b ? "b" : "") + (l ? "l" : "") + (r ? "r" : "") + (t || b ? m3(i) : 0)]);
         if ("X=BC".indexOf(at(i, j - 1)) >= 0) Q.push([i, j, i + 1, j + GLIFT, 0, "g0", false, [0, 32 - GLIFT / APX, 32, GLIFT / APX]]);   // (over cracked rock, a block or a ledge, drawn level: the soil on down to it)
         const up = at(i, j + 1);                          // (under a slope: the grass along it runs on down into this tile)
         if ((up === "/" || up === "\\") && Z.c.upS0) Q.push([i, j + GLIFT, i + 1, j + 1 + GLIFT, 0.001, (up === "/" ? "upS" : "dnS") + m3(i + j + 1)]);
-        if (t && open(at(i, j + 1))) artDecor(A, S, i, j, Q, at);
+        if (t && open(at(i, j + 1)) && !cave(i, j + 1)) artDecor(A, S, i, j, Q, at);   // (nothing grows in a cave)
         /* now and then, deep in the soil, the carved octagon Neo Green Hill has cut in it */
         if (!t && !b && !l && !r && m3(i) === 1 && ((j % 4) + 4) % 4 === 1 && (hash2(i * 3 + 1, j) & 3) === 0 && Z.c.emblem) {
           let deep = true;                                 // (its three by three all buried soil)
@@ -1905,16 +1916,20 @@
         if (at(i - 1, j) !== "-") artBoard(A, S, i, j, 1, Q, at);
         if (at(i + 1, j) !== "-") artBoard(A, S, i, j, -1, Q, at);
       } else if (c === "~") {
+        /* water, as the GBA games draw it: all below the surface seen through a tint (what's behind
+           -- the sky and the sea -- still there), Sonic Advance 3's ripple strip along the top,
+           scrolling to the left; a cave's wall behind, in a cave */
         WQ.push([i, j, i + 1, j + 1, 0.32, "back"]);
-        if (at(i, j + 1) !== "~" && !sol(i, j + 1) && Z.c.wave0) { const h = Z.c.wave0[3] * APX; Q.push([i, j + 1 - h, i + 1, j + 1, 0.33, "wave" + m3(i)]); }
-        Q.push([i, j + GLIFT, i + 1, j + 1 + GLIFT, -0.3, Z.c.wback ? "wback" : "back"]);   // (the pool dug in the ground: its soil, seen through the water)
-      } else if ((open(c) || c === "-") && cave(i, j)) Q.push([i, j + GLIFT, i + 1, j + 1 + GLIFT, -0.3, "back"]);   // (a cave: the soil runs on behind, in shadow)
+        if (at(i, j + 1) !== "~" && !sol(i, j + 1) && Z.c.wsurf0) { const h = Z.c.wsurf0[3] * APX; for (let f = 0; f < 4; f++) (SURF[f] = SURF[f] || []).push([i, j + 1 - h, i + 1, j + 1, 0.33, "wsurf" + f, false, [(i & 1) * 16, 0, 32, Z.c.wsurf0[3]]]); }
+        if (cave(i, j)) Q.push([i, j + GLIFT, i + 1, j + 1 + GLIFT, -0.3, "back"]);
+      } else if ((open(c) || c === "-" || "XBC".indexOf(c) >= 0) && cave(i, j)) Q.push([i, j + GLIFT, i + 1, j + 1 + GLIFT, -0.3, "back"]);   // (a cave: the soil runs on behind, in shadow -- behind what can go, too)
       /* the ragged underside over a cave: the cave's wall behind its ragged edge too */
-      if (c === "#" && j > -12 && !sol(i, j - 1) && cave(i, j - 1)) Q.push([i, j + GLIFT, i + 1, j + 1 + GLIFT, -0.3, "back"]);
+      if (c === "#" && j > -12 && !sol(i, j - 1) && cave(i, j - 1)) Q.push([i, j + GLIFT, i + 1, j + 0.5 + GLIFT, -0.3, "back", false, [0, 16, 32, 16]]);   // (its lower half only: none of it showing between the grass's blade tips on top)
     }
     const out = [];
     if (Q.length) { const m = new THREE.Mesh(artGeo(Z, Q), A.mat); out.push(m); }
     if (WQ.length) { const m = new THREE.Mesh(artGeo(Z, WQ), A.water); m.renderOrder = 2; out.push(m); }
+    SURF.forEach((q, f) => { if (!q || !q.length) return; const m = new THREE.Mesh(artGeo(Z, q), A.mat); m.userData.wsurf = f; m.visible = f === 0; m.renderOrder = 3; out.push(m); (A.surf = A.surf || []).push(m); });   // (the surface's frames, one shown at a time)
     /* what the art has no piece for yet -- a belt, ice, mud -- in voxels as before */
     let odd = false;
     for (let i = Math.max(0, i0); i < Math.min(S.W, i1) && !odd; i++) for (let j = 0; j < S.H; j++) if ("{}Im".indexOf(S.grid[j][i]) >= 0) { odd = true; break; }
@@ -1936,7 +1951,7 @@
     const room = n => { for (let k = 1; k <= n; k++) if (at(i, j + k) !== ".") return false; return true; };
     const flat = n => { for (let k = -n; k <= n; k++) if (at(i + k, j) !== "#" || at(i + k, j + 1) !== ".") return false; return true; };
     if (beach) {                                         // on the beach: a palm every six metres, a tuft at its foot, parasols between
-      if (((i % 6) + 6) % 6 === 2 && room(6)) put("palm0", -0.6, null, 6);   // (its foot's little drift of sand sunk into the beach)
+      if (((i % 6) + 6) % 6 === 2 && room(6)) put("palm0", -0.6, null, 1);   // (a tuft at its foot, on the beach's own sand)
       else if (((i % 6) + 6) % 6 === 5 && (h & 1) && room(2)) put("parasol", -0.05);
       return;
     }
@@ -2025,15 +2040,19 @@
      darker where it turns away behind; a zip line's posts, cable and handle */
   function artMech(w, R, group, A) {
     if (R.k === "loop") {
-      const ri = Math.round(R.r * 32), band = 42, ro = ri + band, S = (ro + 2) * 2;
+      const ri = Math.round(R.r * 32), band = 42, ro = ri + band, tips = 4, S = (ro + tips + 2) * 2;
       artCanvasCard(A, S, S, R.x - S * APX / 2, R.y + R.r + S * APX / 2, -0.08, (set, get) => {
         const kerb = artKerb(get), c = S / 2;
         for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
           const dx = x + 0.5 - c, dy = y + 0.5 - c, d = Math.hypot(dx, dy);
-          if (d < ri || d >= ro) continue;
+          if (d < ri || d >= ro + tips) continue;
           const k = d - ri, up = -dy / d;
+          /* the grass over its top, as thick as the hill's on top and thinning to nothing down its
+             sides -- never cut off -- its blade tips standing out past the edge */
+          const g = Math.round(20 * Math.min(1, Math.max(0, (up - 0.05) / 0.5)));
+          if (g > 0 && d >= ro - g) { const row = Math.floor(ro + tips - d); const px = get("gt0", x & 31, Math.min(31, row)); if (px[3]) { set(x, y, px); continue; } if (d >= ro) continue; }
+          if (d >= ro) continue;
           if (k < 14) { set(x, y, kerb[Math.floor(k)]); continue; }
-          if (up > 0.25 && ro - d < 18) { set(x, y, get("gt0", x & 31, Math.floor(ro - d) + 2)); continue; }    // (grass along the loop's top)
           set(x, y, get("g0", x & 31, y & 31), ro - d < 2 ? 0.55 : 1);
         }
       }, group);
@@ -2060,17 +2079,52 @@
         for (let yy = f; yy < top; yy += seg * APX) q.push([x - wd / 2, yy, x + wd / 2, Math.min(top, yy + seg * APX), -0.07, "shaft", false, [0, 0, S[2], Math.max(1, Math.round(Math.min(seg * APX, top - yy) / APX))]]);
         q.push([x - aw / 2, top - ah / 2, x + aw / 2, top + ah / 2, -0.06, "anchor"]);
       }
-      const len = Math.hypot(R.x1 - R.x0, R.y1 - R.y0), n = Math.max(2, Math.round(len / (7 * APX))), lw = L[2] * APX / 2;
-      for (let k = 0; k <= n; k++) { const x = R.x0 + (R.x1 - R.x0) * k / n, y = R.y0 + (R.y1 - R.y0) * k / n; q.push([x - lw, y - lw, x + lw, y + lw, -0.05, "link"]); }
       group.add(new THREE.Mesh(artGeo(Z, q), A.mat));
+      /* the cable: a steel line two pixels thick, its top edge catching the light, stepped pixel by
+         pixel as the GBA draws a line, taut from block to block */
+      const left = Math.min(R.x0, R.x1) - 2 * APX, top = Math.max(R.y0, R.y1) + 3 * APX;
+      const cw = Math.ceil(Math.abs(R.x1 - R.x0) / APX) + 5, ch = Math.ceil(Math.abs(R.y1 - R.y0) / APX) + 7;
+      artCanvasCard(A, cw, ch, left, top, -0.05, set => {
+        const u0 = (R.x0 - left) / APX, v0 = (top - R.y0) / APX, u1 = (R.x1 - left) / APX, v1 = (top - R.y1) / APX;
+        for (let u = Math.round(Math.min(u0, u1)); u <= Math.round(Math.max(u0, u1)); u++) {
+          const v = Math.round(v0 + (v1 - v0) * (u - u0) / ((u1 - u0) || 1));
+          set(u, v - 1, [176, 184, 196, 255]); set(u, v, [72, 72, 84, 255]); set(u, v + 1, [40, 40, 48, 255]);
+        }
+      }, group);
       R.art = true;
-      R.handle = new THREE.Group();                         // (the grab bar and its two links, waiting at the start)
-      const bar = artSprite(A, "grip", false, 0.5, 0.5); bar.position.set(0, -1.0, 0); R.handle.add(bar);
-      for (let k = 1; k <= 3; k++) { const l = artSprite(A, "link", false, 0.5, 0.5); l.position.set(0, -k * 0.25, -0.01); R.handle.add(l); }
+      R.handle = artZipHandle(A);                            // (the pulley on the cable, its rod, the grab bar: waiting at the start)
       R.handle.position.set(R.x0, R.y0, 0.05); group.add(R.handle);
       return true;
     }
     return false;
+  }
+  /* where a beach runs to the foot of a slope: the sand piled up over the slope's foot, rising
+     out of the beach in a curve and thinning away into the slope's grass, its top edge the dunes'
+     own outline -- so the beach and the hill meet as one ground, not at a line */
+  function artPile(A, S, group) {
+    const D = S.flank, h = S.beachH, x0 = D - 2.4, x1 = D + 1.0, top = h + 1.1, bot = h - 0.2;
+    const W = Math.round((x1 - x0) / APX), Hh = Math.round((top - bot) / APX);
+    artCanvasCard(A, W, Hh, x0, top, 0.012, (set, get) => {
+      for (let u = 0; u < W; u++) {
+        const x = x0 + (u + 0.5) * APX, t = Math.min(1, (x - x0) / (D + 0.85 - x0));
+        const sy = h + 0.9 * t * t * t, ground = x < D ? h : h + (x - D);                 // (the pile's top; the ground under it)
+        if (sy <= ground + APX) continue;
+        const v0 = Math.round((top - sy) / APX), v1 = Math.min(Hh - 1, Math.round((top - ground) / APX) + 3);
+        for (let v = v0; v <= v1; v++) {
+          const k = v - v0;
+          set(u, v, k < 2 ? get("stop0", u & 31, 4 + k) : get("sand", u & 31, v & 31));
+        }
+      }
+    }, group);
+  }
+  /* a zip line's handle, its top on the cable: a pulley wheel running on it (Sunset Hill's ring,
+     its dark hub), a rod down from it, and Neo Green Hill's red grab bar on the end */
+  function artZipHandle(A) {
+    const g = new THREE.Group();
+    const wheel = artSprite(A, "link", false, 0.5, 0.5); wheel.position.set(0, -0.06, 0.01); g.add(wheel);
+    const rod = new THREE.Mesh(new THREE.PlaneGeometry(2 * APX, 0.86), new THREE.MeshBasicMaterial({ color: 0x484854 })); rod.position.set(0, -0.56, 0); g.add(rod);
+    const bar = artSprite(A, "grip", false, 0.5, 0.5); bar.position.set(0, -1.02, 0.01); g.add(bar);
+    return g;
   }
   /* a geyser in the zone's art: a column of its falling water's frames, spray bursting off the top */
   function artGeyser(z, group, A) {
@@ -4151,9 +4205,13 @@
     if (art && art.Z.c.stop0 && def.actN !== 2) {           // its stages start on the beach, as Neo Green Hill does: sand up to the first rise, dip or slope
       const h0 = artTop(S, 0); let e = 0;
       while (e < Math.min(S.W, 36) && artTop(S, e) === h0 && !S.grid.some(row => "/\\~".indexOf(row[e]) >= 0)) e++;
-      S.beach = e;
+      S.beach = e; S.beachH = h0;
+      /* a beach running to the foot of a slope: the hill's flank goes on down under the sand at the
+         slope's own angle, and the sand is piled up over the slope's foot, thinning into its grass */
+      S.flank = e > 0 && e < S.W && S.grid[h0] && S.grid[h0][e] === "/" ? e : 0;
     }
     if (art) {
+      art.surf = [];                                         // (this world's water surfaces, to cycle)
       const sky = artSky(art);
       scene.background = sky.tex; scene.fog = null;
       scene.onBeforeRender = (r, s, cam) => sky.draw(cam);
@@ -4165,6 +4223,7 @@
     for (let i0 = 0; i0 < W; i0 += 16) { if (i0 < 64) for (const m of buildChunk(S, T, i0, Math.min(W, i0 + 16))) group.add(m); else pending.push(i0); }
     const far = new THREE.Group(); scene.add(far);
     if (art) far.userData.anim = [];                        // (its background is the game's own, drawn behind)
+    if (art && S.flank && art.Z.c.stop0) artPile(art, S, group);
     else buildFar(T, S, rnd, far);
     group.add(art ? artSkirts(S, T) : skirts(S, T));
 
@@ -4235,7 +4294,7 @@
           springPose({ coil, cap, sq: 0 });
           break;
         }
-        case ">": w.ents.push({ t: "dash", x, y, m: art ? sprite("dash0", x, y - 3 * APX, 0.03) : put(propGeo("dash"), x, y + 0.01), art: !!art }); break;
+        case ">": w.ents.push({ t: "dash", x, y, m: art ? sprite("dash0", x, y - 6 * APX, -0.02) : put(propGeo("dash"), x, y + 0.01), art: !!art }); break;   // (in the art: set into the ground, its foot under the grass, only its arrows showing)
         case "h": { const m = put(propGeo("hurdle", T), x, y); w.solids.push({ t: "hurdle", x0: x - 0.2, x1: x + 0.2, y0: y, y1: y + 1.0, m, alive: true }); break; }
         case "Q": w.ents.push({ t: "bumper", x, y: y + 0.5, m: put(propGeo("bumper", T), x, y + 0.5, -0.3), sq: 0, cd: 0 }); break;
         case "o": w.ents.push({ t: "balloon", x, y: y + 0.3, y0: y + 0.3, m: put(propGeo("balloon", T), x, y + 0.3), back: 0 }); break;
@@ -6011,7 +6070,10 @@
   function zoneMesh(z, group, T, M) {
     const glow = (c, op) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: op, depthWrite: false });
     z.bits = [];
-    if (z.k === "current" || z.k === "wind" || z.k === "lowg") {    // streaks going with it (or sparkles drifting up)
+    if (z.k === "current" && artOf(T) && artOf(T).Z.c.bubble) {      // (in the zone's art: Sonic Advance 3's little bubbles, carried along with the water)
+      const A = artOf(T), n = Math.min(30, Math.round((z.x1 - z.x0) * (z.y1 - z.y0) / 5));
+      for (let k = 0; k < n; k++) { const m = artSprite(A, "bubble", false, 0.5, 0.5); m.position.set(z.x0 + Math.random() * (z.x1 - z.x0), z.y0 + 0.2 + Math.random() * (z.y1 - z.y0 - 0.4), 0.3); m.renderOrder = 3; group.add(m); z.bits.push(m); }
+    } else if (z.k === "current" || z.k === "wind" || z.k === "lowg") {    // streaks going with it (or sparkles drifting up)
       const n = Math.min(40, Math.round((z.x1 - z.x0) * (z.y1 - z.y0) / (z.k === "lowg" ? 10 : 6)));
       const geo = z.k === "lowg" ? new THREE.BoxGeometry(0.09, 0.09, 0.09) : new THREE.BoxGeometry(z.k === "wind" ? 1.6 : 0.8, 0.05, 0.05);
       const mat = glow(z.k === "current" ? 0xe8f8ff : z.k === "wind" ? 0xffffff : 0xfff6c0, z.k === "wind" ? 0.45 : 0.7);
@@ -6701,9 +6763,8 @@
     const zipR = p.state === "ride" && p.ride && p.ride.R.k === "zip" ? p.ride.R : null;
     if (zipR && !p.grip && p.spr.parent) {
       p.grip = new THREE.Group();
-      if (zipR.art && world.art) {                          // (the zone's art: the red bar on its chain links)
-        const bar = artSprite(world.art, "grip", false, 0.5, 0.5); bar.position.set(0, -1.05, 0.14); p.grip.add(bar);
-        for (let k = 1; k <= 3; k++) { const l = artSprite(world.art, "link", false, 0.5, 0.5); l.position.set(0, -k * 0.26, 0.1); p.grip.add(l); }
+      if (zipR.art && world.art) {                          // (the zone's art: the pulley on the cable, the rod, the red bar in the hand)
+        const h = artZipHandle(world.art); h.position.z = 0.1; p.grip.add(h);
       } else {
         const bar = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 0.12), zipR.handle ? zipR.handle.material : lamb(0xffd23a)); bar.position.set(0, -1.05, 0.14);
         const strap = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.05, 0.06), lamb(0x2a2a30)); strap.position.set(0, -0.52, 0.1);
@@ -6712,6 +6773,15 @@
       p.spr.parent.add(p.grip);
     }
     if (p.grip) { p.grip.visible = !!zipR && p.spr.visible !== false; if (zipR) p.grip.position.set(p.x, p.y + 2.2, 0); }
+    /* on a slope, on the move: leaning with the ground, as the Sonic Advance games draw their
+       runners (stood still, upright); eased in and out where a slope begins and ends */
+    let tilt = 0;
+    if (!spin && p.ground && !battle && sp > 0.6 && /^(run|start|skid|dash|spin|land)$/.test(name)) {
+      const tc = tile(Math.floor(p.x), Math.floor(p.y - 0.001));
+      tilt = tc === "/" ? PI / 4 : tc === "\\" ? -PI / 4 : 0;
+    }
+    p.tilt = lerp(p.tilt || 0, tilt, 1 - Math.exp(-dt * 16));
+    if (!spin && Math.abs(p.tilt) > 0.01) spin = p.tilt;
     if (spin) {                                                     // (turned about its feet)
       const dx = p.spr.position.x - p.x, dy = p.spr.position.y - p.y, cs = Math.cos(spin), sn = Math.sin(spin);
       p.spr.position.x = p.x + dx * cs - dy * sn; p.spr.position.y = p.y + dx * sn + dy * cs;
@@ -6837,6 +6907,7 @@
       } else { w.goal.m.rotation.y += dt * (2 + w.goal.spin * 14); if (!w.goal.spin) w.goal.m.rotation.y = 0; }
     }
     for (const e of w.ents) if (e.t === "dash" && e.art) setArt(e.m, "dash" + (Math.floor(w.t * 12) % 3));
+    if (w.art && w.art.surf) { const f = Math.floor(w.t * 8) % 4; for (const m of w.art.surf) m.visible = m.userData.wsurf === f; }   // (the water's surface rippling on to the left)
     for (const e of w.ents) if (e.t === "spring" || e.t === "dspring") { e.sq = Math.max(0, e.sq - dt * 2.6); springPose(e); }
       else if (e.t === "bumper") { e.sq = Math.max(0, e.sq - dt * 5); e.m.scale.set(1 + e.sq * 0.3, 1 + e.sq * 0.3, 1); }
       else if (e.t === "balloon") { e.m.position.y = e.y + Math.sin(w.t * 2.2 + e.x) * 0.12; e.m.rotation.z = Math.sin(w.t * 1.3 + e.x) * 0.12; }
