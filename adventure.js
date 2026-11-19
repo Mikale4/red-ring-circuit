@@ -5924,14 +5924,25 @@
        (`Y` in the tiles is a spring set at forty-five degrees: up and on, and the shot flies true.) */
   const RIDE_VMIN = 8.5;                              // (slower than this, a loop or a corkscrew lets you by)
   let TUBE_MAT = null;
+  /* A loop's track is a spiral, not a ring: in at its foot along the ground, up the far side,
+     over the top upside down, down the near side -- and out on the ground a metre and a half on
+     from where it went in, so its way up and its way down cross near the ground, as a Sonic
+     loop's do, and where it begins and where it ends are both plain to see. `a` is degrees round
+     from its foot (-90) to its far foot (270); rr how far out from its middle. */
+  const loopShift = R => R.s != null ? R.s : (R.s = clamp(R.r * 0.36, 1.8, 2.6));
+  function loopAt(R, a, rr) {
+    const t = a * PI / 180;
+    return [R.x + loopShift(R) * (a + 90) / 360 + rr * Math.cos(t), R.y + R.r + rr * Math.sin(t)];
+  }
   function buildMech(w, def, T, M, group) {
     w.rides = []; w.zones = (def.zones || []).map(z => Object.assign({ t0: 0 }, z));
     const col = (T.block && T.block[0]) || 0x8a8aa0, hi = (T.neon && T.neon[0]) || T.flowers && T.flowers[0] || 0xffd23a;
     const TUBES = (def.rides || []).filter(r => r.k === "tube").map(r => r.pts);   // (every pipe's points: a fork's two mouths found from them)
     for (const r0 of def.rides || []) {
       const R = Object.assign({}, r0), pts = [];
+      if (R.k === "loop" && artOf(T)) R.s = 0;          // (the 2D look's loop is still a ring: its path one too)
       switch (R.k) {
-        case "loop": { const cx = R.x, cy = R.y + R.r; for (let a = -90; a <= 270.001; a += 4) { const t = a * PI / 180; pts.push([cx + (R.r - 0.05) * Math.cos(t), cy + (R.r - 0.05) * Math.sin(t)]); } break; }   // (the feet on the track all the way round: drawn running on it)
+        case "loop": { for (let a = -90; a <= 270.001; a += 4) pts.push(loopAt(R, a, R.r - 0.05)); break; }   // (the feet on the track all the way round, a spiral: drawn running on it)
         case "cork": { R.n = Math.max(1, Math.round((R.x1 - R.x0) / 12)); for (let x = R.x0; x <= R.x1 + 1e-6; x += 0.5) { const ph = (x - R.x0) / (R.x1 - R.x0) * R.n * PI * 2; pts.push([x, R.y + R.amp * (1 - Math.cos(ph)) / 2]); } break; }
         case "zip": pts.push([R.x0, R.y0 - 2.2], [R.x1, R.y1 - 2.2]); break;
         case "rail": for (const q of R.pts) pts.push([q[0], q[1]]); break;
@@ -5982,18 +5993,49 @@
   function mechMesh(w, R, group, T, M, col, hi) {
     const A = artOf(T); if (A && artMech(w, R, group, A)) return;     // (in the zone's own art)
     switch (R.k) {
-      case "loop": {                                   // the track: a ring of the course's own blocks, a bright stripe round its inside
-        const r = R.r, s = 0.25, n = Math.round(r / s);
+      case "loop": {
+        /* the loop, as the classic games build theirs (Green Hill's): a tunnel through a block of
+           the zone's own ground, grass on its top, the sky through it -- the track lining the hole a
+           spiral (loopAt), in along the road and out again a little further on, its two ends lying
+           on the road in front where it comes in and goes out */
+        const sc = 0.25, n = Math.round(R.r / sc), sh = Math.round(loopShift(R) / sc), bt = 3, wall = 6, topH = 4, foot = 5, mouth = bt + 4;
+        const u0 = -(n + bt + wall), u1 = sh + n + bt + wall, vTop = 2 * n + bt + topH, rnd = mulberry32(Math.round(R.x * 31) + 7);
+        const uc = a => sh * (a + 90) / 360;
+        const near = (u, y) => {                         // how far (u, y) is from the spiral's middle, and how far round it is
+          const th = Math.atan2(y - n, u - sh / 2) * 180 / PI, a1 = th < -90 ? th + 360 : th;
+          let best = 1e9, ba = a1;
+          for (const a of [a1, a1 + 360, a1 - 360]) { if (a < -90 || a > 270) continue; const d = Math.hypot(u - uc(a), y - n); if (d < best) { best = d; ba = a; } }
+          return [best, ba];
+        };
         const g = vox(v => {
-          for (let a = 0; a < 360; a += 0.7) {
-            const t = a * PI / 180;
-            for (let k = 0; k <= 2; k++) {
-              const rr = n + k, ix = Math.round(Math.cos(t) * rr), iy = Math.round(Math.sin(t) * rr);
-              for (let z = -6; z <= -2; z++) v.set(ix, iy, z, k === 0 ? ((Math.floor(a / 18) & 1) ? hi : 0xffffff) : col);
+          for (let u = u0; u <= u1; u++) for (let y = 0; y <= vTop; y++) {
+            const [d, a] = near(u + 0.5, y + 0.5);
+            if (d < n) continue;                                             // the hole
+            const band = d < n + bt, edge = u === u0 || u === u1;
+            /* its foot opened either side of the hole, the road running in under it to the track and
+               out again: the block stands on its two feet, as Sonic 1's loop does */
+            if (!band && y < mouth && u > u0 + foot && u < u1 - foot) continue;
+            /* the track drifts back through the tunnel as it goes round -- in at the front, out at the
+               back -- so at the bottom its way in and its way out pass each other, one before the other */
+            const zc = Math.round(-6 - 3 * (a + 90) / 360);
+            for (let z = -12; z <= -3; z++) {
+              let c;
+              if (band && Math.abs(z - zc) <= 3) c = d < n + 1 ? jit(rnd, pick(rnd, T.top), 0.05) : d < n + 2 ? T.drip : jit(rnd, T.deep, 0.05);   // the track: the ground's own grass, curled round, its soil behind
+              else if (band) c = jit(rnd, mulC(T.soil[0], 0.78), 0.04);                           // the tunnel's wall beside it
+              else if (y >= vTop - 1) c = jit(rnd, pick(rnd, T.top), 0.06);                       // grass on top
+              else if (y >= vTop - 2 && (z === -3 || edge)) c = T.drip;                            // hanging over its face
+              else {                                                                             // the block: the zone's soil, checkered, lit on its left and shaded on its right
+                const chk = (((u + 256) >> 2) + ((y + 256) >> 2)) & 1;
+                c = jit(rnd, chk ? T.soil[1] : mulC(T.soil[0], 0.94), 0.04);
+                if (edge || u === u0 + 1 || u === u1 - 1) c = mulC(c, u < 0 ? 1.07 : 0.82);
+              }
+              v.set(u, y, z, c);
             }
           }
-        }, s);
-        const m = new THREE.Mesh(g, M.vox); m.position.set(R.x, R.y + r, 0); m.castShadow = true; group.add(m);
+          /* the track's two ends running in along the road under its foot, and out the far side */
+          for (let u = u0 + foot + 1; u < u1 - foot; u++) { const [d] = near(u + 0.5, 0.5); if (d < n + bt) continue; for (let z = -12; z <= -3; z++) v.set(u, 0, z, jit(rnd, pick(rnd, T.top), 0.05)); }
+        }, sc);
+        const m = new THREE.Mesh(g, M.vox); m.position.set(R.x, R.y, 0); m.castShadow = true; m.receiveShadow = true; group.add(m);
         break;
       }
       case "cork": {                                   // a ribbon twisting round, behind the road
@@ -6251,7 +6293,7 @@
     S.u += S.v * dt;
     if (S.u >= R.total) {
       const d = rideAt(R, R.total);
-      if (R.k === "loop") rideEnd(p, R.x + 0.05, R.y, S.v, 0, false, true);
+      if (R.k === "loop") rideEnd(p, R.x + loopShift(R) + 0.05, R.y, S.v, 0, false, true);   // (out at the spiral's far foot)
       else if (R.k === "cork") rideEnd(p, R.x1, R.y, S.v, 0, false, true);
       else { const ve = R.k === "rail" ? Math.min(S.v, 26) : S.v; rideEnd(p, d[0], d[1], d[2] * ve, d[3] * ve, true); }   // (off a rail's end no faster than the courses were drawn for: the speed's for the rail)
       if (R.k === "zip" && R.handle) setTimeout(() => { if (R.handle) R.handle.visible = true; }, 1500);

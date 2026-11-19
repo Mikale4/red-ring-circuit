@@ -217,7 +217,11 @@ deck broken by the runners ahead, ends in a slope up out of the water.
 
 **The courses' machinery**, beside the ground and its springs, dash strips, bumpers, balloons,
 belts, ice, mud and water: **loops** and **corkscrews** (run in at speed and round you go -- round a loop on your feet,
-upside down over the top; too slow and you run on under them), **zip lines** (pulleys, vines, cables between airships: run into
+upside down over the top; too slow and you run on under them. A loop is built as the classic games build theirs, Green
+Hill's: a tunnel through a block of the zone's own ground, its top grassed (carpeted, paved...), standing on two feet with
+the road running in under it; the track lining the tunnel is the zone's own ground surface curled round, a spiral that
+drifts back through the tunnel as it goes, so it comes down a little further on and behind where it went up -- its way in
+and its way out passing each other at the bottom), **zip lines** (pulleys, vines, cables between airships: run into
 the handle and hang on; the cable car goes up), **rails** to grind (coasters, mine railways, the
 monorail, ice rails -- see Grinding below), **pipes** (in at the mouth and through at speed, one
 piece round their bends, seen over whatever they run through; each mouth level, sitting on the
