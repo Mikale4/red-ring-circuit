@@ -5454,11 +5454,12 @@
         break;
       }
       case "cork": {                                   // a ribbon twisting round, behind the road
+        const N = (R.x1 - R.x0) / 0.25, yAt = x => Math.round(R.amp * (1 - Math.cos(x * 0.25 / (R.x1 - R.x0) * R.n * PI * 2)) / 2 / 0.25) - 1;
         const g = vox(v => {
-          for (let x = 0; x <= (R.x1 - R.x0) / 0.25; x++) {
-            const ph = x * 0.25 / (R.x1 - R.x0) * R.n * PI * 2, y = Math.round(R.amp * (1 - Math.cos(ph)) / 2 / 0.25) - 1;
-            const zc = Math.round(-4 + Math.cos(ph) * 2);
-            for (let z = zc - 1; z <= zc + 1; z++) v.set(x, y, z, (x >> 2) & 1 ? col : hi);
+          for (let x = 0; x <= N; x++) {                 // (a band three voxels deep, each column joined to the next: unbroken however steep)
+            const ph = x * 0.25 / (R.x1 - R.x0) * R.n * PI * 2, y0 = yAt(x), y1 = x < N ? yAt(x + 1) : y0;
+            const zc = Math.round(-4 + Math.cos(ph) * 2), top = Math.max(y0, y1), bot = Math.min(y0, y1) - 2;
+            for (let y = bot; y <= top; y++) for (let z = zc - 1; z <= zc + 1; z++) v.set(x, y, z, y >= y0 && (x >> 2) & 1 ? hi : col);
           }
         }, 0.25);
         const m = new THREE.Mesh(g, M.vox); m.position.set(R.x0, R.y, 0); group.add(m);
@@ -5652,7 +5653,11 @@
 
   function interact(p, dt, riding) {
     const w = world;
-    const bx0 = p.x - p.c.w / 2, bx1 = p.x + p.c.w / 2, by0 = p.y, by1 = p.y + p.hh;
+    let bx0 = p.x - p.c.w / 2, bx1 = p.x + p.c.w / 2, by0 = p.y, by1 = p.y + p.hh;
+    if (riding && p.ride && p.ride.R.k === "loop") {      // round a loop the body stands out from the track toward its middle, turned as it's drawn
+      const th = Math.atan2(p.vy, p.vx), h2 = p.hh / 2, cx = p.x - Math.sin(th) * h2, cy = p.y + Math.cos(th) * h2, hw = Math.max(p.c.w, p.hh) / 2;
+      bx0 = cx - hw; bx1 = cx + hw; by0 = cy - hw; by1 = cy + hw;
+    }
     const touches = (x, y, r) => x + r > bx0 && x - r < bx1 && y + r > by0 && y - r < by1;
     // rings -- and with the magnetic shield, the ones near fly in (only those in the columns about
     // the runner are looked at: a course has hundreds, and the CPUs look too)
@@ -6050,7 +6055,7 @@
       case "ride": {                                       // carried: hanging from a cable, crouched on a rail, or a ball (a loop, a pipe, a cannon)
         const k = p.ride && p.ride.R.k, ball = framesOf(id, "spin") ? "spin" : framesOf(id, "fly") ? "fly" : "jump";   // (no ball for Gamma or Eggman: flying, or a jump)
         if (k === "zip") { name = framesOf(id, "jump") ? "jump" : "idle"; loop = false; }
-        else if (k === "loop" && framesOf(id, "run")) { name = "run"; fps = 22; face = 1; spin = Math.atan2(p.vy, p.vx); }   // (round a loop on its feet, as Sonic does: up the side, over the top upside down)
+        else if ((k === "loop" || k === "cork") && framesOf(id, "run")) { name = "run"; fps = 22; face = 1; spin = Math.atan2(p.vy, p.vx); }   // (a corkscrew too: along it on its feet, leaning with it)   // (round a loop on its feet, as Sonic does: up the side, over the top upside down)
         else if (k === "rail" && framesOf(id, "land")) { name = "land"; const L = framesOf(id, "land"); let kk = 0; L.forEach((f, j) => { if (f[3] < L[kk][3]) kk = j; }); pick = () => kk; }
         else { name = ball; fps = 24; }
         break;
