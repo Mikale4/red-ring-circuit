@@ -405,6 +405,10 @@
     { id: "duo-spin", name: "Twin Spin", kind: "team", attr: "vel", pow: 46, cost: 2, need: 2, text: "Two spin into it together." },
     { id: "duo-tower", name: "Chao Tower", kind: "team", attr: "pow", pow: 60, cost: 3, need: 2, text: "One throws the other." },
     { id: "trio-storm", name: "Garden Storm", kind: "team", attr: "cha", pow: 90, cost: 5, need: 3, text: "All three at once." },
+    // the dojos' own: taught by their masters, to one who has passed the trial
+    { id: "oak-crush", name: "Oakheart Crush", kind: "strike", attr: "pow", pow: 64, cost: 2, breakGuard: 1, knock: 1, dojo: 1, text: "The Oakheart Dojo's blow: through any guard, and back a row." },
+    { id: "summit-rush", name: "Summit Rush", kind: "strike", attr: "vel", pow: 26, hits: 3, cost: 2, first: 1, dojo: 1, text: "The Summit Dojo's charge: first in, three blows." },
+    { id: "circuit-pulse", name: "Circuit Pulse", kind: "special", attr: "cha", pow: 50, cost: 3, sure: 1, splash: 1, dojo: 1, text: "The Circuit Dojo's program: never misses, and reaches all of them." },
   ];
 
   /* ---------------------------------------------------------------- care: food and toys */

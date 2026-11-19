@@ -72,11 +72,14 @@
   function persist() {
     if (!G || !G.save) return;
     const S = G.save;
+    const here = S.region || "central", rg = o => (o.region || "central") === here;
     for (const e of G.ents) e.c.pos = [+e.x.toFixed(2), +e.z.toFixed(2)];
-    S.eggs = G.items.filter(i => i.kind === "egg").map(i => Object.assign(i.data, { pos: [+i.x.toFixed(2), +i.z.toFixed(2)] }));
-    S.items = G.items.filter(i => i.kind !== "egg" && !i.temp).map(i => ({ kind: i.kind, id: i.id, pos: [+i.x.toFixed(2), +i.z.toFixed(2)] }));
-    if (G.keeper) S.keeper = [+G.keeper.x.toFixed(2), +G.keeper.z.toFixed(2), +G.keeper.a.toFixed(2)];
-    if (G.held) { const h = G.held; if (h.kind === "egg") S.eggs.push(Object.assign(h.data, { pos: [G.keeper.x, G.keeper.z] })); else if (h.kind !== "creature") S.items.push({ kind: h.kind, id: h.id, pos: [G.keeper.x, G.keeper.z] }); }
+    if (G.arrived) {
+      S.eggs = S.eggs.filter(e => !rg(e)).concat(G.items.filter(i => i.kind === "egg").map(i => Object.assign(i.data, { region: here, pos: [+i.x.toFixed(2), +i.z.toFixed(2)] })));
+      S.items = (S.items || []).filter(i => !rg(i)).concat(G.items.filter(i => i.kind !== "egg" && !i.temp).map(i => ({ kind: i.kind, id: i.id, region: here, pos: [+i.x.toFixed(2), +i.z.toFixed(2)] })));
+      if (G.keeper) S.keeper = [+G.keeper.x.toFixed(2), +G.keeper.z.toFixed(2), +G.keeper.a.toFixed(2)];
+      if (G.held) { const h = G.held; if (h.kind === "egg") S.eggs.push(Object.assign(h.data, { region: here, pos: [G.keeper.x, G.keeper.z] })); else if (h.kind !== "creature") S.items.push({ kind: h.kind, id: h.id, region: here, pos: [G.keeper.x, G.keeper.z] }); }
+    }
     for (const c of [...S.chao, ...S.animals]) { if (c.log.length > 40) c.log.splice(1, c.log.length - 40); for (const k in c.rel) if (Math.abs(c.rel[k]) < 0.5) delete c.rel[k]; }
     try { localStorage.setItem(G.opts.key || "redringcircuit.chao", JSON.stringify(S)); } catch (e) {}
   }
@@ -102,7 +105,7 @@
     sg.setAttribute("position", new THREE.Float32BufferAttribute(sp, 3));
     G.stars = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, fog: false }));
     scene.add(G.stars);
-    G.W = G.Wd.make(scene);
+    G.W = G.Wd.make(scene, G.save.region || "central");
     G.W.props.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     G.cam.userData = { yaw: 0, pitch: 0.32, dist: 4.8, tx: 0, ty: 0, tz: 0 };
     resize();
@@ -122,9 +125,12 @@
   const tod = () => ((G.save.day % 1) + 1) % 1;
   const isNight = () => { const t = tod(); return t < 0.21 || t > 0.85; };
   function light() {
-    const t = tod(), [sky, fog] = skyAt(t);
+    const t = tod(), el = Math.sin((t - 0.25) * TAU), day = clamp(el * 3 + 0.25, 0, 1);
+    let [sky, fog] = skyAt(t);
+    const RS = G.W && G.W.RG && G.W.RG.sky;
+    if (RS) { sky = G.M.mixC(sky, RS[0], 0.5 * day); fog = G.M.mixC(fog, RS[1], 0.5 * day); }
     G.scene.background.setHex(sky); G.scene.fog.color.setHex(G.M.mixC(sky, fog, 0.5));
-    const el = Math.sin((t - 0.25) * TAU), day = clamp(el * 3 + 0.25, 0, 1);
+    const fk = (G.W && G.W.RG && G.W.RG.fog) || 1; G.scene.fog.near = 30 * fk; G.scene.fog.far = 70 * fk;
     const k = G.keeper || { x: 0, z: 0 };
     const sa = (t - 0.25) * TAU;
     G.sun.position.set(k.x + Math.cos(sa) * 50, Math.max(8, Math.sin(sa) * 60) + 10, k.z + 24);
@@ -139,26 +145,113 @@
 
   /* ---------------------------------------------------------------- arriving */
   function arrive() {
-    const S = G.save, W = G.W, P = G.Wd.PLAN;
+    const S = G.save, W = G.W, P = G.Wd.PLAN, here = S.region || "central", central = here === "central";
     /* the keeper */
-    const kp = S.keeper || [P.spawn[0], P.spawn[1], PI];
+    const kp = S.keeper || (central ? [P.spawn[0], P.spawn[1], PI] : W.RG.entry);
     G.keeper = { rig: G.M.avatar(S.avatar), x: kp[0], z: kp[1], a: kp[2], y: W.ground(kp[0], kp[1]), vx: 0, vz: 0, vy: 0, air: false };
     shadowsOn(G.keeper.rig.g); G.scene.add(G.keeper.rig.g);
     G.cam.userData.yaw = G.keeper.a + PI;
     /* the warden: the garden's own keeper of old, at the hall */
-    G.npc = { rig: G.M.avatar({ sex: "f", skin: 2, hair: 6, style: "bun", eyes: 2, attire: "sweater", colour: 3, bottoms: "long", glasses: true, custom: { apron: 0x8a6a3a, hat: { c: 0xd8c08a, band: 0x3a6a3a, sun: true, flower: 0xf05a7a }, shoes: 0x6a4a2a } }), x: P.hall[0] + 3.2, z: P.hall[1] - 5.2, a: PI * 0.9, name: "Hazel" };
-    G.npc.y = W.ground(G.npc.x, G.npc.z); place(G.npc); shadowsOn(G.npc.rig.g); G.scene.add(G.npc.rig.g);
-    /* everyone who lives here */
-    for (const c of [...S.chao, ...S.animals]) spawn(c);
-    for (const e of S.eggs) addItem("egg", null, e.pos ? e.pos[0] : rnd(-4, 4), e.pos ? e.pos[1] : 28, e);
-    for (const it of S.items || []) addItem(it.kind, it.id, it.pos[0], it.pos[1]);
+    folkHere();
+    /* everyone who lives here (each creature lives in one garden; carried through a gate, it lives in the next) */
+    settle();
+    gates(true);
+    music(gardenTune());
     W.update(G.keeper.x, G.keeper.z);
     W.group.traverse(o => { if (o.isMesh && !o.material.transparent) { o.receiveShadow = true; o.castShadow = true; } });
     mail();
     if (!S.met) intro();
-    else toast(`Day ${Math.floor(S.day) + 1} in the Central Garden`, "sun");
+    else toast(`Day ${Math.floor(S.day) + 1} in the ${W.RG.name || "Central Garden"}`, "sun");
     G.arrived = true;
   }
+  const HAZEL = { sex: "f", skin: 2, hair: 6, style: "bun", eyes: 2, attire: "sweater", colour: 3, bottoms: "long", glasses: true, custom: { apron: 0x8a6a3a, hat: { c: 0xd8c08a, band: 0x3a6a3a, sun: true, flower: 0xf05a7a }, shoes: 0x6a4a2a } };
+  function settle() {
+    const S = G.save, here = S.region || "central", rg = o => (o.region || "central") === here;
+    for (const c of [...S.chao, ...S.animals]) if (rg(c)) spawn(c);
+    for (const e of S.eggs) if (rg(e)) addItem("egg", null, e.pos ? e.pos[0] : rnd(-4, 4), e.pos ? e.pos[1] : 28, e);
+    for (const it of S.items || []) if (rg(it)) addItem(it.kind, it.id, it.pos[0], it.pos[1]);
+  }
+
+  /* ---------------------------------------------------------------- the gardens
+     The gates round the Central Garden open as the keeper gets on: the bridge mended once a
+     Chao has changed (or two days have passed), the fallen trees cleared once three live here,
+     and so on; the balloon to the Sky Garden flies once the other five are open. */
+  const GATE_RULES = {
+    tropical: { ok: S => S.chao.some(c => c.stage >= 1) || S.day >= 2, why: "A bridge over the river is being mended. (It'll be done once one of your Chao has changed, or in two days.)", done: "The bridge to the Tropical Garden is mended!" },
+    forest:   { ok: S => S.chao.length + S.animals.length >= 4, why: "Fallen trees lie across the path. (The garden's folk will clear them once four creatures live with you.)", done: "The fallen trees are cleared: the Forest Garden is open!" },
+    mountain: { ok: S => (S.ach.duelWins || 0) >= 1, why: "Rocks have fallen across the pass. (The climbers will move them for a keeper who has won a duel at the hall.)", done: "The pass is clear: the Mountain Garden is open!" },
+    mystic:   { ok: S => (S.ach.eggs || 0) >= 1, why: "The old stone door is sealed. (It opens, they say, for a keeper whose creatures have had an egg of their own.)", done: "The stone door has opened: the Mystic Garden!" },
+    mech:     { ok: S => S.chao.length + S.animals.length >= 8 || (S.freedEggs || 0) >= 3, why: "The lift has no power. (The engineers want eight creatures in your care -- or three eggs from animals freed in the zones.)", done: "The lift has power: the Mechanical Garden is open!" },
+    sky:      { ok: S => ["tropical", "forest", "mountain", "mystic", "mech"].every(k => (S.open || {})[k]), why: "The balloon needs mending. (Open the other five gardens and it'll fly.)", done: "The balloon is mended: the Sky Garden is above!" },
+  };
+  /* see which gates have opened (and tell, the first time) */
+  function gates(quiet) {
+    const S = G.save; S.open = S.open || {};
+    if (!G.W || G.W.id !== "central") { for (const k in GATE_RULES) if (!S.open[k] && GATE_RULES[k].ok(S)) S.open[k] = true; return; }
+    for (const g of G.W.gates) {
+      const R = GATE_RULES[g.id]; if (!R) continue;
+      if (!S.open[g.id] && R.ok(S)) { S.open[g.id] = true; if (!quiet) { toast(R.done, "door"); jingle("gate-open"); } }
+      if (S.open[g.id] && !g.open) G.W.openGate(g);
+    }
+  }
+  /* through a gate: the garden behind is put away, the next one built; what you carry comes too */
+  function travel(to, from) {
+    if (G.traveling) return; G.traveling = true;
+    const fade = document.createElement("div"); fade.className = "cg-fade"; G.el.append(fade);
+    requestAnimationFrame(() => fade.classList.add("on"));
+    setTimeout(() => {
+      if (!G) return;
+      const S = G.save, h = G.held;
+      persist();
+      const carried = h && h.kind === "creature" ? h.e.c : null, item = h && h.kind !== "creature" ? { kind: h.kind, id: h.it.id, data: h.it.data } : null;
+      if (carried) carried.region = to;
+      G.held = null;
+      for (const e of G.ents.slice()) despawn(e);
+      for (const it of G.items) G.scene.remove(it.m);
+      G.items = [];
+      if (item && item.kind === "egg") { S.eggs = S.eggs.filter(e => e !== item.data); }
+      else if (item) { const i = (S.items || []).findIndex(x => x.kind === item.kind && x.id === item.id && (x.region || "central") === (S.region || "central")); if (i >= 0) S.items.splice(i, 1); }
+      for (const [, m] of G.W.chunks) m.geometry.dispose();
+      G.scene.remove(G.W.group); G.scene.remove(G.W.props);
+
+      S.region = to;
+      G.W = G.Wd.make(G.scene, to);
+      G.W.props.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      const k = G.keeper;
+      if (to === "central") {
+        const g = G.W.gates.find(x => x.id === from), sp = g ? G.W.spots["gate-" + g.id] : null;
+        if (sp) { const ix = Math.sin(g.face), iz = Math.cos(g.face); k.x = sp.x + ix * 1.5; k.z = sp.z + iz * 1.5; k.a = g.face; } else { k.x = 0; k.z = 29; k.a = PI; }
+      } else { const E = G.W.RG.entry; k.x = E[0]; k.z = E[1]; k.a = E[2]; }
+      folkHere();
+      k.y = G.W.ground(k.x, k.z); k.vx = k.vz = 0;
+      G.cam.userData.yaw = k.a + PI; G.cam.userData.tx = k.x; G.cam.userData.tz = k.z; G.cam.userData.ty = k.y + 1;
+      settle();
+      if (carried) { const e = G.ents.find(x => x.c === carried) || spawn(carried, k.x, k.z); pickUp({ kind: "creature", e }); }
+      if (item) { const it = addItem(item.kind, item.id, k.x, k.z, item.data); pickUp({ kind: item.kind, it, id: item.id }); }
+      G.W.update(k.x, k.z);
+      G.W.group.traverse(o => { if (o.isMesh && !o.material.transparent) { o.receiveShadow = true; o.castShadow = true; } });
+      gates(true);
+      music(gardenTune());
+      S.visited = S.visited || {}; const first = !S.visited[to]; S.visited[to] = true;
+      toast(first ? `The ${G.W.RG.name || "Central Garden"}, for the first time` : `The ${G.W.RG.name || "Central Garden"}`, first ? "star" : "flag");
+      persist();
+      fade.classList.remove("on"); setTimeout(() => fade.remove(), 500);
+      G.traveling = false;
+    }, 480);
+  }
+  /* the gardens you're not in: their creatures' days go on, more quietly */
+  function elsewhere(dt) {
+    G.elseT = (G.elseT || 0) + dt; if (G.elseT < 5) return;
+    const S = G.save, here = S.region || "central", n = G.elseT; G.elseT = 0;
+    for (const c of [...S.chao, ...S.animals]) {
+      if ((c.region || "central") === here) continue;
+      G.L.tick(c, n, { dayLen: DAY, asleep: isNight() && Math.random() < 0.6, wild: c.region === "forest" || c.region === "tropical", mech: c.region === "mech" });
+      c.care.food = Math.max(c.care.food, 35);                       // (they find something to eat)
+      if (Math.random() < n / 40) { const A = G.D.ATTRS, a = REGION_TRAIN[c.region] || A[Math.floor(Math.random() * 7)].id; G.L.train(c, a, 4); }
+    }
+  }
+  /* what each garden is good for, a little, just by living there */
+  const REGION_TRAIN = { tropical: "res", forest: "ins", mountain: "pow", mystic: "cha", mech: "ins", sky: "agi" };
   function shadowsOn(o) { o.traverse(m => { if (m.isMesh && m.material && !m.material.transparent && m.geometry.type !== "PlaneGeometry") { m.castShadow = true; m.receiveShadow = true; } }); }
   /* the animals Sonic and the others free from the badniks: every eight, an egg in the mailbox */
   function mail() {
@@ -237,7 +330,7 @@
   }
   function canStand(e, x, z) {
     const W = G.W, r = (e.rig.r || 0.25) * 0.6;
-    if (Math.hypot(x, z) > 44) return false;
+    if (Math.hypot(x, z) > ((G.W.RG && G.W.RG.radius) || 44)) return false;
     if (e.rig.gait === "fly") return !W.blocked(x, z, r) || true;
     const dep = W.depth(x, z), st = W.standAt(x, z);
     if (e.rig.aquatic) return dep > 0.35;
@@ -325,7 +418,7 @@
   }
   function live(e, dt) {
     const c = e.c, T = e.task, L = G.L;
-    L.tick(c, dt, { dayLen: DAY, asleep: e.st === "sleep", busy: T && (T.fast || T.k === "spar" || T.k === "play"), wild: c.kind === "chao" && G.ents.some(o => o.c.kind === "animal" && Math.hypot(o.x - e.x, o.z - e.z) < 4) && Math.random() < 0.3 });
+    L.tick(c, dt, { dayLen: DAY, asleep: e.st === "sleep", busy: T && (T.fast || T.k === "spar" || T.k === "play"), wild: c.kind === "chao" && (G.W.id === "forest" || G.W.id === "tropical" || (G.ents.some(o => o.c.kind === "animal" && Math.hypot(o.x - e.x, o.z - e.z) < 4) && Math.random() < 0.3)), mech: c.kind === "chao" && G.W.id === "mech" });
     if (!isFinite(e.x) || !isFinite(e.z) || !isFinite(e.a)) { const p = G.W.places.any(); e.x = p[0]; e.z = p[1]; e.a = 0; e.v = 0; e.y = groundFor(e, e.x, e.z); e.task = null; }
     /* a child grows by itself, most in what it was born good at; animals graze as they go */
     if (c.kind === "chao" && c.stage === 0 && !e.held && Math.random() < dt * 2) { const A = G.D.ATTRS; let s2 = 0; for (const a of A) s2 += c.genes.apt[a.id] + 0.2; let r = Math.random() * s2; for (const a of A) { r -= c.genes.apt[a.id] + 0.2; if (r <= 0) { practise(e, a.id, 0.35); break; } } }
@@ -565,7 +658,7 @@
         const w = G.W.waterAt(it.x, it.z), g = groundFor(null, it.x, it.z), floor = w != null && (it.kind === "toy" || it.kind === "fruit") ? w - 0.05 : g;
         if (it.y <= floor) { it.y = floor; if (Math.abs(it.vy) > 2.5 && it.kind === "toy" && it.id === "ball") { it.vy = -it.vy * 0.45; } else { it.air = false; it.vy = 0; } it.vx *= 0.6; it.vz *= 0.6; }
       } else if (Math.abs(it.vx) + Math.abs(it.vz) > 0.05) { it.x += it.vx * dt; it.z += it.vz * dt; it.vx *= Math.pow(0.1, dt); it.vz *= Math.pow(0.1, dt); it.y = groundFor(null, it.x, it.z); }
-      if (Math.hypot(it.x, it.z) > 44) { const k = 43 / Math.hypot(it.x, it.z); it.x *= k; it.z *= k; }
+      const RR = ((G.W.RG && G.W.RG.radius) || 44); if (Math.hypot(it.x, it.z) > RR) { const k = (RR - 1) / Math.hypot(it.x, it.z); it.x *= k; it.z *= k; }
       it.m.position.set(it.x, it.y, it.z);
       if (it.kind === "egg") eggTick(it, dt);
     }
@@ -582,7 +675,7 @@
   function hatch(it) {
     const L = G.L, D = G.D, e = it.data;
     removeItem(it);
-    const c = L.hatch(e, G.save.day, "central");
+    const c = L.hatch(e, G.save.day, G.save.region || "central"); c.region = G.save.region || "central";
     (c.kind === "chao" ? G.save.chao : G.save.animals).push(c);
     G.save.book[c.id] = L.record(c);
     for (const pid of c.parents || []) if (!G.save.book[pid]) { const p = [...G.save.chao, ...G.save.animals].find(x => x.id === pid); if (p) G.save.book[pid] = L.record(p); }
@@ -665,7 +758,7 @@
     for (const it of G.items) if (!it.held) consider({ kind: it.kind, it }, score(it.x, it.z, 1.5) + 0.05);
     for (const t of G.W.trees) if (t.fruit) consider({ kind: "tree", t }, score(t.x, t.z, 2.4) - 0.2);
     for (const n in G.W.spots) { const s = G.W.spots[n]; consider({ kind: "spot", n, s }, score(s.x, s.z, s.r + 0.6) - 0.1); }
-    if (G.npc) consider({ kind: "npc" }, score(G.npc.x, G.npc.z, 2.2) + 0.1);
+    for (const n of G.npcs || []) if (n.rig.g.visible) consider({ kind: "npc", n }, score(n.x, n.z, 2.2) + 0.1);
     return best;
   }
   function prompts() {
@@ -682,8 +775,8 @@
     } else if (r) {
       if (r.kind === "creature") { P.push(["Z", `Pick up ${r.e.c.name}`], ["C", "Pet"], ["V", "Look"]); }
       else if (r.kind === "tree") P.push(["Z", "Shake the tree"]);
-      else if (r.kind === "spot") { const n = r.n; P.push(["Z", n === "incubator" ? "The incubator" : n === "mailbox" ? (G.save.mail && G.save.mail.length ? `Mailbox (${G.save.mail.length})` : "Mailbox") : n === "book" ? "The encyclopedias" : n === "hall" ? "The Garden Hall" : n.startsWith("gate") ? `The way to the ${r.s.gate.name}` : ""]); }
-      else if (r.kind === "npc") P.push(["Z", "Talk to Hazel"]);
+      else if (r.kind === "spot") { const n = r.n; P.push(["Z", n === "incubator" ? "The incubator" : n === "mailbox" ? (G.save.mail && G.save.mail.length ? `Mailbox (${G.save.mail.length})` : "Mailbox") : n === "book" ? "The encyclopedias" : n === "hall" ? "The Garden Hall" : n.startsWith("gate") ? (r.s.gate.open ? `Into the ${r.s.gate.name}` : `The way to the ${r.s.gate.name}`) : n === "exit" ? "Back to the Central Garden" : r.s.dojo ? "The dojo" : r.s.arena ? "The Garden League's arena" : n === "pier" ? "The pier" : n === "lake" ? "The frozen lake" : n === "altar" ? "The altar" : n === "observatory" ? "The observatory" : ""]); }
+      else if (r.kind === "npc") P.push(["Z", `Talk to ${r.n.name}`]);
       else { P.push(["Z", `Pick up ${name(r)}`]); if (r.kind === "egg") P.push(["V", "Look"]); }
     }
     if (!h && !(r && r.kind === "creature")) P.push(["X", "Whistle"]);
@@ -703,14 +796,21 @@
     if (r.kind === "creature") { pickUp({ kind: "creature", e: r.e }); return; }
     if (r.kind === "fruit" || r.kind === "toy" || r.kind === "egg") { pickUp({ kind: r.kind, it: r.it, id: r.it.id }); return; }
     if (r.kind === "tree") { const f = G.W.shake(r.t); sfx("stumble"); r.t.m.rotation.z = 0.06; setTimeout(() => { if (r.t.m) { r.t.m.rotation.z = 0; r.t.m.updateMatrix(); } }, 160); r.t.m.updateMatrix(); if (f) dropFruit(f); else toast("No fruit on it yet: it'll grow more", "clover"); return; }
-    if (r.kind === "npc") { hazelTalk(); return; }
+    if (r.kind === "npc") { r.n.f.talk(); return; }
     if (r.kind === "spot") {
       const n = r.n;
       if (n === "mailbox") { const S = G.save; if (!S.mail || !S.mail.length) { toast("The mailbox is empty", "mail"); return; } let i = 0; for (const e of S.mail) { addItem("egg", null, r.s.x + Math.cos(i) * 1.2 - 0.6, r.s.z - 1 + Math.sin(i) * 0.6, e); i++; } toast(`${S.mail.length} egg${S.mail.length > 1 ? "s" : ""} from the mailbox`, "mail"); S.mail = []; persist(); sfx("grab"); return; }
       if (n === "book") { encyclopedia(); return; }
       if (n === "hall") { hallMenu(); return; }
       if (n === "incubator") { toast("Eggs set here hatch twice as fast", "flame"); return; }
-      if (n.startsWith("gate")) { const g = r.s.gate; talk([["Sign", `To the ${g.name}. ${g.need}`], ["Sign", "(The other gardens open in a later visit.)"]]); return; }
+      if (n.startsWith("gate")) { const g = r.s.gate; if (g.open) travel(g.id); else talk([["Sign", `To the ${g.name}. ${(GATE_RULES[g.id] || {}).why || g.need}`]]); return; }
+      if (n === "exit") { travel("central", G.W.id); return; }
+      if (r.s.dojo) { dojoMenu(r.s.dojo); return; }
+      if (r.s.arena) { leagueMenu(); return; }
+      if (n === "pier") { talk([["", "The pier creaks underfoot. Fish dart in the clear water below; the swimmers love it here."]]); return; }
+      if (n === "lake") { talk([["", "The lake is frozen solid. Something glints under the ice."]]); return; }
+      if (n === "altar") { talk([["", "An old altar at the court's heart. Carvings round its edge show Chao, and a great light over them."]]); return; }
+      if (n === "observatory") { talk([["", "The old observatory. Its telescope points at a patch of sky where the stars gather thickest."]]); return; }
     }
   }
   function pickUp(h) {
@@ -799,8 +899,9 @@
       itemsTick(dt);
       G.W.growFruit(dt, t => G.ents.some(e => e.c.genes.traits.includes("greenthumb") && Math.hypot(e.x - t.x, e.z - t.z) < 8) ? 1.6 : 1);
       G.W.tick(dt);
-      if (G.npc) { G.npc.rig.anim(G.t, dt, "idle"); }
-      G.saveT += dt; if (G.saveT > 25) { G.saveT = 0; persist(); }
+      for (const n of G.npcs || []) { n.rig.g.visible = folkIn(n); if (n.rig.g.visible) n.rig.anim(G.t, dt, "idle"); }
+      G.saveT += dt; if (G.saveT > 25) { G.saveT = 0; persist(); gates(); }
+      elsewhere(dt);
       const dn = Math.floor(G.save.day); if (G.dayN !== dn) { if (G.dayN != null) dawn(dn); G.dayN = dn; }
     }
     camTick(dt); light();
@@ -935,7 +1036,7 @@
     return el;
   }
   function menuClose() { if (G.menu) { G.menu.el.remove(); G.menu = null; } stopPreviews(); if (G.keeper) music(gardenTune()); }
-  const gardenTune = () => "garden";
+  const gardenTune = () => (G && G.W && G.W.RG && G.W.RG.music) || "garden";
   function setFocus(el) { if (!G.menu) return; G.menu.el.querySelectorAll(".kb").forEach(b => b.classList.remove("kb")); G.focus = el; if (el) { el.classList.add("kb"); el.scrollIntoView({ block: "nearest" }); } }
   function moveFocus(dx, dy) {
     if (!G.menu) return;
@@ -1171,30 +1272,30 @@
     el.querySelectorAll("[data-n]").forEach(b => b.onclick = () => duelParty(v, +b.dataset.n, []));
     livePreview(el.querySelector(".cg-prev"), () => G.M.avatar(v.look));
   }
-  function duelParty(v, n, sel, rows) {
+  function duelParty(v, n, sel, rows, o) {
     const S = G.save, D = G.D, L = G.L, all = [...S.chao, ...S.animals].filter(c => { const e = G.ents.find(x => x.c === c); return !(e && e.rig.aquatic); });
     rows = rows || {};
     const party = sel.map(id => all.find(c => c.id === id)).filter(Boolean);
     const el = menuOpen(sec(`${n} against ${n}: your team`, "heart", `
       <p class="cg-text">Pick ${n === 1 ? "one" : n === 2 ? "two" : "three"}.${n > 1 ? " Tap a picked one again to set it in front or behind: the front takes the blows, the back is harder to reach." : ""} Friends side by side hit harder, and cover each other.</p>
       <div class="cg-grid cg-pick">${all.map(c => { const i = sel.indexOf(c.id); return `<button class="cg-crow ${i >= 0 ? "sel" : ""}" data-f data-c="${c.id}"><canvas width="96" height="96" data-thumb="${c.id}"></canvas><span><b>${esc(c.name)}</b><i>${esc(D.species(c.sp).name)}</i><em>${i >= 0 && n > 1 ? (rows[c.id] === "back" ? "Behind" : "In front") : `Lv ${L.lvSum(c)} &middot; ${esc(D.TEMPERS[c.genes.temper[0]].name)}`}</em></span></button>`; }).join("")}</div>
-      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button><button class="btn" data-f data-go ${party.length === n ? "" : "disabled"}>${ico("trophy")}Duel!</button></div>`), () => duelMenu(), "cg-wide");
-    el.querySelector("[data-back]").onclick = () => duelMenu();
+      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button><button class="btn" data-f data-go ${party.length === n ? "" : "disabled"}>${ico("trophy")}${o && o.go || "Duel!"}</button></div>`), () => (o && o.back ? o.back() : duelMenu()), "cg-wide");
+    el.querySelector("[data-back]").onclick = () => (o && o.back ? o.back() : duelMenu());
     el.querySelectorAll("[data-c]").forEach(b => b.onclick = () => {
       const id = b.dataset.c, i = sel.indexOf(id);
-      if (i >= 0 && n > 1 && rows[id] !== "back") { rows[id] = "back"; duelParty(v, n, sel, rows); return; }
-      if (i >= 0) { delete rows[id]; duelParty(v, n, sel.filter(x => x !== id), rows); return; }
+      if (i >= 0 && n > 1 && rows[id] !== "back") { rows[id] = "back"; duelParty(v, n, sel, rows, o); return; }
+      if (i >= 0) { delete rows[id]; duelParty(v, n, sel.filter(x => x !== id), rows, o); return; }
       if (sel.length >= n) return;
-      duelParty(v, n, [...sel, id], rows);
+      duelParty(v, n, [...sel, id], rows, o);
     });
-    el.querySelector("[data-go]").onclick = () => { if (party.length === n) duel(v, party, rows); };
+    el.querySelector("[data-go]").onclick = () => { if (party.length !== n) return; if (o && o.pick) o.pick(party, rows); else duel(v, party, rows, o); };
     thumbs(el, id => all.find(c => c.id === id));
   }
   /* the other side: from the visitor's kinds, grown to about your team's strength */
-  function foeTeam(v, mine) {
+  function foeTeam(v, mine, o) {
     const L = G.L, D = G.D, n = mine.length, avg = mine.reduce((s, c) => s + L.lvSum(c), 0) / n;
     const S = G.save, rec = (S.duels && S.duels[v.id]) || { w: 0 };
-    const want = Math.max(7, avg * (v.easy || 1) * (v.hard || 1) * (1 + rec.w * 0.06) * rnd(0.9, 1.08));
+    const want = Math.max(7, avg * (v.easy || 1) * (v.hard || 1) * (o && o.mul || 1) * (o && o.mul ? 1 : 1 + rec.w * 0.06) * rnd(0.9, 1.08));
     const out = [];
     for (let i = 0; i < n; i++) {
       const id = v.pool[Math.floor(Math.random() * v.pool.length)], c = L.make(id, { name: L.NAMES[Math.floor(Math.random() * L.NAMES.length)] });
@@ -1205,23 +1306,23 @@
     }
     return out;
   }
-  function duel(v, party, rows) {
+  function duel(v, party, rows, o) {
     menuClose();
-    const foes = foeTeam(v, party);
+    const foes = foeTeam(v, party, o);
     G.hud.style.display = "none"; G.tagBox.style.display = "none";
     const touch = G.el.querySelector(".cg-touch"); if (touch) touch.dataset.was = touch.className;
     G.battle = root.ChaoBattle.start({
       R: G.R, el: G.el, M: G.M, L: G.L, D: G.D, ico, esc, sfx, jingle, music, sec, menuOpen, menuClose, isMenu: () => !!G.menu,
     }, { mine: party, foes, rows, foeRows: { [foes[2] && foes[2].id]: "back" }, foeKeeper: { name: v.name, look: v.look }, keeperLook: G.save.avatar,
-      title: `${v.name}`, sub: `${party.length} against ${party.length}`, intro: `${v.name}: "${v.hi}"` }, res => duelOver(v, party, foes, res));
+      title: (o && o.title) || `${v.name}`, sub: (o && o.sub) || `${party.length} against ${party.length}`, intro: `${v.name}: "${(o && o.hi) || v.hi}"`, music: o && o.music }, res => duelOver(v, party, foes, res, o));
   }
-  function duelOver(v, party, foes, res) {
+  function duelOver(v, party, foes, res, o) {
     const S = G.save, L = G.L, D = G.D;
     G.battle = null; G.hud.style.display = ""; G.tagBox.style.display = "";
     S.duels = S.duels || {}; const rec = S.duels[v.id] = S.duels[v.id] || { w: 0, l: 0 };
     const won = res.winner === 0;
     if (won) rec.w++; else rec.l++;
-    const rings = won ? 40 * party.length + 20 * rec.w : res.quit ? 0 : 10;
+    const rings = o && o.rings != null ? (won ? o.rings : 0) : won ? 40 * party.length + 20 * Math.min(rec.w, 10) : res.quit ? 0 : 10;
     S.rings += rings;
     const names = foes.map(c => c.name).join(", ");
     for (const f of res.fighters.filter(x => x.side === 0)) {
@@ -1243,7 +1344,216 @@
     S.ach.duels = (S.ach.duels || 0) + 1; if (won) S.ach.duelWins = (S.ach.duelWins || 0) + 1;
     persist();
     music(gardenTune());
+    if (o && o.onDone) { o.onDone(won, res, rings); return; }
     talk([[v.name, won ? v.win : v.lose], ["", won ? `You won ${rings} rings.` : rings ? `${rings} rings for trying.` : "No rings for giving up."]]);
+  }
+
+  /* ---------------------------------------------------------------- the garden's folk
+     Who's where, and when: each has a garden, a spot (beside the dojo they keep, the arena,
+     the pier...) and hours; at night most have gone home. Talk to them with Z. */
+  const FOLK = [
+    { id: "hazel", name: "Hazel", region: "central", at: () => { const P = G.Wd.PLAN; return [P.hall[0] + 3.2, P.hall[1] - 5.2, PI * 0.9]; }, look: () => HAZEL, hours: [0, 1], talk: () => hazelTalk() },
+    { id: "pip", name: "Pip Marlowe", region: "central", at: () => [8.5, 30.5, -PI * 0.6], look: () => ({ sex: "m", skin: 1, hair: 3, style: "shaggy", eyes: 1, attire: "polo", colour: 0, bottoms: "shorts", custom: { apron: 0xe42630 } }), hours: [0.27, 0.83], talk: () => shopMenu(), role: "Runs the garden shop by the hall" },
+    { id: "bram", name: "Master Bram Oakheart", region: "forest", at: () => { const s2 = G.W.spots.dojo; return [s2.x + 2.2, s2.z - 0.6, PI]; }, look: () => ({ sex: "m", skin: 3, hair: 7, style: "buzz", eyes: 0, attire: "tracksuit", colour: 3, bottoms: "trousers", custom: { hat: { c: 0xf2efe6, band: 0xc0303a } } }), hours: [0.25, 0.86], talk: () => dojoMenu("forest") },
+    { id: "yuki", name: "Master Yuki Hale", region: "mountain", at: () => { const s2 = G.W.spots.dojo; return [s2.x - 2.2, s2.z, 0]; }, look: () => ({ sex: "f", skin: 0, hair: 6, style: "ponytail", eyes: 1, attire: "tracksuit", colour: 6, bottoms: "trousers", custom: { hat: { c: 0x5a8ac8, band: 0xf2efe6 } } }), hours: [0.22, 0.84], talk: () => dojoMenu("mountain") },
+    { id: "nell", name: "Doctor Nell Voss", region: "mech", at: () => { const s2 = G.W.spots.dojo; return [s2.x + 2.2, s2.z, PI]; }, look: () => ({ sex: "f", skin: 2, hair: 5, style: "bob", eyes: 3, attire: "suit", colour: 7, bottoms: "trousers", glasses: true, custom: { tie: 0x40d0f0 } }), hours: [0.3, 0.95], talk: () => dojoMenu("mech") },
+    { id: "ines", name: "Commissioner Ines Vale", region: "mystic", at: () => { const s2 = G.W.spots.arena; return [s2.x + 2.4, s2.z + 0.5, PI]; }, look: () => ({ sex: "f", skin: 4, hair: 0, style: "long", eyes: 2, attire: "suit", colour: 4, bottoms: "long", custom: { tie: 0xffd21a } }), hours: [0.27, 0.9], talk: () => leagueMenu() },
+    { id: "marlo", name: "Old Marlo", region: "tropical", at: () => [-14, 4.2, -PI / 2], look: () => ({ sex: "m", skin: 3, hair: 6, style: "buzz", eyes: 0, attire: "polo", colour: 5, bottoms: "shorts", custom: { hat: { c: 0xd8c08a, band: 0x3a6a8a, sun: true } } }), hours: [0.22, 0.75], talk: () => folkTalk("marlo") },
+    { id: "wren", name: "Wren Ashby", region: "mystic", at: () => [4, 6, PI * 0.7], look: () => ({ sex: "f", skin: 1, hair: 3, style: "bun", eyes: 2, attire: "sweater", colour: 5, bottoms: "trousers", glasses: true }), hours: [0.3, 0.8], talk: () => folkTalk("wren") },
+    { id: "otto", name: "Otto Breck", region: "mountain", at: () => [-6, 22, 0.4], look: () => ({ sex: "m", skin: 0, hair: 2, style: "shaggy", eyes: 1, attire: "sweater", colour: 4, bottoms: "trousers", custom: { hat: { c: 0xe42630, band: 0xf2efe6 } } }), hours: [0.25, 0.8], talk: () => folkTalk("otto") },
+    { id: "skye", name: "Skye Calloway", region: "sky", at: () => [3, 24, PI], look: () => ({ sex: "f", skin: 2, hair: 4, style: "pixie", eyes: 1, attire: "tracksuit", colour: 1, bottoms: "trousers", custom: { hat: { c: 0x8a5a3a, band: 0x3a2a1a } } }), hours: [0.2, 0.9], talk: () => folkTalk("skye") },
+  ];
+  const FOLK_LINES = {
+    marlo: ["Been fishing off this pier since before your grandparents were eggs. The swimmers love it out here -- the sea makes 'em tough.", "Saw a Chao chase a crab clean into the lagoon this morning. The crab won.", "Bring your swimmers to the sea of an evening. The water's warm then."],
+    wren: ["These ruins are older than the gardens. Look at the carvings on the altar: Chao, and a great light over them.", "They say a Chao who's lived three whole lives turns to light itself. I'd give anything to see one.", "The crystals hum at night. Your Chao feel it -- the ones that sleep here grow strange and strong in Chaos."],
+    otto: ["The air's thin up here, but it makes the legs strong. Bring your runners up the slopes.", "Master Hale's dojo is in the cave up the hill. She's tough, but she's fair.", "There's something frozen in the lake. I keep meaning to chip it out."],
+    skye: ["Up here, everyone flies -- or learns to. The fliers' wings come in stronger for it.", "Mind the edges. It's a long way down to the clouds.", "The observatory's telescope sees things nobody else can. Come up on a clear night."],
+  };
+  function folkTalk(id) { const L2 = FOLK_LINES[id] || ["..."]; const S = G.save; S.tips = S.tips || {}; S.tips[id] = ((S.tips[id] || 0) + 1) % L2.length; const f = FOLK.find(x => x.id === id); talk([[f.name, L2[S.tips[id]]]]); }
+  /* who's here now: built when you arrive, shown or gone by the hour */
+  function folkHere() {
+    for (const n of G.npcs || []) G.scene.remove(n.rig.g);
+    G.npcs = [];
+    const here = G.save.region || "central";
+    for (const f of FOLK) {
+      if (f.region !== here) continue;
+      let at; try { at = f.at(); } catch (e) { continue; }
+      if (!at) continue;
+      const n = { f, rig: G.M.avatar(f.look()), x: at[0], z: at[1], a: at[2] || 0, name: f.name };
+      n.y = G.W.ground(n.x, n.z); place(n); shadowsOn(n.rig.g); G.scene.add(n.rig.g);
+      G.npcs.push(n);
+    }
+  }
+  const folkIn = n => { const t = tod(), [a, b] = n.f.hours; return a === 0 && b === 1 ? true : t >= a && t <= b; };
+
+  /* ---------------------------------------------------------------- the garden shop
+     Pip's stall by the hall, open by day: fruit and Chaos Drives (to the bag), toys (at your
+     feet), eggs (by the incubator), and room for more -- a bigger garden, in three steps. */
+  const SHOP = {
+    food: [["round", 20], ["triangle", 40], ["square", 40], ["berry", 15], ["nut", 15], ["candy", 30], ["mushroom", 30], ["heart", 120], ["chaosdrive-g", 80], ["chaosdrive-p", 80], ["chaosdrive-r", 80], ["chaosdrive-y", 80]],
+    toys: [["ball", 60], ["duck", 60], ["trumpet", 80], ["box", 100], ["car", 100], ["kite", 120]],
+    eggs: [["chao-neutral-child", 300, "A Chao egg", "A plain egg: what hatches is up to how you raise it."],
+           ["chao-hero-child", 650, "A Halo Chao egg", "From a Halo line: it hatches already leaning kind and bright."],
+           ["chao-dark-child", 650, "A Shade Chao egg", "From a Shade line: it hatches already leaning sly and bold."],
+           ["chao-wild-child", 650, "A Grove Chao egg", "From a Grove line: half wild from the start, at home with the animals."],
+           ["chao-mech-child", 650, "A Gear Chao egg", "From a Gear line: it hatches with a gear for a ball, and a knack for machines."],
+           ["animal", 250, "An animal's egg", "From the gardens round about. Who knows what's in it?"]],
+    room: [[10, 1000], [20, 2500], [30, 5000]],
+  };
+  function shopMenu(tab) {
+    const S = G.save; tab = tab || "food";
+    const near = (G.npcs || []).some(n => n.f.id === "pip" && n.rig.g.visible);
+    if (!near) { talk([["", "The shop's shutters are down. Pip opens up in the morning."]]); return; }
+    const row = (k, name, text, price, c) => `<button class="cg-irow" data-f data-buy="${k}" ${S.rings < price ? "disabled" : ""}><span class="cg-dot" style="background:#${(c || 0xffd21a).toString(16).padStart(6, "0")}"></span><b>${esc(name)}</b><i>${esc(text)}</i><em>${price}</em></button>`;
+    let rows = "";
+    if (tab === "food") rows = SHOP.food.map(([id, p]) => { const f = G.D.food(id); return row("food:" + id, f.name, f.text + ((S.inv[id] || 0) ? ` (${S.inv[id]} in the bag)` : ""), p, f.c); }).join("");
+    if (tab === "toys") rows = SHOP.toys.map(([id, p]) => { const t = G.D.toy(id); return row("toy:" + id, t.name, t.text, p, t.c); }).join("");
+    if (tab === "eggs") rows = SHOP.eggs.map(([id, p, name, text]) => row("egg:" + id, name, text, p, id === "animal" ? 0xd8c8a0 : (G.D.ALIGNS[G.D.species(id).align] || {}).c ? G.D.ALIGNS[G.D.species(id).align].c[0] : 0xf4f0e4)).join("");
+    if (tab === "room") { const cur = (S.habitat && S.habitat.room) || 0, nx = SHOP.room.find(([r]) => r > cur); rows = nx ? row("room:" + nx[0], `A bigger garden (room for ${30 + nx[0]})`, "The Society's carpenters widen your plots and build more nests.", nx[1], 0x6ad050) : `<p class="cg-empty">The garden's as big as it gets: room for ${30 + cur}.</p>`; }
+    const el = menuOpen(`<div class="panel cg-panel"><div class="panel-hd">${ico("ticket")}Pip's garden shop<small>${S.rings} rings</small></div>
+      <div class="cg-tabs">${[["food", "Food"], ["toys", "Toys"], ["eggs", "Eggs"], ["room", "Room"]].map(([k, n]) => `<button class="${tab === k ? "sel" : ""}" data-f data-tab="${k}">${n}</button>`).join("")}</div>
+      <div class="cg-list">${rows}</div>
+      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div></div>`, menuClose, "cg-small");
+    el.querySelector("[data-back]").onclick = menuClose;
+    el.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => shopMenu(b.dataset.tab));
+    el.querySelectorAll("[data-buy]").forEach(b => b.onclick = () => {
+      const [kind, id] = b.dataset.buy.split(":"), list = kind === "food" ? SHOP.food : kind === "toy" ? SHOP.toys : kind === "egg" ? SHOP.eggs : SHOP.room;
+      const it = list.find(x => String(x[0]) === id); if (!it || S.rings < it[1]) return;
+      if (kind === "egg" && !room()) { toast("The garden's full: buy more room first", "info"); return; }
+      S.rings -= it[1]; sfx("coin");
+      const k = G.keeper, fx = k.x + Math.sin(k.a) * 0.8, fz = k.z + Math.cos(k.a) * 0.8;
+      if (kind === "food") { S.inv[id] = (S.inv[id] || 0) + 1; toast(`${G.D.food(id).name}: into the bag`, "check"); }
+      else if (kind === "toy") { addItem("toy", id, fx, fz); toast(`A new ${G.D.toy(id).name.toLowerCase()}`, "check"); }
+      else if (kind === "egg") {
+        let sp = id;
+        if (id === "animal") { const pool = G.D.ANIMALS.filter(a => a.rarity <= 2 && !a.classic && a.plan !== "fish" && a.plan !== "jelly"); sp = pool[Math.floor(Math.random() * pool.length)].id; }
+        addItem("egg", null, fx, fz, G.L.egg(sp, { from: "bought at Pip's garden shop" })); toast("An egg, at your feet", "check");
+      }
+      else { S.habitat = S.habitat || {}; S.habitat.room = +id; toast(`The garden's bigger: room for ${30 + (+id)}`, "star"); }
+      persist(); shopMenu(tab);
+    });
+  }
+
+  /* ---------------------------------------------------------------- the dojos
+     Three masters, each of two attributes: the Oakheart Dojo in the forest (Power, Resilience),
+     the Summit Dojo in the mountain's cave (Velocity, Vitality), the Circuit Dojo in the lab
+     (Instinct, Chaos). A session (rings) trains a creature hard in the master's two; the trial
+     is three duels in a row against the students -- one, then two, then three a side -- and its
+     reward is the dojo's seal and the master's own technique, taught to one of your team. */
+  const DOJOS = {
+    forest: { name: "Oakheart Dojo", master: "bram", attrs: ["pow", "res"], tech: "oak-crush", pool: ["chao-neutral-power", "chao-wild-power", "chao-hero-power", "an-bear", "an-boar", "an-badger", "an-ram"], cost: 60,
+      hi: "Strength is nothing without the grit to take a blow. Show me both.", win: "Your team stands like oaks. Take the seal -- and take this.", lose: "Rooted, but not yet deep. Train, and come back." },
+    mountain: { name: "Summit Dojo", master: "yuki", attrs: ["vel", "vit"], tech: "summit-rush", pool: ["chao-neutral-run", "chao-hero-run", "chao-dark-run", "an-ibex", "an-snowleopard", "an-hare", "an-wolf"], cost: 60,
+      hi: "The mountain rewards speed and stamina. Can yours keep up?", win: "You reached the summit. The seal is yours, and my technique with it.", lose: "Out of breath already? The slopes will fix that." },
+    mech: { name: "Circuit Dojo", master: "nell", attrs: ["ins", "cha"], tech: "circuit-pulse", pool: ["chao-mech-spark", "chao-mech-normal", "chao-neutral-spark", "an-mechpup", "an-mechcat", "an-mechbird", "an-moto"], cost: 60,
+      hi: "Instinct and Chaos Energy: the mind and the spark. Let's measure both.", win: "Remarkable readings. Here's the seal, and a program for your team.", lose: "Insufficient data. Train, and we'll test again." },
+  };
+  function dojoMenu(id) {
+    const Dj = DOJOS[id], S = G.save, master = FOLK.find(f => f.id === Dj.master);
+    if (!Dj) return;
+    S.seals = S.seals || {};
+    const near = (G.npcs || []).some(n => n.f.id === Dj.master && n.rig.g.visible);
+    if (!near) { talk([["", `The ${Dj.name} is closed for the night. Its master opens up in the morning.`]]); return; }
+    const A1 = G.D.ATTRS.find(a => a.id === Dj.attrs[0]).name, A2 = G.D.ATTRS.find(a => a.id === Dj.attrs[1]).name, tech = G.D.tech(Dj.tech);
+    const el = menuOpen(sec(Dj.name, "dumbbell", `
+      <p class="cg-text"><b>${esc(master.name)}</b>: "${esc(Dj.hi)}"<br>${esc(A1)} and ${esc(A2)} are taught here.${S.seals[id] ? ` You hold this dojo's seal.` : ""}</p>
+      <div class="cg-mm">
+        <button class="cg-mi" data-f data-focus data-go="train">${ico("dumbbell")}<b>A training session</b><i>${Dj.cost} rings: one of yours trains hard in ${esc(A1)} and ${esc(A2)}</i></button>
+        <button class="cg-mi" data-f data-go="trial">${ico("trophy")}<b>The dojo's trial</b><i>Three duels in a row -- one, two, then three a side. Win them all for the seal and ${esc(tech.name)}</i></button>
+      </div>
+      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`, "cg-small"));
+    el.querySelector("[data-back]").onclick = menuClose;
+    el.querySelector('[data-go="train"]').onclick = () => {
+      if (S.rings < Dj.cost) { menuClose(); talk([[master.name, "A session costs " + Dj.cost + " rings. Come back when you have them."]]); return; }
+      pickOne("Who trains?", c => {
+        S.rings -= Dj.cost;
+        const g1 = G.L.train(c, Dj.attrs[0], 70), g2 = G.L.train(c, Dj.attrs[1], 70);
+        c.care.energy = clamp(c.care.energy - 20, 0, 100); c.bond = clamp(c.bond + 1, 0, 100);
+        c.log.push([S.day, `Trained at the ${Dj.name}.`]); persist();
+        talk([[master.name, `Good work. ${c.name} gained ${g1.lv + g2.lv} level${g1.lv + g2.lv === 1 ? "" : "s"} between ${A1} and ${A2}.`]]);
+      }, () => dojoMenu(id));
+    };
+    el.querySelector('[data-go="trial"]').onclick = () => {
+      const all = [...S.chao, ...S.animals].filter(c => { const e = G.ents.find(x => x.c === c); return !(e && e.rig.aquatic); });
+      if (!all.length) { menuClose(); talk([[master.name, "Bring someone to fight first."]]); return; }
+      const n = Math.min(3, all.length), v = { id: "dojo-" + id, name: master.name, look: master.look(), pool: Dj.pool, hi: Dj.hi, win: Dj.win, lose: Dj.lose };
+      duelParty(v, n, [], {}, { go: "Begin the trial", back: () => dojoMenu(id), pick: (party, rows) => {
+        const steps = [1, 2, 3].map(k => Math.min(k, party.length));
+        const next = (i) => {
+          if (i >= steps.length) {
+            const first = !S.seals[id]; S.seals[id] = true; S.ach.seals = Object.keys(S.seals).length;
+            if (first) pickOne(`Who learns ${tech.name}?`, c => { if (!c.techs.includes(tech.id)) { if (c.techs.length < 6) c.techs.push(tech.id); else c.techs[c.techs.length - 1] = tech.id; } c.log.push([S.day, `Earned the ${Dj.name}'s seal and learned ${tech.name}.`]); persist(); talk([[master.name, Dj.win], ["", `${c.name} learned ${tech.name}! The seal of the ${Dj.name} is yours.`]]); }, null, party);
+            else talk([[master.name, "Still sharp. The trial is yours again."]]);
+            return;
+          }
+          const k = steps[i], team = party.slice(0, k);
+          duel(v, team, rows, { mul: 1.05 + i * 0.1 + (S.seals[id] ? 0.15 : 0), rings: 30 + i * 20, title: Dj.name, sub: `The trial: duel ${i + 1} of 3`, hi: i ? "Again!" : Dj.hi, onDone: (won) => { if (won) setTimeout(() => next(i + 1), 50); else talk([[master.name, Dj.lose]]); } });
+        };
+        next(0);
+      } });
+    };
+  }
+  /* pick one creature, for something */
+  function pickOne(title, cb, back, among) {
+    const S = G.save, all = among || [...S.chao, ...S.animals];
+    const el = menuOpen(sec(title, "heart", `<div class="cg-grid cg-pick">${all.map(c => `<button class="cg-crow" data-f data-c="${c.id}"><canvas width="96" height="96" data-thumb="${c.id}"></canvas><span><b>${esc(c.name)}</b><i>${esc(G.D.species(c.sp).name)}</i><em>Lv ${G.L.lvSum(c)}</em></span></button>`).join("")}</div>
+      <div class="cg-foot">${back ? `<button class="btn ghost" data-f data-back>${ico("back")}Back</button>` : ""}</div>`), back || menuClose, "cg-wide");
+    const b = el.querySelector("[data-back]"); if (b) b.onclick = back;
+    el.querySelectorAll("[data-c]").forEach(bt => bt.onclick = () => { const c = all.find(x => x.id === bt.dataset.c); menuClose(); cb(c); });
+    thumbs(el, id => all.find(c => c.id === id));
+  }
+
+  /* ---------------------------------------------------------------- the Garden League
+     In the Mystic Garden's old arena: five cups, each three rounds against the league's keepers
+     (a quarter-final, a semi-final, the final), one, two or three a side, harder cup by cup. A
+     cup won opens the next; the Champion's Cup's first winner is given a silver egg. */
+  const CUPS = [
+    { id: "pebble", name: "Pebble Cup", mul: 0.85, rings: 120 }, { id: "bronze", name: "Bronze Cup", mul: 1.0, rings: 200 }, { id: "silver", name: "Silver Cup", mul: 1.15, rings: 300 },
+    { id: "gold", name: "Gold Cup", mul: 1.3, rings: 450 }, { id: "champion", name: "Champion's Cup", mul: 1.5, rings: 800 },
+  ];
+  const LEAGUE_KEEPERS = [
+    { id: "lg-arlo", name: "Arlo Finch", look: { sex: "m", skin: 1, hair: 2, style: "slick", eyes: 1, attire: "suit", colour: 1, bottoms: "trousers" }, pool: ["chao-neutral-run", "chao-neutral-fly", "an-fox", "an-hawk"], hi: "Nothing personal. The bracket's the bracket.", win: "Good luck in the next round.", lose: "On to the next round for me!" },
+    { id: "lg-mira", name: "Mira Santos", look: { sex: "f", skin: 3, hair: 5, style: "ponytail", eyes: 2, attire: "tracksuit", colour: 4, bottoms: "shorts" }, pool: ["chao-hero-normal", "chao-hero-fly", "an-swan", "an-unicorn"], hi: "My team's trained for this all season!", win: "You earned that. Go win it all.", lose: "Yes! Sorry -- yes!" },
+    { id: "lg-tor", name: "Tor Halvard", look: { sex: "m", skin: 0, hair: 4, style: "spiky", eyes: 4, attire: "sweater", colour: 2, bottoms: "jeans" }, pool: ["chao-dark-power", "chao-dark-normal", "an-bear", "an-wolf", "an-rhino"], hi: "Power wins leagues.", win: "...Huh. Not bad.", lose: "Told you. Power wins." },
+    { id: "lg-ivy", name: "Ivy Kestrel", look: { sex: "f", skin: 1, hair: 3, style: "pixie", eyes: 3, attire: "polo", colour: 6, bottoms: "pleated", glasses: true }, pool: ["chao-mech-spark", "chao-neutral-spark", "an-owl", "an-chameleon"], hi: "I've studied every one of your matches.", win: "My notes were wrong. Fascinating.", lose: "Exactly as calculated." },
+    { id: "lg-cass", name: "Cass Okafor", look: { sex: "f", skin: 4, hair: 0, style: "bun", eyes: 0, attire: "suit", colour: 3, bottoms: "trousers" }, pool: ["chao-wild-power", "chao-wild-run", "an-tiger", "an-gorilla", "an-elephant"], hi: "Let's give the crowd a show.", win: "What a match! Take a bow.", lose: "And the crowd goes wild!" },
+  ];
+  function leagueMenu() {
+    const S = G.save; S.league = S.league || {};
+    const near = (G.npcs || []).some(n => n.f.id === "ines" && n.rig.g.visible);
+    if (!near) { talk([["", "The arena is dark tonight. The Garden League's cups run by day."]]); return; }
+    const won = c => S.league[c.id] && S.league[c.id].won, open = i => i === 0 || won(CUPS[i - 1]);
+    const el = menuOpen(sec("The Garden League", "trophy", `
+      <p class="cg-text"><b>Commissioner Ines Vale</b>: "Welcome to the league. Three rounds a cup, and every one of them in front of a crowd."</p>
+      <div class="cg-mm">${CUPS.map((c, i) => `<button class="cg-mi" data-f ${i === 0 ? "data-focus" : ""} data-cup="${i}" ${open(i) ? "" : "disabled"}>${ico(won(c) ? "crown" : open(i) ? "trophy" : "lock")}<b>${esc(c.name)}</b><i>${won(c) ? `Won${S.league[c.id].n > 1 ? " " + S.league[c.id].n + " times" : ""} -- ${c.rings} rings a win` : open(i) ? `${c.rings} rings to the winner` : "Win the cup before it first"}</i></button>`).join("")}</div>
+      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`, "cg-small"));
+    el.querySelector("[data-back]").onclick = menuClose;
+    el.querySelectorAll("[data-cup]").forEach(b => b.onclick = () => leagueFormat(+b.dataset.cup));
+  }
+  function leagueFormat(ci) {
+    const cup = CUPS[ci], all = [...G.save.chao, ...G.save.animals];
+    const el = menuOpen(sec(cup.name, "trophy", `<div class="cg-mm">${[1, 2, 3].map(n => `<button class="cg-mi" data-f ${n === 1 ? "data-focus" : ""} data-n="${n}" ${all.length < n ? "disabled" : ""}>${ico(n === 1 ? "person" : "heart")}<b>${n} against ${n}</b><i>Three rounds, ${n} a side</i></button>`).join("")}</div><div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`, "cg-small"));
+    el.querySelector("[data-back]").onclick = () => leagueMenu();
+    el.querySelectorAll("[data-n]").forEach(b => b.onclick = () => {
+      const n = +b.dataset.n, keepers = LEAGUE_KEEPERS.slice().sort(() => Math.random() - 0.5).slice(0, 3);
+      duelParty(keepers[0], n, [], {}, { go: "Enter the cup", back: () => leagueFormat(ci), pick: (party, rows) => {
+        const round = ["The quarter-final", "The semi-final", "The final"];
+        const next = i => {
+          if (i >= 3) {
+            const S = G.save, rec = S.league[cup.id] = S.league[cup.id] || { n: 0 }; rec.won = true; rec.n++;
+            S.rings += cup.rings; S.ach.cups = (S.ach.cups || 0) + 1;
+            for (const c of party) c.log.push([S.day, `Won the Garden League's ${cup.name}.`]);
+            const lines = [["Commissioner Ines Vale", `The ${cup.name} goes to ${S.avatar.name || "you"} and ${party.map(c => c.name).join(", ")}! ${cup.rings} rings, and the cup.`]];
+            if (cup.id === "champion" && rec.n === 1) { addItem("egg", null, G.keeper.x + 1, G.keeper.z, G.L.egg("chao-neutral-child", { from: "the Garden League's prize for its champion", genes: null })).data.silver = true; lines.push(["Commissioner Ines Vale", "And for the league's new champion: an egg like no other. Look after it."]); }
+            persist(); jingle("born-change"); talk(lines);
+            return;
+          }
+          const v = keepers[i];
+          duel(v, party, rows, { mul: cup.mul * (1 + i * 0.07), rings: 40 + i * 20, title: cup.name, sub: round[i], music: i === 2 ? "race-3" : "race-2", onDone: won => { if (won) setTimeout(() => next(i + 1), 50); else talk([[v.name, v.lose], ["Commissioner Ines Vale", `Out in ${round[i].toLowerCase()}. The ${cup.name} will be here when you're ready.`]]); } });
+        };
+        next(0);
+      } });
+    });
   }
 
   /* ---------------------------------------------------------------- the encyclopedias */

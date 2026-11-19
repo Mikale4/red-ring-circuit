@@ -3682,6 +3682,7 @@
   const BOSS_BGM = { mecha: "metal-battle", frog: "final-boss" };
   const musicVol = () => { try { const v = root.Settings && Settings.get("musicVolume"); return v == null ? 0.55 : v; } catch (e) { return 0.55; } };
   const BGM = { els: [], cur: 0, key: null, at: {}, over: null };
+  let inGarden = false;                                    // (the Chao Garden is open: its music alone, its keys alone)
   function fadeEl(el, v, ms, done) {
     clearInterval(el._fade);
     const v0 = el.volume, n = Math.max(1, Math.round(ms / 30)); let i = 0;
@@ -3689,7 +3690,7 @@
   }
   /** Play the track `key` (crossfading); a zone's theme picks up where it left off (`resume`). */
   function bgm(key, opts) {
-    if (SIM) return;
+    if (SIM || inGarden) return;
     opts = opts || {};
     if (!key) return;
     if (key === BGM.key && !opts.restart) { const el = BGM.els[BGM.cur]; if (el && opts.rate && el.playbackRate !== opts.rate) el.playbackRate = opts.rate; return; }   // (the same tune on: only its pace, if that's changed)
@@ -7135,7 +7136,9 @@
     keys[b] = down ? 1 : 0;
     if (down && !e.repeat) specTap[b] = 1;              // (a tap, kept for a spectator's next frame: one between two frames still counts)
   }
-  const kd = e => onKey(e, true), ku = e => onKey(e, false);
+  /* (while the Chao Garden is open, the keys are the garden's alone: the cabinet's menus behind
+     it hear nothing -- an X there was "back" here, and the title's music came on over the garden's) */
+  const kd = e => { if (!inGarden) onKey(e, true); }, ku = e => { if (!inGarden) onKey(e, false); };
 
   /* The menus by keyboard. Enter goes on from the title to the stage select, starts the
      stage from the stage select, and opens and closes the pause menu in a run; in any menu the
@@ -10711,13 +10714,13 @@
   }
   function chaoGarden() {
     needChao(() => {
-      cancelAnimationFrame(raf); raf = 0; bgmStop();
+      cancelAnimationFrame(raf); raf = 0; bgmStop(); inGarden = true;
       const ok = root.ChaoGarden && ChaoGarden.open(host, {
         key: KEY() + ".chao", prog: () => PROG(), tone,
         sfx: n => { const f = SFX[n]; if (f) f(); },
-        onExit: () => { last = 0; raf = requestAnimationFrame(frame); mainMenu(); },
+        onExit: () => { inGarden = false; last = 0; raf = requestAnimationFrame(frame); mainMenu(); },
       });
-      if (!ok) { raf = requestAnimationFrame(frame); note("The Chao Garden needs WebGL to draw its voxels."); }
+      if (!ok) { inGarden = false; raf = requestAnimationFrame(frame); note("The Chao Garden needs WebGL to draw its voxels."); }
     });
   }
   /* load the courses when they're first wanted (a megabyte of them; the rest of the cabinet doesn't need it) */

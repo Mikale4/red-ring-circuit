@@ -83,10 +83,12 @@
   /* the general shapes (the land, the arena) */
   function shape(v, x0, y0, z0, x1, y1, z1, inside, col) {
     x0 = Math.floor(x0); y0 = Math.floor(y0); z0 = Math.floor(z0); x1 = Math.ceil(x1); y1 = Math.ceil(y1); z1 = Math.ceil(z1);
+    /* (a cell past the box counts as outside: a test that ignores height, say, still has a top) */
+    const inn = (X, Y, Z) => X > x0 && X < x1 + 1 && Y > y0 && Y < y1 + 1 && Z > z0 && Z < z1 + 1 && inside(X, Y, Z);
     for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) {
       const X = x + 0.5, Y = y + 0.5, Z = z + 0.5;
       if (!inside(X, Y, Z)) continue;
-      if (inside(X + 1, Y, Z) && inside(X - 1, Y, Z) && inside(X, Y + 1, Z) && inside(X, Y - 1, Z) && inside(X, Y, Z + 1) && inside(X, Y, Z - 1)) continue;
+      if (inn(X + 1, Y, Z) && inn(X - 1, Y, Z) && inn(X, Y + 1, Z) && inn(X, Y - 1, Z) && inn(X, Y, Z + 1) && inn(X, Y, Z - 1)) continue;
       const c = typeof col === "function" ? col(x, y, z) : col;
       if (c != null) v.set(x, y, z, c);
     }

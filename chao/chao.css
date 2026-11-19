@@ -276,3 +276,7 @@ button.cg-fbox{cursor:pointer}
   .cg-bside.mine{bottom:130px}
   .cg-blog{top:auto;bottom:220px;max-width:70%}
 }
+
+/* -- between gardens */
+.cg-fade{position:absolute;inset:0;z-index:20;background:#050a22;opacity:0;transition:opacity .45s;pointer-events:none}
+.cg-fade.on{opacity:1}

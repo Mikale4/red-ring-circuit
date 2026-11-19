@@ -172,7 +172,7 @@
   /* a new technique, drawn from the attribute it trained: which one is chance -- two Chao of a
      kind trained alike still end up fighting differently */
   function learn(c, a, r) {
-    const pool = D.TECHS.filter(t => t.attr === a && t.kind !== "team" && !c.techs.includes(t.id));
+    const pool = D.TECHS.filter(t => t.attr === a && t.kind !== "team" && !t.dojo && !c.techs.includes(t.id));
     if (!pool.length) return null;
     const t = pick(r, pool);
     if (c.techs.length < 6) c.techs.push(t.id); else c.techs[Math.floor(r() * 6)] = t.id;
@@ -218,6 +218,7 @@
   function rareForm(c, ctx) {
     const sp = D.species(c.sp);
     const ld = c.lineDepth || {};
+    if (c.silver) return "chao-silver";
     if (both(c, "gold")) return "chao-gold";
     if ((ld["al-hero"] || 0) >= 3 && (ld["al-dark"] || 0) >= 3) return "chao-eclipse";
     if (both(c, "crystal")) return sp.align === "dark" || c.align.dark > 60 ? "chao-shadowglass" : "chao-crystal";
@@ -252,6 +253,7 @@
     const c = make(e.sp, { genes: e.genes, parents: e.parents, gen: e.gen, day, region, from: e.from, name: e.name, bond: 25 });
     if (e.lineDepth) c.lineDepth = e.lineDepth;
     if (e.hatchedAt) c.hatchedAt = e.hatchedAt;
+    if (e.silver) c.silver = true;
     c.line = e.line || c.id;                    // its family line: the founder's, or its own if it founds one
     return c;
   }
