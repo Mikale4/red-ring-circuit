@@ -157,7 +157,11 @@ high road quick for those who get up there, the low road with its secrets), and 
 its heart nobody else has. Each cup is harder than the last: more roads and secret rooms (seven
 in the Flicky Cup, thirty-one in the Emerald), more badniks (the cup's own, from seventeen to
 forty-eight), more thorns and more falls to nothing, bigger set pieces -- each cup's danger its
-own kind (ice and freezing water in the Aurora, the sky under you in the Skyward).
+own kind (ice and freezing water in the Aurora, the sky under you in the Skyward). Whatever
+you fall into has a way out that the slowest, heaviest runner can take: a secret room is
+climbed out of with a jump and a wall kick, a climb or a flight (its monitor one that lasts -- rings, a shield or the
+magnet -- never shoes or invincibility, that would run out on the climb), and a channel, its
+deck broken by the runners ahead, ends in a slope up out of the water.
 
 | Cup | Courses |
 |---|---|
@@ -185,7 +189,7 @@ Fifteen, the classic games' and the Wisps' (Team Sonic Racing's own racing power
 | Power | What it does |
 |---|---|
 | Speed Shoes | faster for 4.5 seconds |
-| Bubble Shield | takes one hit, for 4.5 seconds |
+| Bubble Shield | takes one hit, for 4.5 seconds (a shield from a monitor on the course too: 4.5 seconds in the grand prix) |
 | Invincibility | 7 seconds untouchable and faster, and anyone you touch goes down |
 | Buzz Bomber | Sonic 1's wasp flies after the runner ahead; with nobody ahead, it hovers where you left it, a trap |
 | Eggman Monitor | a fake monitor left behind you |
@@ -208,7 +212,10 @@ quicker or slower than the next (Breeze: about nine tenths of your top speed and
 a little under yours, dashing now and then; Storm: flat out), the pack kept near you, taking the
 rings, Red Rings and monitors they run through and lighting the Star Posts, riding the courses'
 machinery as you do, and using powers of their own (a runner who can fly or glide only does it
-over water, a fall or a wall: flying is slower than running). The HUD shows your place, the
+over water, a fall, thorns or a wall: flying is slower than running). They learn from their
+blunders: a CPU hurt by thorns or a badnik, or lost down a fall, remembers the spot for the rest
+of the race (its respawns too) and from then on jumps or flies further past it, a little further
+each time it happens there again. The HUD shows your place, the
 whole field along the course on a strip, and the power box.
 
 **Story** is *The Red Star Rings*, told the way Sonic Battle tells its story: one plot, an
@@ -486,8 +493,15 @@ are in `HITS` in `adventure.js`.
 | Chaos Gamma | walks slowly; a double tap is **Drive Mode**, fast and steerable for as long as the direction is held; **Flight Mode** in the air, sinking slowly | Solid Knuckle, Electric Stab, Paralyze Cut; Electric Shock, Upper Electric Shock, Buster Drill, Air Electric Shock, Air Knuckle; **Devastator**, which charges while C is held (the charging frames only while it is held) and lets go far bigger; **Meltdown**, his reactor going up, which costs him a heart; Blinker, a mine |
 | Dr. Eggman | in his **Egg Mobile**, a hovercraft, floating off the ground with its shadow under it; **Egg Hover**, Space in the air: held up a while, then sinking slowly (Down lets go) | Egg Fist, Spike Jab, Egg Driver; Wrecker Swing, Upper Fist, Hidden Drill, Wrecking Ball, Fist Piledriver; the Death Egg Cannon, a ball of fire; Missile Launch, a missile that goes off where it hits; Bomb Drop, a bomb out of the bottom, its fuse lit |
 | Metal Sonic | built to outrun Sonic (Sonic CD), the second fastest; his **jet** in the air, a burst ahead and a moment's hover; Spin Dash | Metal Jab, Swipe, Kick; Electrical Discharge, Electric Upper, Fireball Crash, Metal Rocket, Metal Eagle; Electric Bolt; **Black Shield**, a crystal round him that nothing gets through and that breaks what it meets; Plasma Grenade, thrown |
-| Mighty | strong; **Shell Launch**, Space in the air, straight up and curled; against a wall, a **wall jump** off it (Knuckles' Chaotix); curled, spikes and thorns can't hurt him (Sonic Mania Plus); Spin Dash | Mighty Punch, Kick, Hook; Explosive Punch, Mighty Uppercut, Mighty Chop, Mighty Rocket, Axe Sledge; Mighty Cyclone, a tornado along the ground (a ring of fire from the air); Hammer Spin, three times round; **Hammer Drop** (Up + C in the air), straight down through cracked rock, a shockwave both ways where he lands; Peacemaker |
+| Mighty | strong; **Shell Launch**, Space in the air, straight up and curled; against a wall, a **wall jump** off it (Knuckles' Chaotix), three before he lands; curled, spikes and thorns can't hurt him (Sonic Mania Plus); Spin Dash | Mighty Punch, Kick, Hook; Explosive Punch, Mighty Uppercut, Mighty Chop, Mighty Rocket, Axe Sledge; Mighty Cyclone, a tornado along the ground (a ring of fire from the air); Hammer Spin, three times round; **Hammer Drop** (Up + C in the air), straight down through cracked rock, a shockwave both ways where he lands; Peacemaker |
 | Silver | psychokinesis (Sonic '06); the **Air Psycho Dash**, Space in the air: ahead, a hover, and then Space held floats him down; Spin Dash | Silver Punch, Jab, Kick; Psycho Shock, Psycho Upper, Silver Bash, Silver Rocket, Psycho Crush; Psycho Knife, gone in a moment; Psycho Surge, a whirlwind round him; Psycho Orb, sent ahead to hang in the air, one at a time |
+
+**Wall kicks.** In a stage, Space against a wall you meet in the air kicks off it, up: held
+toward the wall, a short hop that comes straight back to it (up one wall and over its top),
+else well away from it (up a shaft, wall to wall). How many before you land is the runner's
+own: Sonic, Shadow, Metal Sonic and Silver two, Mighty three (his wall jump), the rest one;
+Knuckles climbs instead, and the Egg Mobile only hovers. Pressed to a wall with a kick left,
+you slide down it slowly. Not in a battle.
 
 Everyone sinks in deep water and has sixteen seconds of breath unless they find an air
 vent's bubbles, as in the classic games; only Tails swims (by flying), and Chaos, who is
@@ -639,9 +653,13 @@ along the bottom says who you're watching:
   arena, framed as ever, or one fighter followed close (the left and right arrows; Z back to the
   whole arena). Their HUD card is outlined.
 - a **race**, the **grand prix** or a story run: any runner followed -- a player's ghost or a
-  CPU, with their place (left and right) -- or a **free camera** (Z) that the arrows fly anywhere
-  along the course (Z or X back to the runners, the nearest one). On the grand prix's strip the
-  watched face is ringed.
+  CPU, with their place (left and right) -- or, Z, the **auto camera**, a race director cutting
+  to where the race is (the leader, runners side by side, the run-in to the line: a shot held
+  four seconds at least, twelve at most on one runner; left and right pick one to follow), then
+  Z again the **free camera**, which the arrows fly anywhere along the course (Z or X back to
+  the runners, the nearest one). On the grand prix's strip the watched face is ringed, and the
+  power box is theirs: what they hold (spinning as they pick it up) and, as they use it, a flash
+  and its name.
 
 A pad uses its d-pad and buttons the same way; a touch screen gets buttons on the bar. Nothing a
 spectator watches counts: no XP, rating, wins, trophies or story chapters. With nobody playing,

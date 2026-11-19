@@ -483,7 +483,7 @@
 .adv-tut h3{margin:5px 0 3px;font:italic 900 22px/1.05 var(--sx-big);color:#fff;paint-order:stroke fill;-webkit-text-stroke:5px var(--sx-ink);text-transform:uppercase}
 .adv-tut.ok h3{color:#9af0a6}
 .adv-tut p{margin:0;font:600 14px/1.45 var(--sx-pix)}
-.adv-tut kbd{display:inline-block;min-width:1.4em;margin:0 1px;padding:1px 6px 0;text-align:center;font:700 13px/1.25 var(--sx-pix);color:var(--sx-ink);background:#fff;
+.adv-tut kbd{display:inline-block;min-width:1.4em;margin:0 1px;padding:1px 6px 0;text-align:center;font:800 15px/1.1 "Barlow Condensed","Arial Narrow",sans-serif;color:var(--sx-ink);background:#fff;
   border:2px solid var(--sx-ink);border-radius:5px;box-shadow:0 2px 0 var(--sx-ink)}
 .adv-tut-pips{display:flex;gap:6px;margin-top:8px}
 .adv-tut-pips i{width:16px;height:16px;border-radius:50%;border:3px solid #ffd21a;background:var(--sx-ink);box-shadow:0 0 0 2px var(--sx-ink)}
@@ -916,6 +916,8 @@
 .gp-goal{position:absolute;right:-18px;top:2px;width:14px;height:16px;background:repeating-conic-gradient(#fff 0 25%,#050a22 0 50%) 0 0/7px 8px;border:2px solid var(--sx-ink)}
 .gp-pow{position:absolute;left:50%;top:92px;transform:translateX(-50%);width:62px;height:62px;border:3px solid var(--sx-ink);border-radius:12px;background:var(--sx-navy);box-shadow:inset 0 0 0 2px var(--sx-red),0 4px 0 var(--sx-ink);display:grid;place-items:center}
 .gp-pow canvas{width:48px;height:48px}
+.gp-pow.fire{animation:gp-fire .6s ease-out}
+@keyframes gp-fire{0%{background:#fff;box-shadow:inset 0 0 0 2px var(--sx-yel),0 0 0 4px var(--sx-yel),0 4px 0 var(--sx-ink)}100%{background:var(--sx-navy)}}
 .gp-pow i{position:absolute;right:-8px;bottom:-8px;padding:2px 5px;border:2px solid var(--sx-ink);border-radius:5px;background:var(--sx-yel);color:var(--sx-ink);font:700 11px/1 var(--sx-pix);font-style:normal}
 .gp-pow i:empty{display:none}
 .gp-pwrap{position:absolute;right:8px;top:-62px;pointer-events:auto}
@@ -996,7 +998,7 @@
 .np-spec-t small:empty{display:none}
 .np-spec-k{margin:0;font:600 12.5px/1.7 var(--sx-pix);color:#cfe0ff;white-space:nowrap}
 .np-spec-k:empty{display:none}
-.np-spec kbd{display:inline-block;min-width:1.4em;margin:0 1px;padding:1px 6px 0;text-align:center;font:700 13px/1.25 var(--sx-pix);color:var(--sx-ink);background:#fff;
+.np-spec kbd{display:inline-block;min-width:1.4em;margin:0 1px;padding:1px 6px 0;text-align:center;font:800 15px/1.1 "Barlow Condensed","Arial Narrow",sans-serif;color:var(--sx-ink);background:#fff;
   border:2px solid var(--sx-ink);border-radius:5px;box-shadow:0 2px 0 var(--sx-ink)}
 .np-spec-b{display:flex;gap:6px;pointer-events:auto}
 .np-spec-b button{width:44px;height:44px;display:grid;place-items:center;touch-action:none;border:3px solid var(--sx-ink);border-radius:50%;background:rgba(20,41,140,.85);color:#fff;cursor:pointer}

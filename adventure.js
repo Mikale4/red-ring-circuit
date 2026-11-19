@@ -84,7 +84,7 @@
  *             climb, a while), then it glides down. The Death Egg Cannon, missiles, bombs.
  *   Metal     the fastest after Shadow; his jet in the air, a burst ahead and a hover; the
  *             Black Shield (Up + C) lets nothing through. Spin Dash.
- *   Mighty    Shell Launch, straight up, and a wall jump off any wall (Knuckles' Chaotix);
+ *   Mighty    Shell Launch, straight up, and wall jumps, three before he lands (Knuckles' Chaotix);
  *             curled, spikes can't hurt him; Hammer Drop (Up + C in the air) breaks rock and
  *             sends a shockwave both ways (Sonic Mania Plus). Spin Dash.
  *   Silver    the Air Psycho Dash: ahead, a hover, then Space held floats him down; Psycho
@@ -199,7 +199,7 @@
       spinDash: true, air: "launch", from: "Mighty the Armadillo",
       moves: "Shell Launch · Hammer Drop",
       grades: { Speed: "A", Jump: "B", Air: "B", Power: "S" },
-      text: "Space in the air: Shell Launch, straight up; against a wall, a wall jump. Curled, spikes can't hurt him. Up + C in the air: Hammer Drop." },
+      text: "Space in the air: Shell Launch, straight up; against a wall, a wall jump, three before he lands. Curled, spikes can't hurt him. Up + C in the air: Hammer Drop." },
     /* Emerl, Sonic Battle's Gizoid: he copies what he sees. His move set is his own until he wins
        fights, and every win teaches him one move of someone else's -- one of eight he has seen, at
        random, never one he knows -- which he can then use in its slot in place of his own
@@ -4025,14 +4025,15 @@
     SFX.ringLoss();
   }
   /* an item monitor broken open: what it held */
+  const shieldFor = () => (GPR ? 4.5 : 0);               // in the grand prix a monitor's shield lasts four and a half seconds (or one hit), as the Bubble Shield does; elsewhere, till a hit
   function openMonitor(p, e) {
     e.gone = true; e.m.visible = false;
     if (ITEMS) effect("items", "smoke", e.x, e.y + 0.45, 1, 16, true, "fx", 0.9);                  // it goes up in smoke
     else burst(e.x, e.y + 0.5, [0xc8ccd6, 0xffffff, 0x182040], 12, 5);
     SFX.pop();
     if (e.kind === "ring") { p.carrots += 10; p.ringsGot += 10; SFX.coin(); hudToast("Super Ring: ten rings"); }
-    else if (e.kind === "shield") { p.shield = "green"; SFX.set(); hudToast("Shield: it takes one hit for you"); }
-    else if (e.kind === "magnet") { p.shield = "magnet"; SFX.set(); hudToast("Magnetic Shield: rings come to you"); }
+    else if (e.kind === "shield") { p.shield = "green"; p.shieldT = shieldFor(); SFX.set(); hudToast("Shield: it takes one hit for you"); }
+    else if (e.kind === "magnet") { p.shield = "magnet"; p.shieldT = shieldFor(); SFX.set(); hudToast("Magnetic Shield: rings come to you"); }
     else if (e.kind === "star") { p.star = 15; SFX.star(); hudToast("Invincibility"); }
     else { p.speedT = 12; SFX.dash(); hudToast("Speed Shoes"); }
   }
@@ -4098,6 +4099,7 @@
         if (p.state === "glide" && p.c.climb) { startClimb(p, sgn(dx)); return; }
         p.vx = 0; p.ballistic = false;
         if (p.state === "roll") p.state = "run";
+        if (!p.ground && !battle) { p.wkT = 0.15; p.wkDir = sgn(dx); }   // (against a wall in the air: a wall kick off it, for a moment)
       }
     }
     /* up onto a lip: stand on it -- and, coming down onto it from the air, land */
@@ -4215,6 +4217,10 @@
     if (p.shotHit > 0) p.shotHit -= dt;
     if (p.hideT > 0) p.hideT -= dt;
     if (p.wallT > 0) p.wallT -= dt;
+    if (p.shieldT > 0 && (p.shieldT -= dt) <= 0) { p.shieldT = 0; if (p.shield) { p.shield = false; SFX.pop(); } }   // (a shield wears off)
+    if (p.wkT > 0) p.wkT -= dt;                                       // (wall kicks: in touch with a wall in the air, a moment; steering locked after one)
+    if (p.wkLock > 0) p.wkLock -= dt;
+    if (p.ground || p.state === "ride") p.wkLeft = wallKicksOf(c);
     if (p.floorT > 0) p.floorT -= dt;
     p.hh =(p.state === "crouch" || p.state === "roll" || p.state === "charge") && !c.lift ? 0.72 : c.h;
     if (p.state === "ledge") { stepLedge(p, dt); interact(p, dt); return; }
@@ -4304,7 +4310,7 @@
         break;
     }
     // running, and steering in the air (not a shot from a cannon or a spring that flies true)
-    if ((p.state === "run" || p.state === "fly" || p.state === "teleport") && !(p.ballistic && !p.ground)) {
+    if ((p.state === "run" || p.state === "fly" || p.state === "teleport") && !(p.ballistic && !p.ground) && !(p.wkLock > 0)) {
       const t2 = p.state === "fly" ? Math.min(top * 1.3, c.run * (c.flyK || (srcOf(p, "air") === "rouge" ? 0.8 : 0.66))) : top;
       if (dir) {
         if (sgn(p.vx) !== dir && Math.abs(p.vx) > 0.4) p.vx += dir * acc * (ice ? 1 : 2.4) * dt;
@@ -4318,6 +4324,7 @@
     }
 
     const zg = w.zones && w.zones.length ? zoneStep(p, dt, dir) : 1;         // the course's currents, winds and low gravity
+    if (!battle && !p.ground && p.wkT > 0 && dir === p.wkDir && p.wkLeft > 0 && p.state === "run" && p.vy < -3) p.vy = -3;   // (pressed to a wall with a kick left: sliding down it, slowly)
     // the buttons
     const free = p.state === "run" || p.state === "crouch" || p.state === "fly" || p.state === "glide" || p.state === "dash" ||
                  p.state === "roll" || p.state === "teleport" || p.state === "jet" || p.state === "psy";
@@ -4329,6 +4336,7 @@
       else if (input.D && p.ground && !c.spinDash) { /* no Spin Dash (Rouge, Chaos, Gamma, Eggman): Down + Space does nothing */ }
       else if (battle && p.ground && p.shotHit > 0 && juggled(p)) { p.shotHit = 0; superJump(p); }   // a shot of theirs threw someone up: after them
       else if ((p.ground || p.coyote > 0) && p.state !== "fly" && p.state !== "glide") jump(p, mud);
+      else if (canWallKick(p)) wallKick(p);
       else airAction(p);
     }
     if (p.jumping && !input.J && p.vy > 5 && p.state === "run") { p.vy = 5; p.jumping = false; }
@@ -4403,6 +4411,22 @@
     SFX.jump(); emit("jump", { p });
   }
   /** Space again in the air: the runner's air action. */
+  /* Wall kicks: in the air against a wall, Jump kicks off it, up. Held toward the wall, a short hop
+     off it that comes straight back (up one wall, and over its top); else well away from it (up a
+     shaft, wall to wall). How many before you land again is the runner's own: the nimble ones
+     two, most one, Mighty three (Knuckles' Chaotix's wall jump); Knuckles climbs instead, and
+     the Egg Mobile only hovers. Not in a battle. */
+  const WALL_KICKS = { sonic: 2, shadow: 2, metal: 2, mighty: 3, silver: 2, tails: 1, amy: 1, rouge: 1, cream: 1, chaos: 1, gamma: 1, emerl: 1, knuckles: 0, eggman: 0 };
+  const wallKicksOf = c => (c.climb ? 0 : WALL_KICKS[c.id] != null ? WALL_KICKS[c.id] : 1);
+  const canWallKick = p => !battle && !p.ground && p.wkT > 0 && p.wkLeft > 0 && (p.state === "run" || p.state === "fly" || p.state === "glide");
+  function wallKick(p) {
+    const c = p.c, away = -p.wkDir, climb = (input.R - input.L) === p.wkDir;   // (held toward the wall: a short hop off it and straight back, to climb it; else off it, to the next)
+    p.wkLeft--; p.wkT = 0; p.wkLock = climb ? 0.08 : 0.14;
+    p.state = "run"; p.vy = c.jump * 0.95; p.vx = away * (climb ? 2.4 : Math.max(4.5, c.run * 0.34)); p.face = away;
+    p.curl = true; p.jumping = false; p.ballistic = false; p.drop = false;
+    SFX.jump(); burst(p.x - away * c.w / 2, p.y + 0.6, [0xffffff, 0xd8d8d8], 6, 3);
+    emit("walljump", { p });
+  }
   function airAction(p) {
     const c = p.c;
     p.ballistic = false;
@@ -4464,8 +4488,9 @@
         burst(p.x, p.y + 0.6, [0x70f0d0, 0xffffff], 9, 3); SFX.dash();
         break;
       case "launch": {                                     // Mighty
-        /* against a wall, a wall jump (Knuckles' Chaotix): off it and up, the launch his again */
-        for (const d of [p.face, -p.face]) {
+        /* against a wall in a fight, a wall jump (Knuckles' Chaotix): off it and up, the launch his
+           again. (In a stage his wall jumps are the wall kicks, three of them.) */
+        if (battle) for (const d of [p.face, -p.face]) {
           const wi = Math.floor(p.x + d * (c.w / 2 + 0.12));
           if (solid(tile(wi, Math.floor(p.y + 0.4))) && solid(tile(wi, Math.floor(p.y + 0.9)))) {
             p.face = -d; p.vx = -d * 9; p.vy = 12; p.jumping = true; p.curl = false; p.launchT = 0; p.airUses = 0; SFX.jump();
@@ -7322,12 +7347,13 @@
     if (p.healing) p.hp = Math.min(p.hpMax, p.hp + (HEAL[p.c.id] || 6) * p.hpMax / 100 * dt);
   }
   /* the shield, a bubble of light round them; healing, green sparks rising */
+  const shieldBlink = t => t > 0 && t < 1.2 && Math.sin(world.t * 36) > 0.2;   // (a shield about to wear off blinks)
   function drawAura(f, dt) {
     if (!f.aura) { f.aura = new THREE.Sprite(glowMat(0x9ad8ff, 0.5)); f.aura.visible = false; world.group.add(f.aura); }
     const card = ITEMS && f.shield && !f.dead;                 // a shield: Sonic Advance 3's own, see-through, turning
     if (ITEMS) {
       if (!f.shCard) { f.shCard = makeCard("items", "ghost"); world.group.add(f.shCard); }
-      f.shCard.visible = !!card;
+      f.shCard.visible = !!card && !shieldBlink(f.shieldT);
       if (card) setFrame(f.shCard, f.shield === "magnet" ? "shield.magnet" : "shield.green", Math.floor(world.t * 14) % 6, 1, f.x, f.y + f.hh * 0.5 + (f.c.lift || 0), true, 0.32, 1.05);
       /* invincibility: eight little sparkles circling the runner like a turning ball of stars --
          two tilted rings going round, the near side in front of the runner, the far side behind,
@@ -7355,7 +7381,7 @@
         setFrame(f.gCard, "guard", i, f.face, f.x, f.y + f.hh * 0.5 + (f.c.lift || 0), true, 0.35, Math.max(1, f.hh * 0.95 + 0.1));
       }
     }
-    const on = ((guard && !sb) || (f.shield && !ITEMS)) && up;
+    const on = ((guard && !sb) || (f.shield && !ITEMS && !shieldBlink(f.shieldT))) && up;
     f.aura.visible = !!on;
     if (on) { const k = 2.4 + Math.sin(world.t * 30) * 0.08; f.aura.scale.set(k, k, 1); f.aura.position.set(f.x, f.y + f.hh * 0.5 + (f.c.lift || 0), 0.35); }
     /* healing: the green ring, round them flat, rising from their feet up over them and again */
@@ -8641,7 +8667,7 @@
   const AIR_DESC = { ballet: "Sonic Ballet, a second jump that homes on anything near", fly: "flight: tap to climb, until tired",
     glide: "a glide while held; glide into a wall to climb it", double: "a Double Jump", teleport: "Chaos Control, twice a jump",
     float: "Chaos Flight, a little more height", jet: "a burst of the jet ahead, and a hover", psy: "the Air Psycho Dash; then hold Space to float down",
-    launch: "Shell Launch, straight up; against a wall, a wall jump" };
+    launch: "Shell Launch, straight up; against a wall, a wall jump, three before he lands" };
   const airDesc = c => c.id === "eggman" ? "Egg Mobile Flight: tap to climb on its boosters, a while; then it glides down" : c.air === "hover" ? "Flight Mode: held up a while, sinking" : AIR_DESC[c.air] || "";
   function movesHtml(c) {
     const R = (k, t) => `<div class="adv-mv-r"><b>${k}</b><span>${t}</span></div>`;
@@ -9693,7 +9719,7 @@
      breathes as a runner does and is hit as one is. Stuck, it backs off for a run at it or goes up
      by the ledges; a fall, a hit it can't take, or no way past, and the run is "fail" (a CPU in a
      race gets up again from its Star Post, as you do). */
-  const newBot = (p, skill) => ({ t: 0, best: p.x, still: 0, hold: 0, jt: 0, zt: 0, back: 0, tries: 0, airUsed: false, done: 0, goal: null, gt: 0, tried: [], dashT: 0,
+  const newBot = (p, skill) => ({ les: [], t: 0, best: p.x, still: 0, hold: 0, jt: 0, zt: 0, back: 0, tries: 0, airUsed: false, done: 0, goal: null, gt: 0, tried: [], dashT: 0,
                                   rev: 0, revTap: 0, skill: skill || {}, inp: newInput(), tr: !!(skill && skill.trace) });   // (tr: noting why it does what it does, for a trace)
   /* a jump's time to rise `hgt` metres over the feet, and to come back down past it again (null:
      out of its reach) */
@@ -9776,6 +9802,7 @@
       else if (e.t === "bumper") { const x0 = e.x - 0.7 - front; if (x0 > -1.2 && x0 < R && e.y - 0.66 < p.y + p.hh && e.y + 0.66 > p.y) ob(x0, e.x + 0.7 - front, e.y + 0.7 - p.y, "bumper"); }
     }
     for (const z of w.hazards) { const x0 = z.x0 - front; if (x0 > -1.2 && x0 < R && z.y0 < p.y + 0.4 && z.y1 > p.y - 0.4) ob(x0, z.x1 - front, z.y1 - p.y, "thorns", false, true); }
+    if (B.les) for (const L of B.les) { const x0 = L.x0 - front; if (x0 > -1.2 && x0 < R && Math.abs(L.y - p.y) < 0.6) ob(x0, L.x1 - front, L.y + 0.5 - p.y, "thorns", false, true); }   // (a spot it has learnt to fear)
     for (const e of w.enemies) {
       if (!e.alive || e.hidden) continue;
       const EB = e.B, ext = EB.act === "orbit" ? 1.0 : 0, rch = e.reach || EB.reach || 0;
@@ -9816,9 +9843,34 @@
     }
     return best;
   }
+  /* thorns -- or a spot it has learnt to fear (botLearn) -- under feet from x0 to x1 at height y */
+  function botSore(A, x0, x1, y) {
+    for (const z of world.hazards) if (z.x0 < x1 + 0.4 && z.x1 > x0 - 0.4 && z.y0 <= y + 0.3 && z.y1 >= y - 0.3) return true;   // (with a margin: a toe in them is a hit)
+    if (A.les) for (const L of A.les) if (L.x0 < x1 && L.x1 > x0 && Math.abs(L.y - y) < 1.2) return true;
+    return false;
+  }
+  /* A blunder -- hurt by thorns or a badnik, or down a fall to nothing -- remembered for the rest of
+     the race (a CPU's lessons outlive its respawns): the spot, a little round it, and each time it
+     happens there again a little wider. Its jumps and flights then go on past it (botAhead takes
+     it as thorns to clear; botLanding won't come down in it). A hit from a power teaches nothing. */
+  function botLearn(les, p, dead) {
+    if (!les) return;
+    const w = world, x = p.x, y = p.y;
+    let x0 = x - 0.8, x1 = x + 1.2, gy = y, why = null;
+    for (const z of w.hazards) if (z.x0 < x + 1.5 && z.x1 > x - 1.5 && Math.abs(z.y0 - y) < 1.6) { x0 = Math.min(x0, z.x0 - 0.4); x1 = Math.max(x1, z.x1 + 0.8); gy = z.y0; why = "thorns"; }
+    if (!why) for (const e of w.enemies) if (e.alive && Math.abs(e.x - x) < 2.6 && Math.abs(e.y - y) < 2.2) { x0 = Math.min(x0, e.x - 1.6); x1 = Math.max(x1, e.x + 1.8); gy = e.y; why = "foe"; break; }
+    if (!why && dead && y < 2) { why = "fall"; gy = botGroundBehind(x); }
+    if (!why) return;
+    const L = les.find(o => o.x0 < x1 + 1.5 && o.x1 > x0 - 1.5 && Math.abs(o.y - gy) < 1.6);
+    if (L) { L.n++; L.x0 = Math.min(L.x0, x0) - 0.5; L.x1 = Math.max(L.x1, x1) + 1.5; }
+    else les.push({ x0, x1, y: gy, n: 1, why });
+  }
+  /* (the ground a fall to nothing was taken from: the last ground behind x) */
+  function botGroundBehind(x) { for (let i = Math.floor(x); i > Math.floor(x) - 12; i--) for (let j = H - 1; j >= 0; j--) { const t = tile(i, j); if (solid(t) || t === "-") return j + 1; } return 0; }
   /* A fall from where a runner is, as it's going (holding on ahead, no more presses): where it
-     comes down -- "ground", "wall" (into one too high to land on), "pit" (nothing under it, or
-     water), or "far" (past what it can see: ground there, it's taken as ground) */
+     comes down -- "ground", "thorns" (ground, but thorns on it, or a spot it has learnt to fear),
+     "wall" (into one too high to land on), "pit" (nothing under it, or water), or "far" (past what
+     it can see: ground there, it's taken as ground) */
   function botLanding(p, A, top) {
     const c = p.c, dt = 1 / 40;
     let x = 0, y = 0, vx = Math.max(0, p.vx), vy = p.vy;
@@ -9831,15 +9883,15 @@
       for (const R of rides) if (!(R === p.rideLast && t < p.rideCd) && botCaught(R, p.x + x, p.y + y, p.hh)) return "ground";   // (down into a cable's handle, a pipe, a cannon: taken on -- not the one just left, for a moment)
       const g = col(x);
       if (g === undefined) { const last = A.fl[A.fl.length - 1]; return last > -50 && last > y - 26 ? "far" : "pit"; }
-      if (g > -50 && y < g - 0.45 && vy > -14) { const k = Math.floor(A.front + x) - A.i0; if (!(A.rp[k])) return "wall"; }
+      if (g > -50 && y < g - 0.45 && (vy > -14 || yp < g - 0.05)) { const k = Math.floor(A.front + x) - A.i0; if (!(A.rp[k])) return "wall"; }   // (falling fast, only if it was under the top already: else it's down onto it this step)
       if (vy < 0) for (const xx of [x - 0.02, x - c.w + 0.06]) {
         const lv = col(xx);
         if (lv === undefined || lv <= -50 || y > lv) continue;
-        if (yp <= lv) return "ground";                                  // (in at the side, within its lip: up onto it)
+        if (yp <= lv) return botSore(A, A.front + xx - c.w, A.front + xx, p.y + lv) ? "thorns" : "ground";   // (in at the side, within its lip: up onto it)
         /* down through that height this step: just where -- a foot over the ground then (as the
            game lands it: any of its feet), or past the edge already */
         const f = (yp - lv) / (yp - y), xc = xp + (x - xp) * f, a = col(xc - 0.02), b = col(xc - c.w + 0.06);
-        if ((a !== undefined && a > -50 && a >= lv - 0.01) || (b !== undefined && b > -50 && b >= lv - 0.01)) return "ground";
+        if ((a !== undefined && a > -50 && a >= lv - 0.01) || (b !== undefined && b > -50 && b >= lv - 0.01)) return botSore(A, A.front + xc - c.w, A.front + xc, p.y + lv) ? "thorns" : "ground";
       }
       if (y < -26) return "pit";
     }
@@ -9856,6 +9908,13 @@
     const ground = x => { const k = Math.floor(A.front + x) - A.i0; return k < 0 ? 0 : k < A.fl.length ? A.fl[k] : -99; };
     const rampAt = x => { const k = Math.floor(A.front + x) - A.i0; return k >= 0 && k < A.rp.length && A.rp[k]; };
     const needOf = o => Math.max(0.3, o.top + (BOT_NEED[o.kind] != null ? BOT_NEED[o.kind] : o.spiky ? 0.5 : 0.3));
+    const j0 = Math.floor(p.y + 0.05), roofs = {};
+    const roofAt = x => {                                       // (the roof over each column it passes -- a girder ahead, not just over it now -- above that column's own ground)
+      const i = Math.floor(A.front + x); if (roofs[i] != null) return roofs[i];
+      const g = ground(x); let j = Math.max(j0 + 1, g > -50 ? Math.ceil(p.y + g - 0.01) : 0), r = 99;
+      for (let k = 0; k < 8; k++, j++) if (solid(tile(i, j))) { r = j - p.y; break; }
+      return (roofs[i] = r);
+    };
     let fallback = 9, far = -1, farHold = null;
     for (const hold of [0.05, 0.09, 0.13, 0.18, 0.24, 0.31, 0.4, 9]) {
       let t = 0, y = 0, vy = v0, cut = false, ok = true, land = null, xw = 0, vh = v;
@@ -9865,7 +9924,13 @@
         vy -= GRAV * gravAt(A.front + xw, p.y + y) * dt; y += vy * dt;
         if (y + p.hh > roofH && vy > 0) vy = 0;                    // (a roof: it bumps its head)
         if (top && vh > top) vh = Math.max(top, vh - 9 * dt);      // (faster than it runs -- off a dash strip -- it slows in the air)
+        const xPrev = xw;
         xw += (vh + windAt(A.front + xw, p.y + y) * 0.7) * dt;
+        const rNow = roofAt(xw + 0.02);
+        if (y + p.hh > rNow) {                                      // a roof over where it's got to: under it already, it bumps its head; else into its side
+          if (Math.floor(A.front + xPrev + 0.02) === Math.floor(A.front + xw + 0.02) || roofAt(xPrev + 0.02) <= rNow + 0.01) { y = rNow - p.hh; if (vy > 0) vy = 0; }
+          else { ok = false; break; }
+        }
         const x = xw, g = ground(x + 0.02);                         // (its front, over the ground there; a gale carrying it on)
         if (g > -50 && y < g - 0.15 && !rampAt(x + 0.02)) { ok = false; break; }   // into a wall too high to run up onto (a plan keeps the lip it could catch in hand)
         for (const o of A.obs) if (o.kind !== "wall" && x > o.x0 - 0.05 && x - c.w < o.x1 + 0.05 && y < needOf(o)) { ok = false; break; }
@@ -9894,8 +9959,9 @@
   /* (and how high its air action really takes it over a wall's lip: a jump's top, and what flight,
      a double jump or a hop adds -- a hover or a glide holds it up, never higher) */
   const airRows = c => (c.jump * c.jump) / (2 * GRAV) + (AIR_UP[c.air] || 0);
-  function stepUp(p, tried) {
-    const c = p.c, reach = Math.min(jumpRows(c), airRows(c) + 0.4), x0 = Math.floor(p.x), y0 = Math.floor(p.y + 0.01);   // (as high as it truly gets)
+  const kickRows = c => wallKicksOf(c) * 1.4;                 // (what its wall kicks add, up a wall beside it)
+  function stepUp(p, tried, extra) {
+    const c = p.c, reach = Math.min(jumpRows(c), airRows(c) + 0.4) + (extra || 0), x0 = Math.floor(p.x), y0 = Math.floor(p.y + 0.01);   // (as high as it truly gets)
     const open = (i, j) => { const t = tile(i, j); return !solid(t) || t === "-"; };
     let best = null, bs = 1e9;
     for (let i = x0 - 24; i <= x0 + 4; i++) for (let j = y0 + 1; j <= y0 + reach; j++) {        // (as high as it really gets: one step at a time)
@@ -9915,6 +9981,8 @@
     const I = D.inp, c = p.c;
     I.R = 1; I.L = 0; I.U = 0; I.D = 0; I.Z = I.X = I.C = 0;
     D.t += h; D.jt -= h; D.hold -= h; D.back -= h; D.zt -= h; D.dashT -= h;
+    if (p.state === "hurt" && D.ps !== "hurt") botLearn(D.les, p, false);   // (hurt: what by, and where -- remembered)
+    D.ps = p.state;
     if (p.demoFell || p.dead || p.y < 0.3) return "fail";
     if (p.state === "ride" || (p.ballistic && !p.ground)) { I.R = 1; I.J = 0; D.hold = 0; D.still = 0; D.best = Math.max(D.best, p.x); return; }   // (carried, or flying true: nothing to do but hold on)
     if (p.x > D.best + 0.4) { D.best = p.x; D.still = 0; } else D.still += h;
@@ -9927,7 +9995,11 @@
       I.J = I.jp ? 1 : 0;
       return;
     }
-    if (D.back > 0) { I.R = 0; I.L = 1; I.J = 0; return; }            // backing off, for a run at it
+    if (D.back > 0) {                                                  // backing off, for a run at it -- not back into thorns, nor off an edge
+      const bx = p.x - c.w / 2 - Math.max(1.2, -p.vx * 0.25);
+      if (p.ground && (botSore({ les: D.les }, bx - 1, bx, p.y) || botFloorIn(Math.floor(bx), Math.floor(p.y + 0.05)) < 1)) D.back = 0;
+      else { I.R = 0; I.L = 1; I.J = 0; return; }
+    }
     if (D.goal) {                                                      // on the way up to a ledge
       const g = D.goal, dx = g.x - p.x;
       D.gt += h;
@@ -9943,7 +10015,8 @@
         const lowLedge = g.y - p.y <= (c.jump * c.jump) / (2 * GRAV);
         const fast = Math.abs(p.vx) > (lowLedge ? 7 : 9) && Math.abs(dx) < 3 + Math.abs(p.vx) * 0.3 && sgn(p.vx) === sgn(dx);
         if (fast) { I.R = p.vx < 0 ? 1 : 0; I.L = p.vx > 0 ? 1 : 0; }
-        if (p.ground && Math.abs(dx) < 2.4 && D.jt <= 0 && !fast) { I.jp = 1; D.hold = 0.5; D.jt = 0.4; }
+        if (!p.ground && canWallKick(p) && p.y < g.y - 0.3 && D.jt <= 0 && p.vy < 3) { I.jp = 1; D.jt = 0.16; }   // (a wall beside it: up it by a kick)
+        else if (p.ground && Math.abs(dx) < 2.4 && D.jt <= 0 && !fast) { I.jp = 1; D.hold = 0.5; D.jt = 0.4; }
         else if (!p.ground && !D.airUsed && p.vy < 1 && p.y < g.y + 0.2 && D.jt <= 0 && c.air !== "hover" && c.air !== "glide") { I.jp = 1; D.airUsed = true; D.hold = 0.7; D.jt = 0.25; }   // (an air action that takes it higher: not a hover, nor a glide)
         else if (p.state === "fly" && p.y < g.y + 0.5 && D.jt <= 0) { I.jp = 1; D.jt = 0.22; }
         I.J = D.hold > 0 || I.jp ? 1 : 0;
@@ -9953,7 +10026,7 @@
     if (D.still > 1.6) {
       if (++D.tries > 5) return "fail";
       D.still = 0; D.jt = 0;
-      const g = stepUp(p, D.tried);
+      const g = stepUp(p, D.tried) || (wallKicksOf(c) ? stepUp(p, D.tried, kickRows(c)) : null);   // (a ledge its wall kicks get it to, if there's none nearer)
       if (g) { D.goal = g; D.gt = 0; } else D.back = 0.45 * Math.min(3, D.tries);             // a way up; else a run at it, further back each time
       return;
     }
@@ -9961,7 +10034,7 @@
        in good time -- never with a move that stops it -- from the nearest thing on */
     if (p.state === "climb") { I.U = 1; return; }          // Knuckles, on a wall: up and over
     const v = Math.max(0, p.vx), half = c.w / 2, S = D.skill;
-    const A = botAhead(p, w, Math.max(6.5, half + 1.4 + v * 0.5), D.buf || (D.buf = { obs: [], pool: [], fl: [], rp: [], gap: [0, 0] })), obs = A.obs, gap = A.gapOn;
+    const A = botAhead(p, w, Math.max(6.5, half + 1.4 + v * 0.5), D.buf || (D.buf = { obs: [], pool: [], fl: [], rp: [], gap: [0, 0], les: D.les })), obs = A.obs, gap = A.gapOn;
     const mud = p.ground && surfaceAt(p.x, p.y) === "m";
     const topNow = c.run * (p.star > 0 ? 1.22 : 1) * (p.speedT > 0 ? 1.35 : 1) * (p.paceK || 1);
     let roofH = 99;                                                    // (a low roof over it: as high as a jump goes there)
@@ -9987,6 +10060,7 @@
         }
         if (!rf || need > roofH - 0.2) {
           if (o.kind === "wall" && o.top - 0.4 <= airRows(c) && AIR_UP[c.air] && roofH > o.top + 1) { if (o.x0 <= v * 0.3 + 0.6) jumpFor = o; break; }   // (its air action takes it the rest of the way)
+          if (o.kind === "wall" && wallKicksOf(c) && o.top - 0.4 <= airRows(c) + kickRows(c) && roofH > o.top + 1) { if (o.x0 <= v * 0.3 + 0.6) jumpFor = o; break; }   // (or its wall kicks do: at it, and up it)
           if (o.top > 1.2 && !D.goal) { const g = stepUp(p, D.tried); D.why = "up:" + o.kind + o.top.toFixed(1) + (g ? "" : "-none"); if (g) { D.goal = g; D.gt = 0; return; } }   // too tall: up it by its steps, starting now
           if (o.top <= 1.2 && o.x0 <= v * 0.12 + 0.5) jumpFor = o;      // (a low thing under a roof: hop it anyway)
           break;
@@ -10022,8 +10096,11 @@
          water, a pit or a wall: its air action, as late as it can; flying, a beat at a time to
          hold its height, and the moment a drop from there would land, it lets go (Down) and runs
          on; gliding, it keeps on over the trouble and lets go once it's past */
-      const land = botLanding(p, A, topNow), safe = land === "ground";
+      const land = botLanding(p, A, topNow);
+      D.soreT = land === "thorns" ? 0.35 : (D.soreT || 0) - h;           // (thorns where it'd come down: it holds on till it's sure it's past them, not at the first glimpse of ground)
+      const safe = land === "ground" && !(D.soreT > 0);
       if (D.tr) D.why = "air:" + land;
+      if (canWallKick(p) && p.wkDir === 1 && D.jt <= 0 && land === "wall") { I.jp = 1; D.jt = 0.16; I.J = 1; return; }   // (a wall it won't land on top of: up it by a kick, then back to it)
       if (p.state === "fly") {
         if (safe) I.D = 1;
         else if (D.jt <= 0 && (p.vy < 0.2 || land === "wall")) { I.jp = 1; D.jt = 0.2; }
@@ -10061,6 +10138,7 @@
     SIM = true; demo = null;
     try {
       world = buildWorld(def); world.sim = true;
+      if (skill && skill.broken) for (const k in world.tiles) { const t = world.tiles[k]; if (t.c === "C") { t.gone = 1e9; t.fall = 9; world.S.grid[t.j][t.i] = "."; } }   // (a test: the crumbling ledges gone already, as the runners ahead leave them)
       const p = player = makePlayer(castOf(who)); p.demo = true;
       const D = newBot(p, skill);
       input = D.inp; mode = "sim";
@@ -10091,31 +10169,31 @@
   const CLEAN = {
     "seabreeze-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "seabreeze-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "airstrip-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "airstrip-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "parlour-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman mighty emerl", "parlour-3": "sonic tails knuckles amy rouge shadow cream chaos eggman mighty emerl",
-    "peak-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "peak-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl",
+    "parlour-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "parlour-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "peak-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "peak-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "club-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "club-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "expressway-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "expressway-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "museum-1": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver", "museum-3": "tails knuckles amy rouge shadow cream chaos gamma eggman metal silver",
+    "museum-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "museum-3": "tails knuckles amy rouge shadow cream chaos gamma eggman metal silver",
     "springs-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "springs-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "canyon-1": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver", "canyon-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "ruins-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "ruins-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "depot-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "depot-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "stars-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "stars-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty silver",
-    "station-1": "sonic tails knuckles amy rouge shadow cream chaos gamma metal mighty emerl silver", "station-3": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver",
+    "stars-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "stars-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "station-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "station-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
   };
   const cleanRunners = id => (CLEAN[id] || "").split(" ").filter(Boolean);
   /* the same for the grand prix's courses: who gets round each fairly (a cup's rivals are drawn
      from those who get round all four) */
-  const GP_CLEAN = {                                 // (measured 2026-11-18 with _debug.botStats, the CPUs' dash and all, on the redrawn courses)
+  const GP_CLEAN = {                                 // (measured 2026-11-18 with _debug.botStats, the CPUs' dash and all, after the wall kicks and the thorn-wise robot)
     "gp-checker": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-coral": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-grove": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-lagoon": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-pinball": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-funfair": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-sweets": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-pier": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "gp-slopes": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-crystal": "sonic tails amy rouge shadow cream chaos metal mighty emerl silver",
-    "gp-floes": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-tundra": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "gp-slopes": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-crystal": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "gp-floes": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-tundra": "sonic tails knuckles amy rouge cream chaos gamma eggman metal mighty emerl silver",
     "gp-dunes": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-town": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-foundry": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-volcano": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "gp-temple": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-windmills": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "gp-temple": "sonic tails knuckles amy rouge cream chaos gamma eggman metal mighty emerl silver", "gp-windmills": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-fleet": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-spires": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-refinery": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-metro": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-fortress": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-orbit": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
@@ -10130,7 +10208,7 @@
      `paceK` (their top speed, against yours) is how a class or a difficulty holds them back. */
   function cpuAdd(who, o) {
     const p = makePlayer(castOf(who)); p.cpu = true; p.paceK = o.paceK || 1;
-    const q = { id: o.id, who, p, D: newBot(p, o.skill), skill: o.skill || {}, home: null, down: false };
+    const les = [], q = { id: o.id, who, p, D: Object.assign(newBot(p, o.skill), { les }), skill: o.skill || {}, home: null, down: false, les };   // (les: what it has learnt this race)
     p.cpuQ = q; CPUS.push(q);
     return q;
   }
@@ -10152,9 +10230,9 @@
       const I = input;
       if (hold || q.home != null) { I.L = I.R = I.U = I.D = I.J = I.Z = I.X = I.C = 0; I.jp = I.zp = I.xp = I.cp = 0; I.dash = 0; }
       else {
-        if (p.dead) q.down = true;
-        else if (q.down) { q.down = false; q.D = Object.assign(newBot(p, q.skill), { inp: I }); }     // (up again at its post: it thinks again)
-        if (!p.dead && demoBot(q.D, p, world, h) === "fail") q.D = Object.assign(newBot(p, q.skill), { inp: I });
+        if (p.dead) { if (!q.down) botLearn(q.les, p, true); q.down = true; }                      // (down: a lesson, if it was the course's doing)
+        else if (q.down) { q.down = false; q.D = Object.assign(newBot(p, q.skill), { inp: I, les: q.les }); }     // (up again at its post: it thinks again, and remembers)
+        if (!p.dead && demoBot(q.D, p, world, h) === "fail") q.D = Object.assign(newBot(p, q.skill), { inp: I, les: q.les });
       }
       mode = q.home != null ? "goal" : "play";
       step(h);
@@ -10429,7 +10507,7 @@
     const good = pool.filter(clean), rest = pool.filter(id => !good.includes(id));
     U.shuffle(good); U.shuffle(rest);
     const cpus = good.concat(rest).slice(0, 7);
-    GP = { cup: o.cup, cupId: cup.id, cls: o.cls, k: GP_CLS[o.cls], race: 0, online: !!o.online,
+    GP = { cup: o.cup, cupId: cup.id, cls: o.cls, k: GP_CLS[o.cls], race: o.race || 0, online: !!o.online,   // (race: a test starting further into the cup)
            runners: [{ id: "you", who: me, me: true, name: "You" }].concat(cpus.map((who, i) => ({ id: "cpu" + i, who, name: castOf(who).name, skill: 0.97 + Math.random() * 0.07 }))),
            pts: {}, done: [], retries: 0 };
     GP.runners.forEach(r => { GP.pts[r.id] = 0; });
@@ -10495,7 +10573,7 @@
     box.innerHTML = `
       ${G.watch ? "" : `<div class="gp-place"><b class="num">8</b><i>th</i></div>`}
       <div class="gp-strip"><div class="gp-strip-in">${G.runners.map((r, i) => `<span data-gs="${i}" class="${r.me ? "me" : ""}"><canvas width="22" height="22" data-face="${r.who}"></canvas></span>`).join("")}<em class="gp-goal"></em></div></div>
-      ${G.watch ? "" : `<div class="gp-pow"><canvas width="48" height="48"></canvas><i>${TOUCH ? "" : "V"}</i></div>`}`;
+      <div class="gp-pow"><canvas width="48" height="48"></canvas><i>${TOUCH || G.watch ? "" : "V"}</i></div>`;
     hudEl.append(box);
     box.querySelectorAll("[data-face]").forEach(cv => paintCard(cv, cv.dataset.face, "portrait", 1));
     if (TOUCH && !G.watch) { const wrap = document.createElement("div"); wrap.className = "gp-pwrap"; wrap.innerHTML = `<button class="gp-pbtn" data-t="V">Power</button>`; (hudEl.querySelector(".adv-pad") || hudEl).append(wrap); wirePad(wrap); }
@@ -10590,7 +10668,7 @@
     }
     if (G.online && NP.host && Rr.rivals.length) {                // the host: where its CPUs are, to the others, ten times a second
       Rr.cT = (Rr.cT || 0) + dt;
-      if (Rr.cT >= 0.1) { Rr.cT = 0; Online.toAll({ t: "np.gc", c: Rr.rivals.filter(v => v.q).map(v => [v.r.id, r3(v.x), r3(v.y), v.q.p._rf || ["idle", 0, 1], v.fin != null ? 1 : 0, v.shield ? 1 : 0, v.q.p.star > 0 ? 1 : 0]) }, true); }
+      if (Rr.cT >= 0.1) { Rr.cT = 0; Online.toAll({ t: "np.gc", c: Rr.rivals.filter(v => v.q).map(v => [v.r.id, r3(v.x), r3(v.y), v.q.p._rf || ["idle", 0, 1], v.fin != null ? 1 : 0, v.shield ? 1 : 0, v.q.p.star > 0 ? 1 : 0, v.pow || 0]) }, true); }
     }
     /* your Red Rings: run into one and the box spins */
     for (const e of w.powers) {
@@ -10624,7 +10702,7 @@
     gpStepShots(dt);
     if (G.online) {                                        // online: where you are, to the others; the other players, touched
       Rr.gT += dt;
-      if (Rr.gT >= 0.1 && !G.watch) { Rr.gT = 0; const d = { t: "np.g", x: r3(p.x), y: r3(p.y), rf: p._rf || ["idle", 0, 1], fin: Rr.myFin != null ? 1 : 0 }; if (NP.host) Online.toAll(Object.assign({ id: NP.me }, d), true); else Online.toHost(d); }
+      if (Rr.gT >= 0.1 && !G.watch) { Rr.gT = 0; const d = { t: "np.g", x: r3(p.x), y: r3(p.y), rf: p._rf || ["idle", 0, 1], fin: Rr.myFin != null ? 1 : 0, pw: Rr.power || 0 }; if (NP.host) Online.toAll(Object.assign({ id: NP.me }, d), true); else Online.toHost(d); }
       for (const r of G.runners) if (r.human && !r.me) {
         const g = NP.ghosts.get(r.netId); if (!g) continue;
         if (g.fin && Rr.seen[r.netId] == null) Rr.seen[r.netId] = t;
@@ -10634,7 +10712,7 @@
     if (Rr.spin > 0) { Rr.spin -= dt; p.face = Math.floor(Rr.spin * 12) % 2 ? 1 : -1; }
     /* the bubble round you */
     if (!Rr.shieldS) { Rr.shieldS = new THREE.Sprite(glowMat(0x6ac8ff, 0.55)); Rr.shieldS.scale.set(2.8, 2.8, 1); w.group.add(Rr.shieldS); }
-    Rr.shieldS.visible = !!Rr.myShield; Rr.shieldS.position.set(p.x, p.y + p.hh / 2, 0.3);
+    Rr.shieldS.visible = !!Rr.myShield && !shieldBlink(Rr.myShield); Rr.shieldS.position.set(p.x, p.y + p.hh / 2, 0.3);
     gpDraw(dt);
     /* a spectating host: once the CPUs and every player still here are home, the result */
     if (G.watch) {
@@ -10656,11 +10734,34 @@
   }
   function gpNetCpu(d) {
     const Rr = GPR; if (!Rr || !Array.isArray(d.c)) return;
-    for (const [id, x, y, rf, fin, sh, st] of d.c) {
+    for (const [id, x, y, rf, fin, sh, st, pw] of d.c) {
       const v = Rr.rivals.find(o => o.r.id === id); if (!v || v.q) continue;
       v.tx = +x || 0; v.ty = +y || 0; v.rf = Array.isArray(rf) ? rf : v.rf; v.face = (v.rf || [])[2] || 1;
-      v.shield = !!sh; v.star = st ? 1 : 0;
+      v.shield = !!sh; v.star = st ? 1 : 0; v.pow = POWERS[pw] ? pw : null;
       if (fin && v.fin == null) { v.fin = world ? world.t : 0; Rr.fin.push({ id, t: v.fin }); }
+    }
+  }
+  /* A spectator's power box: the power the runner being watched holds -- spinning as they pick
+     one up, as yours does -- and, when they use it, the box flashes and says what it was. (The
+     free camera watches nobody: an empty box.) A held power only goes by being used. */
+  function gpSpecPow(dt) {
+    const Rr = GPR, S = NP.sp, key = S && S.view !== "free" ? S.key : null;
+    const r = key && GP.runners.find(o => o.id === key), g = r && r.human ? NP.ghosts.get(r.netId) : null, v = r && !r.human ? gpRunner(key) : null;
+    const k = (g ? g.pw : v ? v.pow : null) || null, W = Rr.spec || (Rr.spec = { key: null, k: null, roll: 0 });
+    if (key !== W.key) { W.key = key; W.k = k; W.roll = 0; paintPower(k); return; }   // (someone else: what they hold, no news)
+    if (k !== W.k) {
+      if (W.k) {                                           // used (and, between two of the host's words, maybe another picked up)
+        hudToast(r.name + ": " + POWERS[W.k].name + "!");
+        const box = host.querySelector(".gp-pow"); if (box) { box.classList.remove("fire"); void box.offsetWidth; box.classList.add("fire"); }
+        paintPower(null); W.roll = 0;
+      }
+      if (k) W.roll = W.k ? 1.2 : 0.8;                     // picked up: the box spins, then stops on it
+      W.k = k;
+    }
+    if (W.roll > 0) {
+      W.roll -= dt;
+      const ks = Object.keys(POWERS);
+      if (W.roll > 0) paintPower(ks[Math.floor(world.t * 14) % ks.length], true); else { W.roll = 0; paintPower(W.k); }
     }
   }
   /* places: home first by time, then by how far along */
@@ -10676,8 +10777,9 @@
   /* the rivals' cards, and the HUD */
   function gpDraw(dt) {
     const Rr = GPR, G = GP, w = world; if (!Rr || !w) return;
+    if (npWatching()) gpSpecPow(dt);
     for (const v of Rr.rivals) {
-      v.bub.visible = v.shield; v.bub.position.set(v.x, v.y + 1, 0.3);
+      v.bub.visible = !!v.shield && !(v.q && shieldBlink(v.shield)); v.bub.position.set(v.x, v.y + 1, 0.3);
       if (!v.card) continue;
       const a = v.rf || ["idle", 0, 1];
       let name = a[0], i = a[1] | 0, face = a[2] || 1;
@@ -11341,7 +11443,7 @@
             <button class="btn ghost" id="advBack" data-back>${ico("back")}Main menu</button>
           </div>
           <div class="adv-keys">${TOUCH ? "On screen: the pad moves, crouches and picks a move (Up or Down with Heavy or Special); Jump, Light, Heavy and Special." :
-            `<b>&larr; &rarr;</b> run, twice to dash &middot; <b>Space</b> jump, again in the air &middot; <b>Z</b> light &middot; <b>X</b> heavy &middot; <b>C</b> special<br>
+            `<b>&larr; &rarr;</b> run, twice to dash &middot; <b>Space</b> jump, again in the air, or off a wall you meet in the air &middot; <b>Z</b> light &middot; <b>X</b> heavy &middot; <b>C</b> special<br>
              <b>&uarr;</b> or <b>&darr;</b> with <b>X</b> or <b>C</b> for another move &middot; <b>&darr;</b> crouch &middot; <b>&darr; + Space</b> Spin Dash, or drop through &middot; <b>Enter</b> start, and pause<br>
              In the menus: <b>arrows</b> to choose &middot; <b>Z</b> to confirm &middot; <b>X</b> to go back`}</div>
           <div class="adv-credit">Sonic and his friends, his rivals and Dr. Eggman belong to SEGA. Sonic, Tails, Knuckles, Amy, Rouge, Shadow, Cream, Chaos and Chaos Gamma are from SEGA's Sonic Battle (Game Boy Advance, 2003), ripped by QuadFactor; Emerl, and every move he copies, re-ripped by Dinoshi 64 (some rips by Mr. C); Knuckles' climbing and the Spin Dash rev, dust and blast effects are from Sonic Advance (2001), ripped by AsuharaMoon; all from The Spriters Resource. Dr. Eggman, Metal Sonic, Mighty and Silver are drawn in Sonic Battle's style by TheKnucklesMainG4 (DeviantArt). The badniks are from Sonic Advance, Sonic Advance 2 and Sonic Advance 3, ripped by SpitfyaUK and Techokami, Fatazz and SkyLights (The Spriters Resource), and from TheKnucklesMainG4's Modern Sonic Badniks sheet (DeviantArt). The monitors and shields are Sonic Advance 3's, ripped by SpitfyaUK and Techokami (The Spriters Resource). Eggman's bosses, Gemerl and the capsule are from Sonic Advance, Sonic Advance 2 and Sonic Advance 3, ripped by SonicDash57, Flare, raidlandguy, SkyLights, Shade and Sonikku (The Spriters Resource). The music is from the soundtracks of Sonic the Hedgehog 4 Genesis, Sonic 3 Angel Island Revisited, and the Sonic 2 and Sonic 1 Anniversary Editions (khinsider); the sound effects are Sonic 3 &amp; Knuckles', from Mr Lange's Sonic Sounds Complete.</div>
@@ -12020,8 +12122,9 @@
      or a story fight, does a player who isn't in it (NP.spectator). In a battle the camera frames
      the whole arena, as ever, or follows one fighter; in a race or the grand prix it follows any
      runner -- a player's ghost or a CPU -- or flies free along the course. Left and Right: the one
-     before or after; Z (or Jump): the whole arena / the free camera, and back; in the free camera
-     the arrows move it, and X comes back to the runners. A bar along the bottom says who it is.
+     before or after; Z (or Jump): in a fight the whole arena and back, in a race the auto camera
+     (it picks who to watch), then the free camera, then back; in the free camera the arrows move
+     it, and X comes back to the runners. A bar along the bottom says who it is.
      (In a race the spectator's game still has a runner, for the camera to follow: never seen, and
      put each frame where the one watched is.) */
   const SPI = {}, specTap = {};                          // (the spectator's buttons: keys, a pad, the touch bar; the keys tapped since the last frame)
@@ -12030,16 +12133,16 @@
     const S = NP.sp; if (!battle || !S || S.view !== "follow" || !npWatching()) return null;
     return battle.fs.find(f => "f" + f.slot === S.key) || null;
   }
-  /* who there is to watch, in order: { key, x, y, face, name, sub } */
+  /* who there is to watch, in order: { key, x, y, face, name, sub, place, fin } */
   function specList() {
     if (battle) return battle.fs.filter(f => !f.out).map(f => ({ key: "f" + f.slot, x: f.x, y: f.y, face: f.face, name: f.netName || f.c.name,
       sub: f.netName ? f.c.name : f.ctl === "cpu" ? "CPU" : f.c.name }));
     const out = [];
     if (GP && GPR) {
-      const ord = gpOrder(), place = id => ord.findIndex(o => o.id === id) + 1;
+      const ord = gpOrder(), place = id => ord.findIndex(o => o.id === id) + 1, fin = id => { const o = ord.find(q => q.id === id); return !!o && o.fin != null; };
       for (const r of GP.runners) {
-        if (r.human) { const g = NP.ghosts.get(r.netId); if (g) out.push({ key: r.id, x: g.x, y: g.y, face: (g.rf || [])[2] || 1, name: r.name, sub: castOf(r.who).name + " · " + ORD(place(r.id)) }); }
-        else { const v = gpRunner(r.id); if (v) out.push({ key: r.id, x: v.x, y: v.y, face: v.face || 1, name: r.name, sub: "CPU · " + ORD(place(r.id)) }); }
+        if (r.human) { const g = NP.ghosts.get(r.netId); if (g) out.push({ key: r.id, x: g.x, y: g.y, face: (g.rf || [])[2] || 1, name: r.name, sub: castOf(r.who).name + " · " + ORD(place(r.id)), place: place(r.id), fin: fin(r.id) }); }
+        else { const v = gpRunner(r.id); if (v) out.push({ key: r.id, x: v.x, y: v.y, face: v.face || 1, name: r.name, sub: "CPU · " + ORD(place(r.id)), place: place(r.id), fin: fin(r.id) }); }
       }
       return out;
     }
@@ -12047,8 +12150,9 @@
     for (const m of (NP.plan && NP.plan.mem) || []) {
       const g = NP.ghosts.get(m.id); if (!g) continue;
       const who = story && m.id === NP.plan.hero ? story.ch.who : m.who;
-      out.push({ key: m.id, x: g.x, y: g.y, face: (g.rf || [])[2] || 1, name: m.name, sub: castOf(who).name + (g.fin ? " · home" : "") });
+      out.push({ key: m.id, x: g.x, y: g.y, face: (g.rf || [])[2] || 1, name: m.name, sub: castOf(who).name + (g.fin ? " · home" : ""), fin: !!g.fin });
     }
+    out.slice().sort((a, b) => b.x - a.x).forEach((o, k) => { o.place = k + 1; });   // (places by how far along)
     return out;
   }
   function npSpecTick(dt) {
@@ -12068,18 +12172,20 @@
       if (S.view === "follow" && !list.some(o => o.key === S.key)) S.view = "all";     // (they're out of it)
     } else {
       const p = player;
-      if (cam || (SPI.xp && S.view === "free")) {
-        if (S.view === "free") {                         // back to the runners: the one nearest where the camera is
-          S.view = "follow"; let best = null, bd = 1e9;
-          for (const o of list) { const d = Math.abs(o.x - S.fx) + Math.abs(o.y - S.fy) * 0.5; if (d < bd) { bd = d; best = o; } }
-          if (best) S.key = best.key;
-        } else if (cam) { S.view = "free"; S.fx = p.x; S.fy = p.y; }
-      } else if (S.view === "free") {
+      if (cam && S.view === "follow") { S.view = "auto"; S.holdT = 0; S.autoT = 0; }      // a runner -> the auto camera -> the free camera -> a runner
+      else if (cam && S.view === "auto") { S.view = "free"; S.fx = p.x; S.fy = p.y; }
+      else if ((cam || SPI.xp) && S.view === "free") {    // back to the runners: the one nearest where the camera is
+        S.view = "follow"; let best = null, bd = 1e9;
+        for (const o of list) { const d = Math.abs(o.x - S.fx) + Math.abs(o.y - S.fy) * 0.5; if (d < bd) { bd = d; best = o; } }
+        if (best) S.key = best.key;
+      } else if (SPI.xp && S.view === "auto") S.view = "follow";
+      else if (S.view === "free") {
         S.fx = clamp(S.fx + (SPI.R - SPI.L) * 20 * dt, 2, world.W - 2); S.fy = clamp(S.fy + (SPI.U - SPI.D) * 12 * dt, 0, H - 4);
-      } else if ((L || R) && n) step(R ? 1 : -1);
-      if (S.view === "follow" && !list.some(o => o.key === S.key) && n) S.key = list[0].key;
+      } else if ((L || R) && n) step(R ? 1 : -1);        // (from the auto camera too: that one, followed)
+      if (S.view === "auto") specAuto(S, list, dt);
+      if (S.view !== "free" && !list.some(o => o.key === S.key) && n) S.key = list[0].key;
       /* the runner nobody sees, where the camera is to be */
-      const o = S.view === "follow" ? list.find(q => q.key === S.key) : null;
+      const o = S.view !== "free" ? list.find(q => q.key === S.key) : null;
       const x = o ? o.x : S.view === "free" ? S.fx : p.x, y = o ? o.y : S.view === "free" ? S.fy : p.y;
       if (Math.abs(x - p.x) < 8 && dt > 0) p.vx = clamp(lerp(p.vx || 0, (x - p.x) / dt, 0.2), -30, 30);   // (a cut to someone else: no speed)
       p.x = x; p.y = y; if (o) p.face = o.face < 0 ? -1 : 1;
@@ -12087,6 +12193,25 @@
     }
     host.classList.toggle("np-free", S.view === "free");
     npSpecBar(S, list);
+  }
+  /* The auto camera, a race director: it cuts to where the race is -- the leader, a close fight
+     (runners side by side), the run-in to the line -- holding each shot four seconds at least,
+     and after twelve on one runner it goes looking elsewhere; the finished are left be. */
+  function specAuto(S, list, dt) {
+    S.holdT = (S.holdT || 0) + dt; S.autoT = (S.autoT || 0) - dt;
+    if (S.autoT > 0 && list.some(o => o.key === S.key)) return;
+    S.autoT = 0.5;
+    const live = list.filter(o => !o.fin), pool = live.length ? live : list; if (!pool.length) return;
+    const gx = world.goal ? world.goal.x : null, cur = pool.find(o => o.key === S.key);
+    const score = o => {
+      let s = o.place === 1 ? 3 : o.place ? Math.max(0, 2 - (o.place - 2) * 0.5) : 0;
+      for (const q of pool) if (q !== o && Math.abs(q.x - o.x) < 5 && Math.abs(q.y - o.y) < 4) s += 2;   // (a fight)
+      if (gx != null && o.x < gx && gx - o.x < 80) s += 2;                                                  // (the run-in)
+      return s + (o === cur ? 2 : 0);
+    };
+    let best = null, bs = -1e9;
+    for (const o of pool) { if (o === cur && S.holdT > 12 && pool.length > 1) continue; const s = score(o); if (s > bs) { bs = s; best = o; } }
+    if (best && best !== cur && (!cur || S.holdT >= 4)) { S.key = best.key; S.holdT = 0; }
   }
   /* the bar along the bottom: who's being watched, and the keys (on a touch screen, buttons) */
   function npSpecBar(S, list) {
@@ -12099,13 +12224,14 @@
           `<button data-t="Z" class="cam" aria-label="Change the camera">${ico("eye")}</button><button data-t="D" class="fv" aria-label="Down">${ico("down")}</button><button data-t="R" aria-label="The one after">${ico("next")}</button></div>` : "");
       h.append(el); wirePad(el); S.bar = "";
     }
-    const o = S.view === "follow" ? list.find(q => q.key === S.key) : null, two = `${td("L")}${td("R")}`;
+    const o = S.view === "follow" || (S.view === "auto" && !battle) ? list.find(q => q.key === S.key) : null, two = `${td("L")}${td("R")}`;
     let t, sub, k;
     if (battle) {
       if (o) { t = o.name; sub = o.sub; k = `${two} switch · ${tk("Z")} the whole arena`; }
       else { t = "The whole arena"; sub = list.length + " in the fight"; k = `${two} follow a fighter`; }
     } else if (S.view === "free") { t = "Free camera"; sub = "Anywhere on the course"; k = `${td("L")}${td("R")}${td("U")}${td("D")} move · ${tk("Z")} back to the runners`; }
-    else if (o) { t = o.name; sub = o.sub; k = `${two} switch runner · ${tk("Z")} free camera`; }
+    else if (o && S.view === "auto") { t = o.name; sub = "Auto camera · " + o.sub; k = `${two} pick a runner · ${tk("Z")} free camera`; }
+    else if (o) { t = o.name; sub = o.sub; k = `${two} switch runner · ${tk("Z")} auto camera`; }
     else { t = "Waiting for the runners…"; sub = ""; k = ""; }
     const key = t + "|" + sub + "|" + k + "|" + S.view;
     if (S.bar === key) return;
@@ -12159,7 +12285,7 @@
       g = { id, name: mem.name, sheet, spr, x: +d.x || 0, y: +d.y || 0, tx: +d.x || 0, ty: +d.y || 0, rf: d.rf, fin: false };
       NP.ghosts.set(id, g);
     }
-    g.tx = +d.x || 0; g.ty = +d.y || 0; g.rf = Array.isArray(d.rf) ? d.rf : g.rf; g.fin = !!d.fin;
+    g.tx = +d.x || 0; g.ty = +d.y || 0; g.rf = Array.isArray(d.rf) ? d.rf : g.rf; g.fin = !!d.fin; g.pw = d.pw || null;   // (pw: the power they hold, in the grand prix)
   }
   function npDrawGhosts(dt) {
     for (const g of NP.ghosts.values()) {
