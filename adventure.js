@@ -9977,6 +9977,7 @@
     }
     return best;
   }
+  const BOT_ONESHOT = { teleport: 1, double: 1, hover: 1, glide: 1 };   // (air actions that set a runner's rise lower than a spring's, once)
   function demoBot(D, p, w, h) {
     const I = D.inp, c = p.c;
     I.R = 1; I.L = 0; I.U = 0; I.D = 0; I.Z = I.X = I.C = 0;
@@ -9985,8 +9986,9 @@
     D.ps = p.state;
     if (p.demoFell || p.dead || p.y < 0.3) return "fail";
     if (p.state === "ride" || (p.ballistic && !p.ground)) { I.R = 1; I.J = 0; D.hold = 0; D.still = 0; D.best = Math.max(D.best, p.x); return; }   // (carried, or flying true: nothing to do but hold on)
-    if (p.x > D.best + 0.4) { D.best = p.x; D.still = 0; } else D.still += h;
-    if (p.ground) D.airUsed = false;
+    if (p.state === "hurt") { D.best = p.x; D.still = 0; }             // (knocked back: not stuck -- it goes on from where it lands)
+    else if (p.x > D.best + 0.4) { D.best = p.x; D.still = 0; } else D.still += h;
+    if (p.ground) { D.airUsed = false; D.soreT = 0; }                  // (down: its air action back, and the thorns it feared behind it)
     if (D.t > 220) return "fail";
     if (D.rev > 0) {                                                   // a Spin Dash: Down, Jump tapped to rev it, then let go
       D.rev -= h; D.revTap -= h; I.R = 0; I.D = 1;
@@ -10083,7 +10085,7 @@
         if (D.tr) D.why = (atEdge ? "edge" + gap[0].toFixed(1) + "-" + gap[1].toFixed(1) : "for:" + jumpFor.kind + jumpFor.x0.toFixed(1)) + " " + A.why;
       } else if (!I.jp && !rolling && p.state === "run" && D.jt <= 0) {
         /* stopped (by a hit, a wall, the start): a Spin Dash, if the road's clear for it */
-        if (c.spinDash && v < 3.5 && !p.inWater && clearTo(7) && roofH > 1.2 && D.t > 0.02) { D.rev = 0.34; D.revTap = 0; I.R = 0; I.D = 1; return; }
+        if (c.spinDash && v < 3.5 && p.vx > -0.5 && !p.inWater && clearTo(7) && roofH > 1.2 && D.t > 0.02) { D.rev = 0.34; D.revTap = 0; I.R = 0; I.D = 1; return; }
         if (v < 1.5 && D.t > 0.6 && D.still > 0.35) { I.jp = 1; D.hold = 0.42; D.jt = 0.3; D.why = "low"; }          // (stuck at something low)
         /* a clear road: its own dash, now and then */
         else if (S.dash && D.dashT <= 0 && v >= topNow * 0.9 && !p.inWater && !mud && clearTo(v * 0.9 + 2.5) && roofH > 2) { I.dash = 1; D.dashT = S.dash; }
@@ -10099,13 +10101,13 @@
       const land = botLanding(p, A, topNow);
       D.soreT = land === "thorns" ? 0.35 : (D.soreT || 0) - h;           // (thorns where it'd come down: it holds on till it's sure it's past them, not at the first glimpse of ground)
       const safe = land === "ground" && !(D.soreT > 0);
-      if (D.tr) D.why = "air:" + land;
+      if (D.tr) D.why = "air:" + land + (D.airUsed ? " used" : "") + (D.jt > 0 ? " jt" : "");
       if (canWallKick(p) && p.wkDir === 1 && D.jt <= 0 && land === "wall") { I.jp = 1; D.jt = 0.16; I.J = 1; return; }   // (a wall it won't land on top of: up it by a kick, then back to it)
       if (p.state === "fly") {
         if (safe) I.D = 1;
         else if (D.jt <= 0 && (p.vy < 0.2 || land === "wall")) { I.jp = 1; D.jt = 0.2; }
       } else if (p.state === "glide") { if (!safe) D.hold = Math.max(D.hold, 0.1); }
-      else if (!safe && !D.airUsed && D.jt <= 0 && (p.vy < 1.5 || land === "wall") && !obs.some(o => o.spiky && o.x0 < 3)) { I.jp = 1; D.airUsed = true; D.hold = 0.6; D.jt = 0.25; }
+      else if (!safe && !D.airUsed && D.jt <= 0 && !(p.coyote > 0) && (p.vy < 1.5 || (land === "wall" && (p.vy < 6 || !BOT_ONESHOT[c.air]))) && !obs.some(o => o.spiky && o.x0 < 3)) { I.jp = 1; D.airUsed = true; D.hold = 0.6; D.jt = 0.25; }   // (at a wall, a one-shot air action not while a spring or a jump still carries it up fast: it would only take that rise away; flight climbs on from there)
     }
     I.J = D.hold > 0 || I.jp ? 1 : 0;
   }
@@ -10175,7 +10177,7 @@
     "expressway-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "expressway-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "museum-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "museum-3": "tails knuckles amy rouge shadow cream chaos gamma eggman metal silver",
     "springs-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "springs-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "canyon-1": "sonic tails knuckles amy rouge shadow cream chaos eggman metal mighty emerl silver", "canyon-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "canyon-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "canyon-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "ruins-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "ruins-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "depot-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "depot-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "stars-1": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "stars-3": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
@@ -10190,10 +10192,10 @@
     "gp-pinball": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-funfair": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-sweets": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-pier": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-slopes": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-crystal": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "gp-floes": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-tundra": "sonic tails knuckles amy rouge cream chaos gamma eggman metal mighty emerl silver",
+    "gp-floes": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-tundra": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-dunes": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-town": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-foundry": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-volcano": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
-    "gp-temple": "sonic tails knuckles amy rouge cream chaos gamma eggman metal mighty emerl silver", "gp-windmills": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
+    "gp-temple": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-windmills": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-fleet": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-spires": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-refinery": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-metro": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
     "gp-fortress": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver", "gp-orbit": "sonic tails knuckles amy rouge shadow cream chaos gamma eggman metal mighty emerl silver",
