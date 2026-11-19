@@ -8317,6 +8317,8 @@
         epc ? `${epc}/${eps.length}` : ""],
       ["gp", "trophy", "Red Ring Circuit", "The grand prix: six cups of four courses, eight runners, and Red Rings with a power in each",
         (() => { const t = (saveData.gp && saveData.gp.trophies) || {}; const n = Object.values(t).reduce((a, x) => a + Object.keys(x).length, 0); return n ? `${n}/18` : "New"; })()],
+      ["chao", "clover", "Chao Garden", "Raise Chao and animals in a garden of your own: hatch, feed, play, and watch them grow into themselves",
+        (() => { let n = 0; try { const c = JSON.parse(localStorage.getItem(KEY() + ".chao")); n = c ? (c.chao || []).length + (c.animals || []).length : 0; } catch (e) {} return n ? `${n}` : "New"; })()],
       ["exhibition", "flag", "Free Exhibition", "Any runner in any zone you've opened, Act 1 or Act 2 and its boss: for time, rings and Red Star Rings",
         `${stages().filter((st, i) => cleared(i)).length}/${stages().length}`],
       ["battle", "trophy", "Battle", "Up to four fighters with health, players or CPUs, in any runner's arena", ""],
@@ -8347,7 +8349,7 @@
         <button hidden data-back id="advMMBack"></button>
       </div>`;
     const go = { story: storyMenu, gp: () => gpMenu(), exhibition: () => { load3d(stageIdx); menu(); }, battle: () => battleSetup(true), training: () => trainingMenu(), options: () => optionsScreen(true), exit: () => exit(),
-                 tourney: () => tourSetup(), online: () => { if (root.AdventureOnline) { AdventureOnline._from = "lobby"; AdventureOnline.lobby(); } } };
+                 chao: () => chaoGarden(), tourney: () => tourSetup(), online: () => { if (root.AdventureOnline) { AdventureOnline._from = "lobby"; AdventureOnline.lobby(); } } };
     if (root.AdventureOnline) { AdventureOnline._from = "menu"; AdventureOnline.topbar(ov.querySelector(".ao-topbar")); }
     ov.querySelectorAll("[data-mm]").forEach(b => b.onclick = () => go[b.dataset.mm]());
     ov.querySelector("[data-team]").onclick = () => fighters();
@@ -10693,6 +10695,31 @@
   const gpSave = () => (saveData.gp = saveData.gp || { trophies: {} });
   const gpCupOpen = (i, online) => online || i === 0 || Object.keys((gpSave().trophies[GPD().CUPS[i - 1].id]) || {}).length > 0;
   const gpClsOpen = (cls, online) => online || cls !== "storm" || Object.values(gpSave().trophies).some(t => t.gale === 1);
+  /* the Chao Garden: a mode of its own, in its own files (chao/), loaded the first time it's
+     wanted; the cabinet's loop rests while it's open, and starts again on the way out */
+  function needChao(then) {
+    if (root.ChaoGarden) { then(); return; }
+    const mods = ["chao/chao-data", "chao/chao-life", "chao/chao-models", "chao/chao-world", "chao/chao"];
+    let i = 0;
+    const next = () => {
+      if (i >= mods.length) { then(); return; }
+      const s = document.createElement("script"); s.src = mods[i++] + ".js" + (root.V ? "?v=" + root.V : "");
+      s.onload = next; s.onerror = () => note("The Chao Garden didn't load: check the connection.");
+      document.head.append(s);
+    };
+    next();
+  }
+  function chaoGarden() {
+    needChao(() => {
+      cancelAnimationFrame(raf); raf = 0; bgmStop();
+      const ok = root.ChaoGarden && ChaoGarden.open(host, {
+        key: KEY() + ".chao", prog: () => PROG(), tone,
+        sfx: n => { const f = SFX[n]; if (f) f(); },
+        onExit: () => { last = 0; raf = requestAnimationFrame(frame); mainMenu(); },
+      });
+      if (!ok) { raf = requestAnimationFrame(frame); note("The Chao Garden needs WebGL to draw its voxels."); }
+    });
+  }
   /* load the courses when they're first wanted (a megabyte of them; the rest of the cabinet doesn't need it) */
   function needGP(then) {
     if (root.AdventureGP) { then(); return; }

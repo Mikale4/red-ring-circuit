@@ -7,7 +7,8 @@ four racecourses, eight runners at a time, with Red Rings that hold a power each
 fighting with health for one to four players or CPUs; tournaments of 8 or 16; training; Emerl, who
 learns his friends' moves in his own episode; a team to win over, fighter by fighter; and an
 online lobby -- accounts, friends, messages, chat, and rooms for battles, races, the grand prix,
-the story together and tournaments. Fourteen runners, each in Sonic Battle's sprites (or sprites
+the story together and tournaments; and the **Chao Garden**, a voxel garden of Chao and animals to
+hatch, raise and keep. Fourteen runners, each in Sonic Battle's sprites (or sprites
 drawn in its style), with that game's combos, specials and effects.
 
 **Play:** https://mikale4.github.io/red-ring-circuit/ -- or open `index.html` from a local
@@ -37,6 +38,7 @@ request. The credits for every sprite sheet, track and sound are below.
 | `voxkit.js` | The voxel grid and AO mesher (from Post Parade's race renderer). |
 | `settings.js`, `icons.js` | The settings (music, sound, dialogue speed, shake) and the interface's icons. |
 | `theme.css`, `game.css` | The base styles (from Post Parade) and the game's own Sonic look. |
+| `chao/` | The Chao Garden (loaded when it's first opened): `chao-data.js` (every Chao form and animal species, the attributes, temperaments, techniques, food and toys), `chao-life.js` (a creature's genes, growth, care, friendships, breeding), `chao-models.js` (the voxel Chao, animals, the keeper and the garden's things), `chao-world.js` (the land), `chao.js` (the mode), `chao.css`. |
 | `audio/` | The music (the Sonic soundtracks below, at 96 kbps; the grand prix's, Mario Kart 64's, `mk64-*`, at 128) and `audio/sfx/`, the sound effects. |
 | `tools/` | Local only (not in the repository): the stage generator, the packers, the validator, the source art. |
 
@@ -240,6 +242,56 @@ a CPU breaks its way out, as you would: up to it, and every blow it has (its tra
 at what's over its head; then straight up the shaft it opened, each its own way -- wall kicks
 off its side, flight, a double jump, and Knuckles a glide onto its wall and the climb. The HUD shows your place, the
 whole field along the course on a strip, and the power box.
+
+**The Chao Garden** (main menu) is a mode of its own: a voxel garden where Chao and animals live,
+and you keep them. The first visit makes your keeper -- an original person, made the way Post
+Parade makes its trainers: build, height, skin, eyes, hair, clothes, hat and an extra, each a row
+of words or colours, the figure turning beside them as you pick (up and down between rows, left
+and right through each). Hazel, the garden's warden, meets you at the Garden Hall with two Chao
+eggs and a Flicky's. The Central Garden is half-metre voxels: the hall and its plaza with the
+fountain, the orchard of fruit trees, the flower meadow, the pond under the waterfall cliff
+(stepping stones to the palm island), a ramp up the cliff, and gates round the rim to the other
+gardens (Tropical, Forest, Mountain, Mystic, Mechanical, and the Sky Garden's balloon), which
+open in later visits. Walk with the arrows (Shift runs, Space jumps); Z picks up and uses (an
+egg, a fruit, a toy, a creature; shakes a tree; the mailbox, the encyclopedias, the hall), C pets
+(or cuddles what you hold, or rubs an egg warm), X throws what you hold or whistles the fond ones
+over, V looks closer; Q and E or a drag turn the camera, the wheel zooms; Enter is the menu. A
+gamepad and a phone's stick and buttons work too.
+
+Every creature is its own. A species only leans: each one is born with an aptitude (E to S) in
+each of the garden's seven attributes -- Velocity, Agility, Power, Resilience, Vitality,
+Instinct and Chaos (Chaos Energy) -- its own colouring, pattern and size, two temperaments
+(playful, shy, curious, energetic, calm, mischievous, affectionate, competitive, stubborn,
+adventurous) that decide how it spends its day and how it fights, a quirk or two (thirty-odd,
+and a few rare ones), a favourite food, toy and place, techniques from what it leans to and its
+temperament, and hidden alleles it carries for its children. It grows in what it does: the
+swimmers in the pond get tough, the runners fast, the dreamers clever, the ones at play nimble,
+and a child grows a little by itself in what it was born good at; every sixth level in an
+attribute it learns a technique from it. They eat (fruit off the ground, or under a tree till
+one drops; hungry and stuck, they come and ask), sleep (most at night), play with the toys and
+each other (tag), talk, spar, tease, swim, explore (finding fruit, nuts, now and then an egg),
+follow you, hide from you; time together makes friends, squabbles rivals, and both go into
+their stories. The animals freed from Eggman's badniks in the zones send eggs to the mailbox,
+one for every eight freed; the Garden Society sends one now and then.
+
+A Chao changes when it's grown: its **alignment** is who and what raised it -- petting, praise
+and comfort make it Hero (a halo), rough handling Dark (a spiked ball), days among the animals
+Wild (a leaf), the machines and badnik drives Gear (a gear) -- and its **path** is what it did
+most (Tidal fins, Sky wings, Dash legs and swept ears, Brawn arms, Spark antlers and glow; a
+balanced upbringing, the round Bloom), changing again later with a second path blended in.
+5 alignments x those paths and their blends, the children and the rare forms make 206 Chao, every
+one built from its parts; the 233 animals are 35 body plans dressed in each species' own
+features (a fox's snout, ears and brush; a lion's mane and tufted tail; an elephant's trunk,
+fans and tusks). The rare forms wait in the genes and the upbringing: two crystal alleles make a
+Crystal Chao, a sweet tooth a Candy Chao, an egg warmed by the volcano vents an Ember Chao, a
+Tidal line three generations long a Tide Chao, and the legendary ones further still. A creature's
+card shows it all: its picture, care, bond and leaning, temperaments, the seven attributes
+(grade, level, progress, value), quirks, techniques, likes, friends and rivals, and its story so
+far. The encyclopedias (the lectern by the hall, or the menu) list every form and species, found
+or not. The garden plays Sonic Adventure 2 Battle's own Chao Garden music, looped where the game
+loops it; an egg hatching, a Chao changing, their jingles. Its save is its own, beside the
+account's (`<account save>.chao`). Breeding, battles, the other gardens, races and training,
+the shop and quests come in the stages after this one.
 
 **Story** is *The Red Star Rings*, told the way Sonic Battle tells its story: one plot, an
 episode for each of the fourteen. Eggman means to set every Red Star Ring in his Star Engine
@@ -765,7 +817,11 @@ Starfall Orbit Rainbow Road. Past the last Star Post the Final Lap fanfare, and 
 tune again a little faster; invincible, Super Star; home, the 1st, 2nd-4th or 5th-8th place
 fanfare, and the results to the top four's or the back four's results theme; the cup's podium
 the Award Ceremony, then Congratulations! (or No Trophy for You!). A trap laid (a fake monitor,
-a spring) makes MK64's item-drop sound (The Mushroom Kingdom's wavs). The jingles are
+a spring) makes MK64's item-drop sound (The Mushroom Kingdom's wavs). The Chao Garden plays **Sonic Adventure 2 Battle's Chao Garden
+music** (the Steam release's BGM, ripped as ADX on the Internet Archive, converted at 128 kbps by
+`tools/chao-audio/convert.py`, which keeps each track's loop points in `audio/chao/loops.json`):
+the Neutral, Hero and Dark Garden themes, the hatching and changing jingles, the Chao Lobby, the
+Kindergarten, and the race tunes. The jingles are
 there too: the Act clear, invincibility (over whatever plays, which picks up again where it
 left off), and the drowning count. The sound effects are Sonic 3 & Knuckles' (Mr Lange's Sonic
 Sounds Complete rips, named from the Sonic Retro disassembly): jump, the rings right and left,

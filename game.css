@@ -783,7 +783,7 @@
 
 /* ---- the main menu, with the lobby and the tournament in it: two columns on a wide screen, and
    smaller on a short one */
-.adv-mi:nth-child(7){--o:72px}.adv-mi:nth-child(8){--o:84px}
+.adv-mi:nth-child(7){--o:72px}.adv-mi:nth-child(8){--o:84px}.adv-mi:nth-child(9){--o:96px}.adv-mi:nth-child(10){--o:108px}
 @media (min-width:1000px){
   .adv-main{width:min(1020px,100%)}
   .adv-main .adv-mm{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px}
