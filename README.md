@@ -68,8 +68,9 @@ Snowfield, Nakayama Grand Jump and Red Rock Quarry, and Seaside Camp went (the c
 seaside now). The old stages' text is kept outside the project, in the extras folder. The
 last seven are new: each opens when the one before it is cleared (its boss beaten).
 
-**Seabreeze Cape in Sonic Advance's own art** (2026-11-19, the first zone to leave the voxels).
-It is drawn in Neo Green Hill Zone's art, Sonic Advance's first zone, which is the same place:
+**Seabreeze Cape in Sonic Advance's own art** (2026-11-19), an option: Options, "Stage look",
+Voxels (as it was, and the default) or Sonic Advance 2D. In 2D the cape is drawn in Neo Green
+Hill Zone's art, Sonic Advance's first zone, which is the same place:
 a tropical beach, palms, checkered soil, the sea, the Egg Hammer Tank. `tools/pack-zones.py`
 cuts the pieces from the rips into `assets/zones/cape.png` (32 pixels to a one-metre tile, the
 runners' own size) and `cape-bg.png`, and writes `adventure-zoneart.js`; adventure.js lays them

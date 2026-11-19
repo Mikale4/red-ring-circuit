@@ -1799,6 +1799,7 @@
   const GLIFT = 4 * APX;                                  // the ground drawn this much up: its grass's top rows are blade tips, round the runners' feet, the grass itself level with the ground they stand on
   const ART = {};
   function artOf(T) {
+    if (!root.Settings || !Settings.get("zoneArt")) return null;      // (an option: the voxels unless it's on)
     const id = T && T.id, Z = ZART && id && ZART[id];
     if (!Z) return null;
     if (ART[id]) return ART[id];
@@ -9502,6 +9503,7 @@
             ${row("Dialogue speed", "How quickly the story's talk types out.", setSeg("textSpeed"))}
             ${row("Screen shake", "The jolt when a heavy blow lands.", seg("set:shake", [[1, "On"], [0, "Off"]], S && S.get("shake") === false ? 0 : 1))}
             ${row("Ping on player tags", "Online: each player's ping bars by their name, over their head and on their card.", seg("set:tagPing", [[1, "On"], [0, "Off"]], S && S.get("tagPing") === false ? 0 : 1))}
+            ${row("Stage look", "The zones in voxels, or in the Sonic Advance games' own 2D art (Seabreeze Cape so far). From the next stage you start.", seg("set:zoneArt", [[0, "Voxels"], [1, "Sonic Advance 2D"]], S && S.get("zoneArt") ? 1 : 0))}
           </div>
           <p class="adv-note">Music, sound, dialogue speed and screen shake are Post Parade's own settings: they change for the whole game.</p>
           <div class="panel-hd adv-hd2">${ico("arcade")}Two players, one keyboard</div>
@@ -9528,6 +9530,7 @@
       if (key === "pad") { KEYMAP.padSwap = v === "1"; saveKeys(); }
       else if (key === "set:shake") S && S.set("shake", v === "1");
       else if (key === "set:tagPing") S && S.set("tagPing", v === "1");
+      else if (key === "set:zoneArt") S && S.set("zoneArt", v === "1");
       else if (S) { const d = def(key.slice(4)); const c = d && d.choices.find(c => String(c[0]) === v); if (c) S.set(d.id, c[0]); }
       bgmVolume();
       optionsScreen();

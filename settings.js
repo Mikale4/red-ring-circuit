@@ -13,6 +13,7 @@
     { id: "textSpeed", label: "Dialogue speed", type: "choice", def: 18, choices: [[34, "Relaxed"], [18, "Normal"], [7, "Fast"], [0, "Instant"]] },
     { id: "shake", label: "Screen shake", type: "toggle", def: true },
     { id: "tagPing", label: "Ping on player tags", type: "toggle", def: true },
+    { id: "zoneArt", label: "Stage look", type: "toggle", def: false },      // (off: the stages in voxels; on: in the Sonic Advance games' own art, where a zone has it)
   ];
   const defaults = () => { const o = {}; for (const d of DEFS) o[d.id] = d.def; return o; };
   let cache = null;
