@@ -217,7 +217,9 @@
   const both = (c, al) => c.genes.al[al] && c.genes.al[al][0] && c.genes.al[al][1];
   function rareForm(c, ctx) {
     const sp = D.species(c.sp);
-    if (both(c, "gold") && both(c, "crystal")) return "chao-gold";
+    const ld = c.lineDepth || {};
+    if (both(c, "gold")) return "chao-gold";
+    if ((ld["al-hero"] || 0) >= 3 && (ld["al-dark"] || 0) >= 3) return "chao-eclipse";
     if (both(c, "crystal")) return sp.align === "dark" || c.align.dark > 60 ? "chao-shadowglass" : "chao-crystal";
     if (both(c, "star") && ctx.night) return "chao-star";
     const diet = c.diet || {}, eaten = Object.values(diet).reduce((s, n) => s + n, 0);
@@ -243,13 +245,14 @@
     const sp = D.species(spId) || D.species("chao-neutral-child");
     const genes = opts.genes || rollGenes(sp, r, opts.parents);
     const look = sp.kind === "chao" ? EGG_LOOK[sp.align === "neutral" ? "chao" : sp.align] : [sp.cols[0], sp.cols[1]];
-    return { id: uid("e"), kind: "egg", sp: sp.id, genes, from: opts.from || "", parents: opts.parents || null, gen: opts.gen || 1,
+    return { id: uid("e"), kind: "egg", sp: sp.id, genes, from: opts.from || "", parents: opts.parents || null, gen: opts.gen || 1, line: opts.line || null,
       warm: 0, need: opts.need || (sp.kind === "chao" ? 70 : 55), look, spots: Math.floor(r() * 4), name: opts.name || null, lineDepth: opts.lineDepth || null, hatchedAt: opts.at || null };
   }
   function hatch(e, day, region) {
     const c = make(e.sp, { genes: e.genes, parents: e.parents, gen: e.gen, day, region, from: e.from, name: e.name, bond: 25 });
     if (e.lineDepth) c.lineDepth = e.lineDepth;
     if (e.hatchedAt) c.hatchedAt = e.hatchedAt;
+    c.line = e.line || c.id;                    // its family line: the founder's, or its own if it founds one
     return c;
   }
 
@@ -372,6 +375,13 @@
       const sa = D.species(a.sp).p1 === p, sb = D.species(b.sp).p1 === p;
       if (sa || sb) ld[p] = Math.max(sa ? da + 1 : 0, sb ? db + 1 : 0);
     }
+    /* and of an alignment: a Halo line, a Shade line (two long ones brought together make something) */
+    for (const al of D.ALIGN_KEYS) {
+      const k = "al-" + al, da = (a.lineDepth && a.lineDepth[k]) || 0, db = (b.lineDepth && b.lineDepth[k]) || 0;
+      const sa = D.species(a.sp).align === al && a.kind === "chao", sb = D.species(b.sp).align === al && b.kind === "chao";
+      const v = Math.max(sa ? da + 1 : da, sb ? db + 1 : db);
+      if (v) ld[k] = v;
+    }
     /* the pity rule (after the FF7 ranch): a pair that keeps missing a rare form gets closer to it */
     save.breedMiss = save.breedMiss || 0;
     const rareChance = 0.02 * (1 + save.breedMiss);
@@ -381,14 +391,32 @@
     } else save.breedMiss++;
     a.bredAt = a.age; b.bredAt = b.age;
     a.love = 0; b.love = 0;
-    const e = egg(sp, { genes: g, parents: [a.id, b.id], gen: Math.max(a.gen, b.gen) + 1, from: `the egg of ${a.name} and ${b.name}`, rng: r, lineDepth: ld });
+    const elder = (a.gen || 1) >= (b.gen || 1) ? a : b;
+    const e = egg(sp, { genes: g, parents: [a.id, b.id], gen: Math.max(a.gen, b.gen) + 1, from: `the egg of ${a.name} and ${b.name}`, rng: r, lineDepth: ld, line: elder.line || elder.id });
     return e;
+  }
+  /* what a pairing might bring (the Society's pens show it, as the FF7 ranch's rancher does):
+     the child's kind, each aptitude's range between its parents', the quirks that might come
+     down, and a hint when the two carry something hidden between them */
+  function preview(a, b, save) {
+    const why = canBreed(a, b);
+    const out = { why, apt: {}, traits: [], hint: null, sp: null };
+    if (a.kind === "animal") out.sp = a.sp;
+    else { const la = D.species(a.sp).align, lb = D.species(b.sp).align; out.sp = la === lb ? `chao-${la}-child` : `chao-${la}-child|chao-${lb}-child|chao-neutral-child`; }
+    for (const x of A) { const p = a.genes.apt[x], q = b.genes.apt[x]; out.apt[x] = [gradeOf(Math.max(0, Math.min(p, q) - 0.06)), gradeOf(Math.min(0.98, Math.max(p, q) + 0.06))]; }
+    out.traits = [...new Set([...a.genes.traits, ...b.genes.traits])].map(t => TRAITS[t]).filter(Boolean).map(t => t.name);
+    const carried = ALLELES.filter(al => (a.genes.al[al] || [0, 0]).some(Boolean) && (b.genes.al[al] || [0, 0]).some(Boolean));
+    const lines = ["al-hero", "al-dark"].filter(k => ((a.lineDepth || {})[k] || 0) >= 2 || ((b.lineDepth || {})[k] || 0) >= 2);
+    if (carried.length) out.hint = "Something runs in both these families. A child of theirs might be... unusual.";
+    else if (lines.length === 2) out.hint = "Two old lines, light and dark. Something waits where they meet.";
+    else if ((save && save.breedMiss || 0) > 12) out.hint = "The Society's luck is turning: something rare is due.";
+    return out;
   }
 
   /* ---------------------------------------------------------------- the save
      Every creature that ever lived keeps a line in the family book (for the genealogy), even
      after it's gone; the living keep everything. */
-  function record(c) { return { id: c.id, name: c.name, sp: c.sp, gen: c.gen, parents: c.parents, kind: c.kind }; }
+  function record(c) { return { id: c.id, name: c.name, sp: c.sp, gen: c.gen, parents: c.parents, kind: c.kind, line: c.line || c.id }; }
   function fresh() {
     return { v: 1, day: 0.3, chao: [], animals: [], eggs: [], book: {}, seen: {}, owned: {}, inv: { round: 4, triangle: 1, square: 1 }, rings: 300,
       avatar: null, freed: 0, freedEggs: 0, breedMiss: 0, ach: {}, log: [], habitat: {}, quest: {} };
@@ -402,5 +430,5 @@
   }
 
   root.ChaoLife = { TRAITS, TRAIT_KEYS, RARE_TRAITS, ALLELES, NAMES, GRADES, gradeOf, make, egg, hatch, stat, grade, train, trainMul, levelCap, learn, raise, lvSum,
-    leadAlign, leadPath, evolveCheck, evolve, feed, pet, rough, tick, meet, friendOf, rivalOf, adult, canBreed, breed, inherit, record, fresh, sane, traitsOf, bestApt, uid };
+    leadAlign, leadPath, evolveCheck, evolve, feed, pet, rough, tick, meet, friendOf, rivalOf, adult, canBreed, breed, preview, inherit, record, fresh, sane, traitsOf, bestApt, uid };
 })(typeof globalThis !== "undefined" ? globalThis : this);

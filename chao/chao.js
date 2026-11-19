@@ -220,7 +220,11 @@
   }
   function despawn(e) { G.scene.remove(e.rig.g); G.ents.splice(G.ents.indexOf(e), 1); const tag = G.tags.get(e); if (tag) { tag.remove(); G.tags.delete(e); } }
   /* young animals grow into their size */
-  function growScale(e) { const s = (e.c.genes.size || 1) * (e.c.kind === "animal" ? lerp(0.55, 1, clamp(e.c.grown || 0, 0, 1)) : 1); e.rig.g.scale.setScalar(s); }
+  function growScale(e) {
+    const al = e.c.genes.al || {}, two = k => al[k] && al[k][0] && al[k][1];
+    const s = (e.c.genes.size || 1) * (two("giant") ? 1.35 : two("tiny") ? 0.7 : 1) * (e.c.kind === "animal" ? lerp(0.55, 1, clamp(e.c.grown || 0, 0, 1)) : 1);
+    e.rig.g.scale.setScalar(s);
+  }
   const isFlier = e => e.rig.gait === "fly" || e.rig.gait === "bird" && e.task && e.task.fly;
   function groundFor(e, x, z) {
     const W = G.W, g = W.smooth(x, z), w = W.waterAt(x, z), st = W.standAt(x, z);
@@ -430,8 +434,16 @@
     if (T.k === "social") {
       if (Math.random() < dt * 0.9) { const x = Math.random() < 0.5 ? e : o; G.M.emote(x.rig, (c.rel[o.c.id] || 0) > 25 ? "heart" : "note"); x.bub = 1.1; }
       L.meet(c, o.c, "chat", dt * 0.6); practise(e, "ins", dt * 0.9);
+      /* close friends, both grown and content, fall a little in love; Heart Fruit hurries it */
+      if (L.adult(c) && L.adult(o.c) && (c.rel[o.c.id] || 0) >= 45 && c.care.mood > 60 && o.c.care.mood > 60) { c.love = (c.love || 0) + dt * 0.12; o.c.love = (o.c.love || 0) + dt * 0.12; }
+      if ((c.love || 0) >= 4 && (o.c.love || 0) >= 4 && !L.canBreed(c, o.c) && room()) { T.k = "court"; T.t2 = 0; o.task = { k: "with", t: 0, until: 9, other: e }; return "dance"; }
       o.st = "idle"; if (T.t2 > 5) { e.task = null; if (o.task && o.task.k === "with") o.task = null; maybeFriends(e, o); }
       return "idle";
+    }
+    if (T.k === "court") {
+      o.st = "dance"; if (Math.random() < dt * 2) { const x = Math.random() < 0.5 ? e : o; G.M.emote(x.rig, "heart"); x.bub = 0.8; }
+      if (T.t2 > 6) { e.task = null; if (o.task && o.task.k === "with") o.task = null; layEgg(e, o, "in the garden"); }
+      return "dance";
     }
     if (T.k === "spar") {
       o.st = "train"; practise(e, "pow", dt * 2); practise(o, "agi", dt * 1.4); practise(o, "res", dt * 0.8);
@@ -454,6 +466,23 @@
       toast(now === "friends" ? `${a.c.name} and ${b.c.name} are friends now` : `${a.c.name} and ${b.c.name} are rivals now`, now === "friends" ? "heart" : "flame");
     }
   }
+  /* the garden holds so many (the habitats that come later hold more) */
+  const CAP = () => 30 + ((G.save.habitat && G.save.habitat.room) || 0);
+  const room = () => G.save.chao.length + G.save.animals.length + G.items.filter(i => i.kind === "egg").length < CAP();
+  /* two creatures' egg: between them in the garden, or by the pens' incubator */
+  function layEgg(a, b, how) {
+    const L = G.L, egg = L.breed(a.c, b.c, G.save);
+    const pen = how === "at the pens";
+    const x = pen ? G.W.spots.incubator.x + rnd(-0.6, 0.6) : (a.x + b.x) / 2, z = pen ? G.W.spots.incubator.z - 1.2 : (a.z + b.z) / 2;
+    addItem("egg", null, x, z, egg);
+    for (const [p, q] of [[a, b], [b, a]]) p.c.log.push([G.save.day, `Had an egg with ${q.c.name}.`]);
+    G.save.ach.eggs = (G.save.ach.eggs || 0) + 1;
+    toast(`${a.c.name} and ${b.c.name} had an egg!`, "heart"); jingle("dance");
+    burst(x, G.W.ground(x, z) + 0.4, z, [0xf07ab0, 0xffffff, 0xffd21a], 18);
+    persist();
+    return egg;
+  }
+  const allRecs = () => { const out = Object.assign({}, G.save.book); for (const c of [...G.save.chao, ...G.save.animals]) out[c.id] = c; return out; };
   /* exploring turns things up: fruit, nuts, now and then a toy -- or an egg */
   function find(e) {
     const L = G.L, D = G.D, f = L.traitsOf(e.c).reduce((m, t) => m * (t.find || 1), 1) * (D.TEMPERS[e.c.genes.temper[0]].finds || 1);
@@ -487,6 +516,7 @@
     if (T.m) e.rig.g.remove(T.m);
     const out = G.L.feed(e.c, T.id); e.fails = 0;
     if (out && out.fav) { G.M.emote(e.rig, "heart"); e.bub = 1.6; floatText(e, "Favourite!", 0xf07ab0); }
+    if (T.id === "heart" && G.L.adult(e.c)) { G.M.emote(e.rig, "heart"); e.bub = 3; floatText(e, "In love", 0xf07ab0); }
     e.task = null;
   }
   /* the cocoon: a Chao changing into what it's become */
@@ -982,7 +1012,8 @@
           <h4>Its story</h4><ul class="cg-log">${c.log.slice(-6).reverse().map(([d, t]) => `<li><b>Day ${Math.floor(d) + 1}</b>${esc(t)}</li>`).join("")}</ul>
         </div>
       </div>
-      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button><button class="btn" data-f data-focus data-rename>${ico("clipboard")}Rename</button></div></div>`, back ? () => { menuClose(); back(); } : menuClose, "cg-cardwrap");
+      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button><button class="btn ghost" data-f data-fam>${ico("person")}Family</button><button class="btn" data-f data-focus data-rename>${ico("clipboard")}Rename</button></div></div>`, back ? () => { menuClose(); back(); } : menuClose, "cg-cardwrap");
+    el.querySelector("[data-fam]").onclick = () => family(c, back);
     el.querySelector("[data-back]").onclick = () => { menuClose(); if (back) back(); };
     el.querySelector("[data-rename]").onclick = () => nameIt(c, () => card(c, back));
     livePreview(el.querySelector(".cg-prev"), () => G.M.creature(c));
@@ -1028,17 +1059,68 @@
   function hallMenu() {
     music("hall");
     const el = menuOpen(sec("The Garden Hall", "door", `<p class="cg-text">Hazel's hall: the warden's desk, the Society's notices, a kettle always on. Its shop and the breeding pens are being made ready.</p>
-      <div class="cg-mm"><button class="cg-mi" data-f data-focus data-go="rest">${ico("moon")}<b>Rest till morning</b><i>Sleep here; the garden goes on through the night</i></button>
+      <div class="cg-mm"><button class="cg-mi" data-f data-focus data-go="pens">${ico("heart")}<b>The Society's pens</b><i>Pair two grown creatures who are fond of each other</i></button>
+      <button class="cg-mi" data-f data-go="rest">${ico("moon")}<b>Rest till morning</b><i>Sleep here; the garden goes on through the night</i></button>
       <button class="cg-mi" data-f data-go="look">${ico("person")}<b>The mirror</b><i>Change how you look</i></button>
       <button class="cg-mi" data-f data-go="save">${ico("check")}<b>Save</b><i>Write the garden down</i></button></div>
       <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`, "cg-small"));
     el.querySelector("[data-back]").onclick = menuClose;
     el.querySelectorAll("[data-go]").forEach(b => b.onclick = () => {
       const k = b.dataset.go;
+      if (k === "pens") { pens(); return; }
       if (k === "rest") { const t = tod(), add = (t < 0.27 ? 0.27 - t : 1.27 - t); for (const e of G.ents) { G.L.tick(e.c, add * DAY * 0.25, { dayLen: DAY, asleep: true }); e.c.care.energy = 100; e.task = null; } G.save.day += add; menuClose(); toast("Morning", "sun"); persist(); }
       else if (k === "look") creator(false);
       else if (k === "save") { persist(); menuClose(); toast("Saved", "check"); }
     });
+  }
+
+  /* the pens: two grown creatures, what their egg might be (and a hint when something rare
+     might come), and a pairing */
+  function pens(sel) {
+    const L = G.L, D = G.D, S = G.save, all = [...S.chao, ...S.animals].filter(c => L.adult(c));
+    sel = sel || [];
+    const [a, b] = sel.map(id => all.find(c => c.id === id));
+    const pv = a && b ? L.preview(a, b, S) : null;
+    const nm = c => c ? `<b>${esc(c.name)}</b><i>${esc(D.species(c.sp).name)}</i>` : "<i>Pick one</i>";
+    const sps = pv ? pv.sp.split("|").map(id => D.species(id).name) : [];
+    const body = `
+      <p class="cg-text">Two grown creatures, fond of each other, and rested a day since their last egg. The pens make no pairing the garden wouldn't: a Chao with a Chao, an animal with its own kind.</p>
+      <div class="cg-pair"><div class="cg-slot ${a ? "on" : ""}">${nm(a)}</div><span class="cg-plus">${ico("heart")}</span><div class="cg-slot ${b ? "on" : ""}">${nm(b)}</div></div>
+      ${pv ? `<div class="cg-pv">${pv.why ? `<p class="cg-why">${esc(pv.why)}</p>` : ""}
+        <p><b>The egg:</b> ${esc(sps.join(" or "))}${pv.sp.includes("|") ? " (whichever way it takes after)" : ""}</p>
+        <div class="cg-pv-apt">${D.ATTRS.map(x => `<span><b>${x.short}</b>${pv.apt[x.id][0]}${pv.apt[x.id][0] !== pv.apt[x.id][1] ? "-" + pv.apt[x.id][1] : ""}</span>`).join("")}</div>
+        ${pv.traits.length ? `<p class="cg-meta">Quirks that might come down: ${esc(pv.traits.join(", "))}</p>` : ""}
+        ${pv.hint ? `<p class="cg-hint">${ico("sparkle")} ${esc(pv.hint)}</p>` : ""}</div>` : ""}
+      <div class="cg-grid cg-pick">${all.length ? all.map(c => `<button class="cg-crow ${sel.includes(c.id) ? "sel" : ""}" data-f data-c="${c.id}"><canvas width="96" height="96" data-thumb="${c.id}"></canvas><span><b>${esc(c.name)}</b><i>${esc(D.species(c.sp).name)}</i><em>${(c.love || 0) >= 4 ? ico("heart") + " in love" : `Gen ${c.gen}`}</em></span></button>`).join("") : `<p class="cg-empty">Nobody's grown yet: a Chao is grown once it has changed; an animal, once it's full size.</p>`}</div>
+      <div class="cg-foot">${room() ? "" : `<p class="cg-why">The garden is full: ${CAP()} at most, eggs included.</p>`}<button class="btn ghost" data-f data-back>${ico("back")}Back</button><button class="btn" data-f data-pair ${pv && !pv.why && room() ? "" : "disabled"}>${ico("heart")}Pair them</button></div>`;
+    const el = menuOpen(sec("The Society's pens", "heart", body), () => { menuClose(); hallMenu(); }, "cg-wide");
+    el.querySelector("[data-back]").onclick = () => { menuClose(); hallMenu(); };
+    el.querySelectorAll("[data-c]").forEach(bt => bt.onclick = () => { const id = bt.dataset.c, i = sel.indexOf(id); const ns = i >= 0 ? sel.filter(x => x !== id) : [...sel, id].slice(-2); pens(ns); });
+    const pb = el.querySelector("[data-pair]");
+    if (pb) pb.onclick = () => { const ea = G.ents.find(e => e.c === a), eb = G.ents.find(e => e.c === b); if (!ea || !eb) return; layEgg(ea, eb, "at the pens"); menuClose(); };
+    thumbs(el, id => all.find(c => c.id === id));
+  }
+  /* a creature's family: its line, two generations up, its brothers and sisters, its children */
+  function family(c, back) {
+    const D = G.D, R = allRecs(), get = id => R[id] || null, live = id => G.save.chao.concat(G.save.animals).some(x => x.id === id);
+    const box = (r, cls) => r ? `<button class="cg-fbox ${cls || ""}" data-f ${live(r.id) ? `data-c="${r.id}"` : ""}><b>${esc(r.name)}</b><i>${esc((D.species(r.sp) || {}).name || "")}</i><em>Gen ${r.gen || 1}</em></button>` : `<div class="cg-fbox none"><i>Unknown</i></div>`;
+    const par = (c.parents || []).map(get), gp = par.map(p => p && p.parents ? p.parents.map(get) : [null, null]);
+    const kids = Object.values(R).filter(r => r.parents && r.parents.includes(c.id));
+    const sibs = c.parents ? Object.values(R).filter(r => r.id !== c.id && r.parents && r.parents.some(id => c.parents.includes(id))) : [];
+    const lineId = c.line || c.id, inLine = Object.values(R).filter(r => (r.line || r.id) === lineId), founder = get(lineId) || c;
+    const gens = Math.max(1, ...inLine.map(r => r.gen || 1));
+    const where = ((c.log[0] || [0, ""])[1].split(": ")[1] || "").replace(/\.$/, "");
+    const el = menuOpen(sec(`${esc(c.name)}'s family`, "person", `
+      <p class="cg-text">Of the ${esc(founder.name)} line${inLine.length > 1 ? `: ${inLine.length} so far, over ${gens} generation${gens > 1 ? "s" : ""}` : ", which it founded"}.</p>
+      <div class="cg-tree">
+        ${c.parents ? `${gp.flat().some(Boolean) ? `<div class="cg-trow">${gp.flat().map(r => box(r, "gp")).join("")}</div>` : ""}<div class="cg-trow">${par.map(r => box(r, "p")).join("")}</div>` : `<p class="cg-meta">${where ? esc(where[0].toUpperCase() + where.slice(1)) : "An egg of the garden"}: the first of its family here.</p>`}
+        <div class="cg-trow">${box(c, "me")}</div>
+        ${sibs.length ? `<h4>Brothers and sisters</h4><div class="cg-trow">${sibs.slice(0, 8).map(r => box(r)).join("")}</div>` : ""}
+        ${kids.length ? `<h4>Children</h4><div class="cg-trow">${kids.slice(0, 12).map(r => box(r)).join("")}</div>` : ""}
+      </div>
+      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`), () => { menuClose(); card(c, back); }, "cg-wide");
+    el.querySelector("[data-back]").onclick = () => { menuClose(); card(c, back); };
+    el.querySelectorAll("[data-c]").forEach(bt => bt.onclick = () => { const x = [...G.save.chao, ...G.save.animals].find(y => y.id === bt.dataset.c); if (x && x !== c) card(x, back); });
   }
 
   /* ---------------------------------------------------------------- the encyclopedias */
