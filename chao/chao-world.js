@@ -53,7 +53,7 @@
     spawn: [0, 29], hall: [0, 38.5], fountain: [0, 22], incubator: [-6.5, 30.5], mailbox: [6.5, 30.5], book: [4, 33],
     pond: { x: -16, z: -13, rx: 11, rz: 13, level: 1.0 }, island: [-20, -14], stones: [[-6.2, -11], [-19, -12.6]],
     fall: { x: -16, z: -27, top: 7.6, w: 4 },
-    plaza: [0, 24, 9.5], orchard: [22, -2, 11], meadow: [-24, 20, 10],
+    plaza: [0, 24, 9.5], orchard: [22, -2, 11], meadow: [-24, 20, 10], yard: [21, 19, 4.5],
     cliffZ: -27, plateau: 8,
     ramp: [[30, 6], [31, -14], [24, -26], [12, -33]],
     paths: [
@@ -122,6 +122,8 @@
     const pz = Math.hypot(x - PLAN.plaza[0], z - PLAN.plaza[1]);
     if (pz < PLAN.plaza[2] + 3) h = lerp(2, h, sm(PLAN.plaza[2], PLAN.plaza[2] + 3, pz));
     if (Math.hypot(x - PLAN.hall[0], z - PLAN.hall[1]) < 8) h = 2;
+    const yd = Math.max(Math.abs(x - PLAN.yard[0]), Math.abs(z - PLAN.yard[1]));
+    if (yd < PLAN.yard[2] + 2.5) h = lerp(2, h, sm(PLAN.yard[2] + 0.5, PLAN.yard[2] + 2.5, yd));
     /* the rim: hills all round, broken only where the gates are */
     const gc = gateCorridor(x, z);
     if (r > 43 && z > PLAN.cliffZ + 2) h += Math.min(9, (r - 43) * 0.9) * sm(3.5, 7, gc);
@@ -136,6 +138,7 @@
     if (inPond(x, z) < 1.18) return "sand";
     if (Math.hypot(x - PLAN.plaza[0], z - PLAN.plaza[1]) < PLAN.plaza[2] || Math.hypot(x - PLAN.hall[0], z - PLAN.hall[1]) < 7.5) return "stone";
     if (pathD(x, z) < 1.25 || segDist(x, z, PLAN.ramp) < 1.8) return "path";
+    if (Math.max(Math.abs(x - PLAN.yard[0]), Math.abs(z - PLAN.yard[1])) < PLAN.yard[2]) return "sand";
     if (Math.hypot(x - PLAN.meadow[0], z - PLAN.meadow[1]) < PLAN.meadow[2]) return "meadow";
     if (h > PLAN.plateau - 0.6 && z < PLAN.cliffZ) return "high";
     return "grass";
@@ -646,6 +649,15 @@
     W.spots.mailbox = { x: PLAN.mailbox[0], z: PLAN.mailbox[1], r: 1.4 };
     put(buildingMesh("lectern"), PLAN.book[0], PLAN.book[1], PI); block(PLAN.book[0], PLAN.book[1], 0.35);
     W.spots.book = { x: PLAN.book[0], z: PLAN.book[1], r: 1.4 };
+    /* the training ground: a fenced yard east of the plaza, its gap facing the plaza */
+    { const [yx, yz, yr] = PLAN.yard;
+      put(buildingMesh("yard"), yx, yz, 0, 2);
+      block(yx, yz - yr, 0, { box: true, w: yr, d: 0.15, a: 0 }); block(yx, yz + yr, 0, { box: true, w: yr, d: 0.15, a: 0 });
+      block(yx + yr, yz, 0, { box: true, w: 0.15, d: yr, a: 0 });
+      block(yx - yr, yz - (yr + 1) / 2, 0, { box: true, w: 0.15, d: (yr - 1) / 2, a: 0 }); block(yx - yr, yz + (yr + 1) / 2, 0, { box: true, w: 0.15, d: (yr - 1) / 2, a: 0 });
+      block(yx + 2.33, yz - 2, 0.8); block(yx + 2.67, yz + 2.33, 0.6); block(yx - 2.33, yz - 1, 0.9);
+      const sign = buildingMesh("sign"); put(sign, yx - yr - 0.6, yz - 1.6, PI / 2); block(yx - yr - 0.6, yz - 1.6, 0.25);
+      W.spots.yard = { x: yx - yr - 0.4, z: yz, r: 2 }; }
     /* the gates */
     for (const G of PLAN.gates) {
       const gm = buildingMesh(G.lift ? "balloon" : "gate");
@@ -827,6 +839,26 @@
         ell(v, 0, 15, 0, 8, 7, 8, (x, y, z) => y < 15 ? null : grain(0x8a9ab0, x, y, z, 0.03));
         cap(v, 0, 19, 0, 6, 25, 0, 1.5, 1.2, 0x3a404a);
         blk(v, -2, 0, 7, 1, 7, 8, (x, y) => (y === 7 ? 0x6a4022 : 0x8a5a32));
+      } else if (k === "yard") {
+        /* the fence: posts and two rails, a gap on the west side */
+        const wood = (x, y, z) => grain(0x8a5a32, x, y, z, 0.06), rail = (x, y, z) => grain(0xa8743e, x, y, z, 0.05);
+        for (let i = -27; i <= 27; i += 6) for (const [x, z] of [[i, -27], [i, 27], [27, i], [-27, i]]) if (!(x === -27 && Math.abs(z) < 7)) blk(v, x, 0, z, x, 4, z, wood);
+        for (const y of [2, 4]) { blk(v, -27, y, -27, 27, y, -27, rail); blk(v, -27, y, 27, 27, y, 27, rail); blk(v, 27, y, -27, 27, y, 27, rail); blk(v, -27, y, -27, -27, y, -7, rail); blk(v, -27, y, 7, -27, y, 27, rail); }
+        /* hurdles */
+        for (const x0 of [-10, 2]) { for (const x of [x0 - 4, x0 + 4]) blk(v, x, 0, -19, x, 3, -19, 0xf0f0e8); blk(v, x0 - 4, 3, -19, x0 + 4, 3, -19, x => ((x >> 1) & 1) ? 0xe42630 : 0xf8f8f8); }
+        /* a boulder to smash */
+        ell(v, 14, 3, -12, 5, 4, 5, (x, y, z) => grain(((y + (hash(x >> 1, 0, z >> 1) * 3 | 0)) % 4 === 0) ? 0x7a7468 : 0x9a9484, x, y, z, 0.07));
+        /* the ball machine, pointing in */
+        blk(v, 14, 0, 11, 19, 1, 17, 0x3a3a44); blk(v, 15, 2, 12, 18, 7, 16, (x, y, z) => grain(y === 7 ? 0xffd21a : 0x1f58e0, x, y, z, 0.04)); blk(v, 11, 4, 13, 14, 5, 14, 0x2a2a34);
+        gl.set(16, 8, 14, 0xff4a3a);
+        for (const [x, z, c] of [[8, 20, 0xf05a9a], [10, 22, 0xffd21a], [6, 23, 0x3ad8a0]]) blk(v, x, 0, z, x + 1, 1, z + 1, c);
+        /* a tub of water, for swimming strokes */
+        shape(v, -20, 0, -12, -8, 4, 0, (x, y, z) => Math.hypot(x + 14, z + 6) <= 5.8, (x, y, z) => { const d = Math.hypot(x + 14, z + 6); return d > 4.8 ? grain((y & 1) ? 0x8a5a32 : 0x7a4a2a, x, y, z, 0.05) : y === 3 ? grain(0x3aa0e0, x, y, z, 0.05) : y < 3 ? 0x2a80c0 : null; });
+        /* four Chaos Drive pedestals */
+        for (const [dx, dz, c] of [[0, -4, 0x3ad86a], [4, 0, 0xffd21a], [0, 4, 0xb06af0], [-4, 0, 0xf04a4a]]) { const x = -12 + dx, z = 14 + dz; blk(v, x - 1, 0, z - 1, x + 1, 3, z + 1, (xx, y, zz) => grain(0xc8c0b0, xx, y, zz, 0.05)); gl.set(x, 4, z, c); gl.set(x, 5, z, mixC(c, 0xffffff, 0.3)); }
+        /* a basket of fruit */
+        shape(v, 0, 0, 10, 6, 3, 16, (x, y, z) => Math.hypot(x - 3, z - 13) <= 3.2, (x, y, z) => y < 3 ? grain(((x + y + z) & 1) ? 0xc89a50 : 0xa87a3a, x, y, z, 0.05) : null);
+        for (const [x, z, c] of [[2, 12, 0xffd21a], [4, 13, 0xf05a3a], [3, 14, 0x8ad84a], [2, 14, 0xffd21a]]) v.set(x, 3, z, c);
       } else if (k === "sign") {
         cap(v, 0, 0, 0, 0, 8, 0, 0.6, 0.6, 0x6a4022);
         blk(v, -5, 8, -1, 5, 13, -1, (x, y) => (Math.abs(x) === 5 || y === 8 || y === 13 ? 0x6a4022 : 0xd8b070));

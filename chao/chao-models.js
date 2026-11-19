@@ -485,8 +485,9 @@
     /* legs and feet */
     for (const s of [-1, 1]) {
       const l = part(`${K}:leg${s}:${legH}`, S, v => {
-        if (legH > 2) bx(v, -1, -legH, -1, 0, -3, 0, (x, y, z) => col(x, y, z, "body"));
-        rbx(v, -1, -2, -1, 0, -1, 1, (x, y, z) => z === 1 ? mixC(L.body, L.tip, 0.85) : col(x, y, z, "body"), 3);
+        /* (from the hip down: the leg, then the foot at the bottom, its toes forward) */
+        if (legH > 2) bx(v, -1, -legH + 2, -1, 0, -1, 0, (x, y, z) => col(x, y, z, "body"));
+        rbx(v, -1, -legH, -1, 0, -legH + 1, 1, (x, y, z) => z === 1 ? mixC(L.body, L.tip, 0.85) : col(x, y, z, "body"), 3);
       }, L.kind);
       at(l, s * 1.6, legH, 0, S); inner.add(l); rig.legs.push(l);
     }

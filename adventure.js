@@ -10702,7 +10702,7 @@
      wanted; the cabinet's loop rests while it's open, and starts again on the way out */
   function needChao(then) {
     if (root.ChaoGarden) { then(); return; }
-    const mods = ["chao/chao-data", "chao/chao-life", "chao/chao-models", "chao/chao-world", "chao/chao-battle", "chao/chao"];
+    const mods = ["chao/chao-data", "chao/chao-life", "chao/chao-models", "chao/chao-world", "chao/chao-battle", "chao/chao-train", "chao/chao"];
     let i = 0;
     const next = () => {
       if (i >= mods.length) { then(); return; }

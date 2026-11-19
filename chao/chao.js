@@ -775,7 +775,7 @@
     } else if (r) {
       if (r.kind === "creature") { P.push(["Z", `Pick up ${r.e.c.name}`], ["C", "Pet"], ["V", "Look"]); }
       else if (r.kind === "tree") P.push(["Z", "Shake the tree"]);
-      else if (r.kind === "spot") { const n = r.n; P.push(["Z", n === "incubator" ? "The incubator" : n === "mailbox" ? (G.save.mail && G.save.mail.length ? `Mailbox (${G.save.mail.length})` : "Mailbox") : n === "book" ? "The encyclopedias" : n === "hall" ? "The Garden Hall" : n.startsWith("gate") ? (r.s.gate.open ? `Into the ${r.s.gate.name}` : `The way to the ${r.s.gate.name}`) : n === "exit" ? "Back to the Central Garden" : r.s.dojo ? "The dojo" : r.s.arena ? "The Garden League's arena" : n === "pier" ? "The pier" : n === "lake" ? "The frozen lake" : n === "altar" ? "The altar" : n === "observatory" ? "The observatory" : ""]); }
+      else if (r.kind === "spot") { const n = r.n; P.push(["Z", n === "incubator" ? "The incubator" : n === "mailbox" ? (G.save.mail && G.save.mail.length ? `Mailbox (${G.save.mail.length})` : "Mailbox") : n === "book" ? "The encyclopedias" : n === "hall" ? "The Garden Hall" : n === "yard" ? "The training ground" : n.startsWith("gate") ? (r.s.gate.open ? `Into the ${r.s.gate.name}` : `The way to the ${r.s.gate.name}`) : n === "exit" ? "Back to the Central Garden" : r.s.dojo ? "The dojo" : r.s.arena ? "The Garden League's arena" : n === "pier" ? "The pier" : n === "lake" ? "The frozen lake" : n === "altar" ? "The altar" : n === "observatory" ? "The observatory" : ""]); }
       else if (r.kind === "npc") P.push(["Z", `Talk to ${r.n.name}`]);
       else { P.push(["Z", `Pick up ${name(r)}`]); if (r.kind === "egg") P.push(["V", "Look"]); }
     }
@@ -802,6 +802,7 @@
       if (n === "mailbox") { const S = G.save; if (!S.mail || !S.mail.length) { toast("The mailbox is empty", "mail"); return; } let i = 0; for (const e of S.mail) { addItem("egg", null, r.s.x + Math.cos(i) * 1.2 - 0.6, r.s.z - 1 + Math.sin(i) * 0.6, e); i++; } toast(`${S.mail.length} egg${S.mail.length > 1 ? "s" : ""} from the mailbox`, "mail"); S.mail = []; persist(); sfx("grab"); return; }
       if (n === "book") { encyclopedia(); return; }
       if (n === "hall") { hallMenu(); return; }
+      if (n === "yard") { yardMenu(); return; }
       if (n === "incubator") { toast("Eggs set here hatch twice as fast", "flame"); return; }
       if (n.startsWith("gate")) { const g = r.s.gate; if (g.open) travel(g.id); else talk([["Sign", `To the ${g.name}. ${(GATE_RULES[g.id] || {}).why || g.need}`]]); return; }
       if (n === "exit") { travel("central", G.W.id); return; }
@@ -964,8 +965,8 @@
   }
   function hudTick() {
     const t = tod(), h = Math.floor(t * 24), m = Math.floor((t * 24 - h) * 60 / 10) * 10;
-    const s = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`, d = `Day ${Math.floor(G.save.day) + 1}`;
-    if (s !== G.hudS) { G.hudS = s; const c = G.hud.querySelector(".cg-clock"); c.querySelector("b").textContent = s; c.querySelector("i").textContent = d; c.querySelector(".cg-sun").innerHTML = ico(isNight() ? "moon" : "sun"); }
+    const s = `${h % 12 || 12}:${String(m).padStart(2, "0")}<small>${h < 12 ? "AM" : "PM"}</small>`, d = `Day ${Math.floor(G.save.day) + 1}`;
+    if (s !== G.hudS) { G.hudS = s; const c = G.hud.querySelector(".cg-clock"); c.querySelector("b").innerHTML = s; c.querySelector("i").textContent = d; c.querySelector(".cg-sun").innerHTML = ico(isNight() ? "moon" : "sun"); }
     const rings = G.save.rings; if (rings !== G.hudR) { G.hudR = rings; G.hud.querySelector(".cg-rings b").textContent = rings; }
   }
   const V3 = new THREE.Vector3();
@@ -1434,6 +1435,68 @@
     });
   }
 
+  /* ---------------------------------------------------------------- the training ground
+     The fenced yard east of the plaza: seven little games, one for each attribute (chao-train.js),
+     played with one of the creatures in this garden. Three sessions a day each, if it has the
+     energy; the better it goes, the more it grows, and the best of each is kept on the board. */
+  const TRAIN_PER_DAY = 3;
+  function trainsLeft(c) { const d = Math.floor(G.save.day); return c.trainDay === d ? Math.max(0, TRAIN_PER_DAY - (c.trainN || 0)) : TRAIN_PER_DAY; }
+  function yardMenu(sel) {
+    const S = G.save, T = root.ChaoTrain; if (!T || !T.ok) { toast("The training ground isn't ready", "info"); return; }
+    S.trainBest = S.trainBest || {};
+    const el = menuOpen(sec("The training ground", "dumbbell", `
+      <p class="cg-text">Seven games, one for each attribute. Pick one, then who plays it: you do the timing, it does the work, and it grows by how well it goes. Three goes a day each.</p>
+      <div class="cg-list">${T.GAMES.map((g, i) => { const A = G.D.ATTRS.find(a => a.id === g.attr), b = S.trainBest[g.id];
+        return `<button class="cg-irow" data-f ${(sel ? sel === g.id : i === 0) ? "data-focus" : ""} data-g="${g.id}"><span class="cg-dot" style="background:#${A.c.toString(16).padStart(6, "0")}"></span><b>${esc(g.name)}</b><i>${esc(A.name)}. ${b ? `Best: ${esc(b.show)}, ${esc(b.who)}` : "No best yet"}</i><em>${esc(A.short)}</em></button>`; }).join("")}</div>
+      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`), menuClose, "cg-small");
+    el.querySelector("[data-back]").onclick = menuClose;
+    el.querySelectorAll("[data-g]").forEach(b => b.onclick = () => {
+      const g = T.GAMES.find(x => x.id === b.dataset.g), here = S.region || "central";
+      const among = [...S.chao, ...S.animals].filter(c => (c.region || "central") === here);
+      if (!among.length) { menuClose(); talk([["", "There's no one in this garden to train."]]); return; }
+      const A = G.D.ATTRS.find(a => a.id === g.attr);
+      pickOne(`${g.name}: who plays?`, c => trainGo(c, g.id), () => yardMenu(g.id), among,
+        c => !trainsLeft(c) ? "Done for today" : c.care.energy < 15 ? "Worn out" : `${A.short} ${c.lv[g.attr]} · ${trainsLeft(c)} go${trainsLeft(c) === 1 ? "" : "es"} left`);
+    });
+  }
+  function trainGo(c, game) {
+    const S = G.save;
+    if (!trainsLeft(c)) { talk([["", `${c.name} has trained enough for one day. Let it rest, and come back tomorrow.`]]); return; }
+    if (c.care.energy < 15) { talk([["", `${c.name} is worn out. A sleep, or something to eat, first.`]]); return; }
+    menuClose();
+    G.hud.style.display = "none"; G.tagBox.style.display = "none";
+    G.battle = root.ChaoTrain.start({ R: G.R, el: G.el, M: G.M, L: G.L, D: G.D, esc, ico, sfx, jingle, music, tone: G.opts.tone, isMenu: () => !!G.menu || !!G.talking }, { c, game }, res => trainOver(c, res));
+    G.battle.train = true;
+  }
+  function trainOver(c, res) {
+    const S = G.save, L = G.L, D = G.D;
+    G.battle = null; G.hud.style.display = ""; G.tagBox.style.display = "";
+    music(gardenTune());
+    if (res.quit) { toast("Training stopped", "info"); return; }
+    const g = res.game, A = D.ATTRS.find(a => a.id === g.attr), A2 = D.ATTRS.find(a => a.id === g.also);
+    const r = clamp(res.ratio, 0, 1.25), xp = Math.round(12 + 60 * r * (res.grade === "S" ? 1.15 : 1));
+    const lv0 = c.lv[g.attr];
+    const g1 = L.train(c, g.attr, xp), g2 = L.train(c, g.also, Math.round(xp * 0.25));
+    const d = Math.floor(S.day); if (c.trainDay !== d) { c.trainDay = d; c.trainN = 0; } c.trainN++;
+    c.care.energy = clamp(c.care.energy - 18, 0, 100); c.care.food = clamp(c.care.food - 8, 0, 100);
+    c.care.mood = clamp(c.care.mood + (r >= 0.6 ? 6 : -3), 0, 100); c.bond = clamp(c.bond + 1, 0, 100);
+    S.trainBest = S.trainBest || {}; const best = S.trainBest[g.id], isBest = !best || res.score > best.score;
+    if (isBest) S.trainBest[g.id] = { score: res.score, show: res.show, who: c.name };
+    S.ach.trained = (S.ach.trained || 0) + 1;
+    c.log.push([S.day, `Trained at ${g.name}: ${res.show} (${res.grade}).`]);
+    for (const t of [g1.tech, g2.tech].filter(Boolean)) { const tt = D.tech(t); toast(`${c.name} learned ${tt.name}!`, "star"); c.log.push([S.day, `Learned ${tt.name}.`]); }
+    persist();
+    const grow = g1.lv ? `+${g1.lv} ${A.name} level${g1.lv > 1 ? "s" : ""} (now ${c.lv[g.attr]})` : `${A.name} ${lv0 >= L.levelCap(c) ? "is as high as it goes for now" : "a little better"}`;
+    const el = menuOpen(sec(g.name, "dumbbell", `
+      <div class="cg-tres"><div class="cg-tgrade g${res.grade}">${res.grade}</div>
+        <div class="cg-tres-tx"><b>${esc(res.show)}</b><i>${isBest ? (best ? "A new best at the training ground!" : "The training ground's first best.") : `Best: ${esc(best.show)}, ${esc(best.who)}`}</i>
+          <p>${esc(c.name)}: ${esc(grow)}${g2.lv ? `; +${g2.lv} ${esc(A2.name)}` : ""}.</p></div></div>
+      <div class="cg-foot"><button class="btn ghost" data-f data-other>${ico("dumbbell")}Another game</button><button class="btn" data-f data-focus data-again ${trainsLeft(c) && c.care.energy >= 15 ? "" : "disabled"}>${ico("swap")}Again (${trainsLeft(c)} left today)</button><button class="btn ghost" data-f data-back>${ico("back")}Done</button></div>`), menuClose, "cg-small");
+    el.querySelector("[data-back]").onclick = menuClose;
+    el.querySelector("[data-other]").onclick = () => yardMenu(g.id);
+    el.querySelector("[data-again]").onclick = () => trainGo(c, g.id);
+  }
+
   /* ---------------------------------------------------------------- the dojos
      Three masters, each of two attributes: the Oakheart Dojo in the forest (Power, Resilience),
      the Summit Dojo in the mountain's cave (Velocity, Vitality), the Circuit Dojo in the lab
@@ -1494,9 +1557,9 @@
     };
   }
   /* pick one creature, for something */
-  function pickOne(title, cb, back, among) {
+  function pickOne(title, cb, back, among, note) {
     const S = G.save, all = among || [...S.chao, ...S.animals];
-    const el = menuOpen(sec(title, "heart", `<div class="cg-grid cg-pick">${all.map(c => `<button class="cg-crow" data-f data-c="${c.id}"><canvas width="96" height="96" data-thumb="${c.id}"></canvas><span><b>${esc(c.name)}</b><i>${esc(G.D.species(c.sp).name)}</i><em>Lv ${G.L.lvSum(c)}</em></span></button>`).join("")}</div>
+    const el = menuOpen(sec(title, "heart", `<div class="cg-grid cg-pick">${all.map(c => `<button class="cg-crow" data-f data-c="${c.id}"><canvas width="96" height="96" data-thumb="${c.id}"></canvas><span><b>${esc(c.name)}</b><i>${esc(G.D.species(c.sp).name)}</i><em>${note ? esc(note(c)) : `Lv ${G.L.lvSum(c)}`}</em></span></button>`).join("")}</div>
       <div class="cg-foot">${back ? `<button class="btn ghost" data-f data-back>${ico("back")}Back</button>` : ""}</div>`), back || menuClose, "cg-wide");
     const b = el.querySelector("[data-back]"); if (b) b.onclick = back;
     el.querySelectorAll("[data-c]").forEach(bt => bt.onclick = () => { const c = all.find(x => x.id === bt.dataset.c); menuClose(); cb(c); });
@@ -1687,6 +1750,7 @@
     const down = ev.type === "keydown", tag = ev.target && ev.target.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA") return;
     const k = ev.code;
+    if (KEYMAP[k] && down && !ev.repeat && G.battle && G.battle.train && !G.menu && !G.talking) { G.battle.key(k); ev.preventDefault(); return; }
     if (KEYMAP[k]) { G.keys[KEYMAP[k]] = down; if (down && G.menu) { G.kbUsed = true; const d = KEYMAP[k]; moveFocus(d === "L" ? -1 : d === "R" ? 1 : 0, d === "U" ? -1 : d === "D" ? 1 : 0); } ev.preventDefault(); return; }
     if (k === "ShiftLeft" || k === "ShiftRight") G.keys.Shift = down;
     if (k === "KeyQ") G.keys.q = down; if (k === "KeyE") G.keys.e = down;
@@ -1724,6 +1788,12 @@
     if (G.menu || G.talking) {
       if (G.talking && (press(0) || press(1))) G.talkNext && G.talkNext();
       else if (G.menu) { if (press(12) || (P.ly < -0.6 && !P.navY)) moveFocus(0, -1); if (press(13) || (P.ly > 0.6 && !P.navY)) moveFocus(0, 1); if (press(14) || (P.lx < -0.6 && !P.navX)) moveFocus(-1, 0); if (press(15) || (P.lx > 0.6 && !P.navX)) moveFocus(1, 0); if (press(0)) { G.kbUsed = true; G.focus && G.focus.isConnected ? (G.focus.dataset.row != null && G.menu.row ? G.menu.row(G.focus, 1) : G.focus.click()) : moveFocus(0, 1); } if (press(1) || press(9)) G.menu.back && G.menu.back(); }
+      P.navY = Math.abs(P.ly) > 0.6; P.navX = Math.abs(P.lx) > 0.6;
+    } else if (G.battle && G.battle.train) {
+      if (press(0)) G.battle.key("KeyZ"); if (press(1)) G.battle.key("KeyX"); if (press(9)) G.battle.key("Enter");
+      for (const [i, k] of [[12, "ArrowUp"], [13, "ArrowDown"], [14, "ArrowLeft"], [15, "ArrowRight"]]) if (press(i)) G.battle.key(k);
+      const fx = P.lx < -0.6 ? "ArrowLeft" : P.lx > 0.6 ? "ArrowRight" : null, fy = P.ly < -0.6 ? "ArrowUp" : P.ly > 0.6 ? "ArrowDown" : null;
+      if (fx && !P.navX) G.battle.key(fx); if (fy && !P.navY) G.battle.key(fy);
       P.navY = Math.abs(P.ly) > 0.6; P.navX = Math.abs(P.lx) > 0.6;
     } else if (G.battle) {
       if (press(0) || press(9)) G.battle.key("KeyZ");
