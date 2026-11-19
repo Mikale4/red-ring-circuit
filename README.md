@@ -275,7 +275,11 @@ one drops; hungry and stuck, they come and ask), sleep (most at night), play wit
 each other (tag), talk, spar, tease, swim, explore (finding fruit, nuts, now and then an egg),
 follow you, hide from you; time together makes friends, squabbles rivals, and both go into
 their stories. The animals freed from Eggman's badniks in the zones send eggs to the mailbox,
-one for every eight freed; the Garden Society sends one now and then.
+one for every eight freed; the Garden Society sends one now and then. Each animal lives as its
+own kind does: birds hop on the ground, fly where they're going and perch up in the trees, the
+ground fowl strut, the waders stalk the shallows, ducks and penguins waddle and swim; monkeys,
+apes and meerkats go on all fours (and meerkats stand up to keep watch); herds keep together and
+graze; night animals sleep the day away; crabs walk sideways; the water-lovers swim.
 
 A Chao changes when it's grown: its **alignment** is who and what raised it -- petting, praise
 and comfort make it Hero (a halo), rough handling Dark (a spiked ball), days among the animals
