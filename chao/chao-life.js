@@ -218,6 +218,7 @@
   function rareForm(c, ctx) {
     const sp = D.species(c.sp);
     const ld = c.lineDepth || {};
+    if (c.legend && D.species(c.legend)) return c.legend;
     if (c.silver) return "chao-silver";
     if (both(c, "gold")) return "chao-gold";
     if ((ld["al-hero"] || 0) >= 3 && (ld["al-dark"] || 0) >= 3) return "chao-eclipse";
@@ -247,13 +248,14 @@
     const genes = opts.genes || rollGenes(sp, r, opts.parents);
     const look = sp.kind === "chao" ? EGG_LOOK[sp.align === "neutral" ? "chao" : sp.align] : [sp.cols[0], sp.cols[1]];
     return { id: uid("e"), kind: "egg", sp: sp.id, genes, from: opts.from || "", parents: opts.parents || null, gen: opts.gen || 1, line: opts.line || null,
-      warm: 0, need: opts.need || (sp.kind === "chao" ? 70 : 55), look, spots: Math.floor(r() * 4), name: opts.name || null, lineDepth: opts.lineDepth || null, hatchedAt: opts.at || null };
+      warm: 0, need: opts.need || (sp.kind === "chao" ? 70 : 55), look: opts.legend ? [0xf8f0c0, 0x40e8a0] : look, spots: Math.floor(r() * 4), name: opts.name || null, lineDepth: opts.lineDepth || null, hatchedAt: opts.at || null, legend: opts.legend || null };
   }
   function hatch(e, day, region) {
     const c = make(e.sp, { genes: e.genes, parents: e.parents, gen: e.gen, day, region, from: e.from, name: e.name, bond: 25 });
     if (e.lineDepth) c.lineDepth = e.lineDepth;
     if (e.hatchedAt) c.hatchedAt = e.hatchedAt;
     if (e.silver) c.silver = true;
+    if (e.legend) c.legend = e.legend;          // (a legendary egg: it becomes that form at its first change)
     c.line = e.line || c.id;                    // its family line: the founder's, or its own if it founds one
     return c;
   }

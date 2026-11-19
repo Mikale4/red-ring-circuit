@@ -28,7 +28,7 @@
   const lerp = (a, b, t) => a + (b - a) * t;
   const rnd = (a, b) => a + Math.random() * (b - a);
   const angTo = (a, b) => { let d = (b - a) % TAU; if (d > PI) d -= TAU; if (d < -PI) d += TAU; return d; };
-  const RING = 6.2;
+  const RING = 6.2, FLOOR = 0.25;                 // (the ring's floor: its top voxels end a quarter metre up)
 
   /* how each fighting temperament plays: how near it likes to be, how often it guards, how
      much it leans on its specials, how bravely it goes in */
@@ -95,7 +95,7 @@
       const f = { c, rig, side, row: row || "front", x: lane, z: z0, a: side ? 0 : PI, hp: hpMax, hpMax, en: Math.min(2, enMax), enMax,
         gap: rnd(0.6, 1.6), dodgeCD: 0, guard: 0, guardK: 0, buff: {}, daze: 0, act: null, alive: true, st: "idle", v: 0, hit: 0, id: c.id + ":" + side,
         style: STYLE[D.TEMPERS[c.genes.temper[0]].fight] || STYLE.steady, call: null, cheer: 0, dealt: 0, taken: 0, used: {} };
-      rig.g.position.set(f.x, 0, f.z); scene.add(rig.g);
+      rig.g.position.set(f.x, FLOOR, f.z); scene.add(rig.g);
       B.fighters.push(f); return f;
     };
     const rows = setup.rows || {};
@@ -279,7 +279,7 @@
       const targets = t.splash ? foesOf(f) : [tg];
       for (const o of targets) {
         const m = new THREE.Mesh(new THREE.IcosahedronGeometry(t.id === "nova" ? 0.4 : 0.2, 0), new THREE.MeshBasicMaterial({ color: c }));
-        m.position.set(f.x, 0.55, f.z); scene.add(m);
+        m.position.set(f.x, FLOOR + 0.55, f.z); scene.add(m);
         B.shots.push({ m, f, o, t, k: t.splash ? 0.6 : 1, sp: t.id === "nova" ? 6 : 9 });
       }
       env.sfx && env.sfx("shot");
@@ -303,7 +303,7 @@
       face(f, tg, dt);
     }
     function tickF(f, dt) {
-      if (!f.alive) { f.rig.anim(B.t, dt, "sleep"); f.rig.g.position.set(f.x, 0, f.z); return; }
+      if (!f.alive) { f.rig.anim(B.t, dt, "sleep"); f.rig.g.position.set(f.x, FLOOR, f.z); return; }
       f.en = Math.min(f.enMax, f.en + dt * (0.18 + S(f, "cha") / 1600));
       f.dodgeCD -= dt; f.daze -= dt; f.cheer -= dt; f.taunt = (f.taunt || 0) - dt; f.covering = (f.covering || 0) - dt;
       if (f.guardT > 0) f.guardT -= dt; else { f.guard = 0; f.guardK = 0; }
@@ -313,7 +313,7 @@
       else if ((f.gap -= dt) <= 0) { const t = choose(f); if (t) begin(f, t); else f.gap = 0.5; }
       else idle(f, dt);
       f.hit = Math.max(0, f.hit - dt); f.jump = Math.max(0, (f.jump || 0) - dt);
-      f.rig.g.position.set(f.x + (f.hit > 0 ? Math.sin(B.t * 80) * 0.03 : 0), f.jump > 0 ? Math.sin(f.jump / 0.3 * PI) * 0.35 : 0, f.z);
+      f.rig.g.position.set(f.x + (f.hit > 0 ? Math.sin(B.t * 80) * 0.03 : 0), FLOOR + (f.jump > 0 ? Math.sin(f.jump / 0.3 * PI) * 0.35 : 0), f.z);
       f.rig.g.rotation.y = f.a;
       f.rig.face = f.hit > 0 ? "shut" : f.daze > 0 ? "sad" : null;
       f.rig.anim(B.t, dt, f.st, 1.2);
@@ -324,10 +324,10 @@
         const o = s.o, dx = o.x - s.m.position.x, dz = o.z - s.m.position.z, d = Math.hypot(dx, dz);
         if (!o.alive || d < 0.4) {
           if (o.alive) strike(s.f, o, s.t, s.k);
-          burst(s.m.position.x, 0.55, s.m.position.z, [s.m.material.color.getHex(), 0xffffff], 10);
+          burst(s.m.position.x, FLOOR + 0.55, s.m.position.z, [s.m.material.color.getHex(), 0xffffff], 10);
           scene.remove(s.m); s.m.geometry.dispose(); B.shots.splice(B.shots.indexOf(s), 1); continue;
         }
-        s.m.position.x += dx / d * s.sp * dt; s.m.position.z += dz / d * s.sp * dt; s.m.rotation.y += dt * 6; s.m.position.y = 0.55 + Math.sin(B.t * 12) * 0.05;
+        s.m.position.x += dx / d * s.sp * dt; s.m.position.z += dz / d * s.sp * dt; s.m.rotation.y += dt * 6; s.m.position.y = FLOOR + 0.55 + Math.sin(B.t * 12) * 0.05;
       }
     }
 
@@ -342,7 +342,7 @@
     const V = new THREE.Vector3();
     function pop(f, text, col, big) {
       const el = document.createElement("div"); el.className = "cg-float" + (big ? " big" : ""); el.textContent = text; el.style.color = "#" + col.toString(16).padStart(6, "0");
-      hud.querySelector(".cg-bfloat").append(el); B.floats.push({ el, x: f.x, z: f.z, y: (f.rig.h || 0.6) + 0.2, t: 0, life: 1.1 });
+      hud.querySelector(".cg-bfloat").append(el); B.floats.push({ el, x: f.x, z: f.z, y: FLOOR + (f.rig.h || 0.6) + 0.2, t: 0, life: 1.1 });
     }
     function callout(f, text, big) { pop(f, text, big ? 0xff8a10 : 0xffd21a, big); }
     function floatsTick(dt) {

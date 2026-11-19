@@ -278,6 +278,12 @@ button.cg-fbox{cursor:pointer}
   .cg-blog{top:auto;bottom:220px;max-width:70%}
 }
 
+/* -- the world map: the minimap (FF7's corner map) and the landmark's name */
+.cg-mini{position:absolute;right:14px;top:96px;padding:4px;background:rgba(20,44,30,.62);border:3px solid var(--sx-ink);border-radius:8px;pointer-events:none}
+.cg-mini canvas{display:block;width:132px;height:132px;image-rendering:pixelated}
+.cg-mapname{position:absolute;left:50%;top:66px;transform:translateX(-50%) skewX(-10deg);padding:6px 22px 7px;background:var(--sx-blue);border:3px solid var(--sx-ink);box-shadow:0 4px 0 var(--sx-ink);font:900 italic 22px/1 var(--sx-big);color:var(--sx-yel);-webkit-text-stroke:5px var(--sx-ink);paint-order:stroke fill;white-space:nowrap;pointer-events:none}
+@media (max-width:760px){ .cg-mini canvas{width:96px;height:96px} .cg-mapname{font-size:17px;top:60px} }
+
 /* -- between gardens */
 .cg-fade{position:absolute;inset:0;z-index:20;background:#050a22;opacity:0;transition:opacity .45s;pointer-events:none}
 .cg-fade.on{opacity:1}

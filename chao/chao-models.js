@@ -832,6 +832,33 @@
     aTail(R, L, f, g, K, 1, [0, ll + 1, -Math.floor(bd / 2)]);
     R.h = (ll + bh + hh + 2) * g; R.r = Math.max(bw, bd) * 0.6 * g; R.headY = (ll + bh + hh / 2) * g; R.gait = "biped"; R.legLen = ll;
   }
+  /* Eggman's robots: an egg of a body in his red with a hazard band round it, a grey dome with
+     a glowing visor and an antenna, heavy arms with claws, short thick legs */
+  BUILD.robot = (R, L, f, g, K, u) => {
+    const bw = Math.max(6, Math.round(u * 0.17) * 2), bh = Math.max(6, Math.round(u * 0.42)), bd = Math.max(5, Math.round(u * 0.3)), ll = Math.max(3, Math.round(u * 0.16));
+    const metal = (x, y, z) => grain(L.second, x, y, z, 0.04), paint = (x, y, z) => grain(L.main, x, y, z, 0.04), band = Math.floor(bh * 0.45);
+    const body = part(K + ":body", g, (v, gl) => {
+      rbx(v, -bw / 2, 0, -Math.floor(bd / 2), bw / 2 - 1, bh - 1, Math.ceil(bd / 2) - 1, (x, y, z) => (y === band || y === band + 1) ? ((((x + 64) >> 1) & 1) ? L.belly : 0x2a2a2a) : paint(x, y, z), 3);
+      for (const x of [-1, 0]) for (const y of [band + 2, band + 3]) gl.set(x, y, Math.ceil(bd / 2), y === band + 3 ? 0xfff0a0 : 0xffd21a);       // (a lamp mid-chest)
+      for (const x of [-bw / 2 + 1, bw / 2 - 2]) v.set(x, bh - 2, Math.ceil(bd / 2) - 1, 0x5a606a);
+    });
+    at(body, 0, ll, 0, g); R.inner.add(body); R.body = body;
+    const hw = Math.max(3, Math.round(bw * 0.32));
+    const head = part(K + ":head", g, (v, gl) => {
+      rbx(v, -hw, 0, -hw, hw - 1, hw + 1, hw - 1, metal, 3);
+      for (let x = -hw + 1; x < hw - 1; x++) gl.set(x, Math.round(hw * 0.6), hw, 0xff3a2a);
+      v.set(-1, hw + 2, -1, 0x5a606a); v.set(-1, hw + 3, -1, 0x5a606a); gl.set(-1, hw + 4, -1, 0xffe040);
+    });
+    at(head, 0, ll + bh, 0, g); R.inner.add(head); R.head = head; R.eyes = [];
+    const al = Math.max(3, Math.round(bh * 0.7));
+    for (const s of [-1, 1]) {
+      const arm = part(`${K}:arm${s}`, g, v => { bx(v, mx(s, 0), -al, -1, mx(s, 1), 0, 0, metal); bx(v, mx(s, -1), -1, -1, mx(s, 2), 1, 1, paint); v.set(mx(s, 0), -al - 1, 1, L.belly); v.set(mx(s, 1), -al - 1, 1, L.belly); v.set(mx(s, 0), -al - 1, -1, L.belly); });
+      at(arm, s * (bw / 2 + 0.5), ll + bh - 2, 0, g); R.inner.add(arm); R.arms.push(arm);
+      const leg = part(`${K}:leg${s}`, g, v => { bx(v, -1, -ll, -1, 0, -1, 0, metal); bx(v, -2, -ll, -1, 1, -ll, 2, paint); });
+      at(leg, s * Math.round(bw / 4), ll, 0, g); R.inner.add(leg); R.legs.push(leg);
+    }
+    R.h = (ll + bh + hw + 4) * g; R.r = bw * 0.6 * g; R.headY = (ll + bh + hw / 2) * g; R.gait = "biped"; R.legLen = ll;
+  };
   BUILD.primate = (R, L, f, g, K, u) => biped(R, L, f, g, K, u, { w: 0.16, h: 0.32, d: 0.25, l: 0.22, hw: 0.17, hh: 0.3, a: 0.32 });
   BUILD.ape = (R, L, f, g, K, u) => biped(R, L, f, g, K, u, { w: 0.22, h: 0.4, d: 0.3, l: 0.22, hw: 0.2, hh: 0.3, a: f.arms === "long" ? 0.5 : 0.42, thick: true });
   BUILD.upright = (R, L, f, g, K, u) => biped(R, L, f, g, K, u, { w: 0.13, h: 0.42, d: 0.22, l: 0.14, hw: 0.13, hh: 0.24, a: 0.16 });

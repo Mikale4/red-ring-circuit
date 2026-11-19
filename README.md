@@ -331,6 +331,27 @@ with eight in your care (or three eggs from the zones), and the balloon once the
 open. What you carry comes through; the creatures in the other gardens live on there, and each
 garden trains them a little just by living in it. The folk keep hours, open in the day.
 
+**The world map.** Between the gardens lies their island, walked the way a JRPG's world map is
+(the FF7 project's, here): leave any garden by its gate and you're out on the map beside its
+landmark, the keeper at four tenths of his size, a corner minimap showing where you are and
+which way you face. Each garden is a landmark in little -- the Garden Hall and its fountain,
+a beach hut among palms, a dojo in the pines, a cave under a snowy peak, a ring of ruins, a
+factory, the balloon -- joined by roads, with the northern range, a river down to the western
+sea, and the sea all round. Walk onto one to go in (not straight back into the one you just
+left); a shut one shows what's in the way (a broken bridge, fallen logs, a rockfall, a sealed
+slab, a dead pylon, a balloon lying flat) and says what would clear it. A creature you carry
+comes with you across the map.
+
+**Habitats.** Decor of your own from Pip's shop (the Decor tab): nest beds, a fruit feeder, a
+perch tower, a sparring dummy, a Chaos lamp, a paddling pool, flower beds, benches, a music
+box, a toy chest, an egg warmer, lanterns, a flower arch, a Chao statue, fences. Set a piece out
+from the menu's Habitat -- it stands in front of you till Z puts it down; C turns it, V paints
+it in six colours -- and walk up to one later to move, turn, repaint or put it away. Each
+garden takes eight, four more for each step of room bought. The creatures use it: they sleep
+in the nests (rested in half the time), train on the perches and dummies, sit by the lamps,
+splash in the pools, dance to the music boxes; the feeders and toy chests fill every morning;
+an egg warmer hatches eggs in any garden.
+
 **The training ground.** Seven games in the Central Garden's yard, one for each attribute,
 played with one of your creatures in a little scene of its own: Dash Lane (Velocity, left and
 right in turn), Hurdle Run (Agility, jump and duck), Rock Smash (Power, strike in the gold),
@@ -357,8 +378,20 @@ of each line, and more room for the garden.
 Motobugs, Buzz Bombers, Crabmeats, Choppers) have been raiding the gardens. Each raid is told by
 the garden's folk when its garden is open; a cage appears there with its badniks round it, and a
 duel frees the animals inside. The last is Eggman's beacon in the Mechanical Garden, and Doctor
-Nell sets a badnik of each kind right for you. The hall's notice board holds the folk's fifteen
+Nell sets a badnik of each kind right for you. The hall's notice board holds the folk's
 requests, paid out when done, and Wren sends a gift for every so many kinds in the encyclopedias.
+
+**The Chaos Heart.** The story after the raids: the Crabmeats were digging for the gardens' old
+light, broken long ago into five shards and hidden where only a creature grown strong in the
+right way can reach -- a deep rock pool in the Tropical Garden (Resilience), a dead tree's crown
+in the Forest (Agility), under a boulder in the Mountains (Power), in one of Eggman's puzzle
+boxes in the Mechanical Garden (Instinct), inside a column of light in the Sky (Chaos). Carry a
+creature to each and let it try. Set the five on the Mystic Garden's altar and the Heart forms
+-- and Eggman's Egg Warden snatches it and flies off to his outpost, which appears on the world
+map. Beat the Warden and his badniks there, bring the Heart home, and the altar's deepest
+chamber opens on an Emerald Chao's egg, with the Heart's shrine for a garden of yours. After
+that, the sleeper in the ruins wakes at night for a creature that loves you, and Doctor Nell
+can rebuild the Warden's core into a Gizoid Chao for three Chaos Drives of every colour.
 
 **Story** is *The Red Star Rings*, told the way Sonic Battle tells its story: one plot, an
 episode for each of the fourteen. Eggman means to set every Red Star Ring in his Star Engine

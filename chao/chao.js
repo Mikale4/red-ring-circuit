@@ -151,8 +151,11 @@
     G.keeper = { rig: G.M.avatar(S.avatar), x: kp[0], z: kp[1], a: kp[2], y: W.ground(kp[0], kp[1]), vx: 0, vz: 0, vy: 0, air: false };
     shadowsOn(G.keeper.rig.g); G.scene.add(G.keeper.rig.g);
     G.cam.userData.yaw = G.keeper.a + PI;
+    /* (on the world map: nothing lives out here -- anyone left there by a save goes home) */
+    if (here === "world") { for (const c of [...S.chao, ...S.animals]) if (c.region === "world") c.region = "central"; for (const e of S.eggs) if (e.region === "world") { e.region = "central"; e.pos = null; } }
+    G.onMap = false; mapMode(here === "world");
     /* the warden: the garden's own keeper of old, at the hall */
-    folkHere(); raidHere();
+    folkHere(); raidHere(); heartHere(); decorHere();
     /* everyone who lives here (each creature lives in one garden; carried through a gate, it lives in the next) */
     settle();
     gates(true);
@@ -188,7 +191,7 @@
   /* see which gates have opened (and tell, the first time) */
   function gates(quiet) {
     const S = G.save; S.open = S.open || {};
-    if (!G.W || G.W.id !== "central") { for (const k in GATE_RULES) if (!S.open[k] && GATE_RULES[k].ok(S)) S.open[k] = true; return; }
+    if (!G.W || G.W.id !== "central") { for (const k in GATE_RULES) if (!S.open[k] && GATE_RULES[k].ok(S)) { S.open[k] = true; if (!quiet) { toast(GATE_RULES[k].done, "door"); jingle("gate-open"); } } mapGates(); return; }
     for (const g of G.W.gates) {
       const R = GATE_RULES[g.id]; if (!R) continue;
       if (!S.open[g.id] && R.ok(S)) { S.open[g.id] = true; if (!quiet) { toast(R.done, "door"); jingle("gate-open"); } }
@@ -198,6 +201,7 @@
   /* through a gate: the garden behind is put away, the next one built; what you carry comes too */
   function travel(to, from) {
     if (G.traveling) return; G.traveling = true;
+    const src = G.W.id;                                // (the garden being left; `from` may be the gate it was left by)
     const fade = document.createElement("div"); fade.className = "cg-fade"; G.el.append(fade);
     requestAnimationFrame(() => fade.classList.add("on"));
     setTimeout(() => {
@@ -222,19 +226,28 @@
       if (to === "central") {
         const g = G.W.gates.find(x => x.id === from), sp = g ? G.W.spots["gate-" + g.id] : null;
         if (sp) { const ix = Math.sin(g.face), iz = Math.cos(g.face); k.x = sp.x + ix * 1.5; k.z = sp.z + iz * 1.5; k.a = g.face; } else { k.x = 0; k.z = 29; k.a = PI; }
+      } else if (to === "world") {
+        /* out beside the garden just left; from the Central Garden, on the road its gate faced */
+        const LM = G.W.RG.LM, s = G.W.spots["lm-" + src];
+        if (s && src !== "central") { const L = LM[src]; k.x = s.x + Math.sin(L.face) * 1.4; k.z = s.z + Math.cos(L.face) * 1.4; k.a = L.face; }
+        else { const C = LM.central, T = LM[from] || { x: C.x, z: C.z + 10 }, d = Math.hypot(T.x - C.x, T.z - C.z) || 1; k.x = C.x + (T.x - C.x) / d * 5.2; k.z = C.z + (T.z - C.z) / d * 5.2; k.a = Math.atan2(T.x - C.x, T.z - C.z); }
+        G.graceLm = s && src !== "central" ? src : "central";
       } else { const E = G.W.RG.entry; k.x = E[0]; k.z = E[1]; k.a = E[2]; }
-      folkHere(); raidHere();
+      mapMode(to === "world");
+      if (G.placing) { G.scene.remove(G.placing.m); G.placing = null; }
+      folkHere(); raidHere(); heartHere(); decorHere();
       k.y = G.W.ground(k.x, k.z); k.vx = k.vz = 0;
       G.cam.userData.yaw = k.a + PI; G.cam.userData.tx = k.x; G.cam.userData.tz = k.z; G.cam.userData.ty = k.y + 1;
       settle();
-      if (carried) { const e = G.ents.find(x => x.c === carried) || spawn(carried, k.x, k.z); pickUp({ kind: "creature", e }); }
-      if (item) { const it = addItem(item.kind, item.id, k.x, k.z, item.data); pickUp({ kind: item.kind, it, id: item.id }); }
+      if (carried) { const e = G.ents.find(x => x.c === carried) || spawn(carried, k.x, k.z); pickUp({ kind: "creature", e }); if (G.onMap) e.rig.g.scale.multiplyScalar(MAP_K); }
+      if (item) { const it = addItem(item.kind, item.id, k.x, k.z, item.data); pickUp({ kind: item.kind, it, id: item.id }); if (G.onMap) it.m.scale.multiplyScalar(MAP_K); }
       G.W.update(k.x, k.z);
       G.W.group.traverse(o => { if (o.isMesh && !o.material.transparent) { o.receiveShadow = true; o.castShadow = true; } });
       gates(true);
       music(gardenTune());
       S.visited = S.visited || {}; const first = !S.visited[to]; S.visited[to] = true;
-      toast(first ? `The ${G.W.RG.name || "Central Garden"}, for the first time` : `The ${G.W.RG.name || "Central Garden"}`, first ? "star" : "flag");
+      if (to === "world") { if (first) talk([["", "Out on the world map: the gardens' island. Walk onto a garden's landmark to go in; the shut ones show what's in the way. The corner map shows where you are."]]); }
+      else toast(first ? `The ${G.W.RG.name || "Central Garden"}, for the first time` : `The ${G.W.RG.name || "Central Garden"}`, first ? "star" : "flag");
       persist();
       fade.classList.remove("on"); setTimeout(() => fade.remove(), 500);
       G.traveling = false;
@@ -358,6 +371,9 @@
     if (e.rig.gait === "fly" || e.rig.gait === "bird") w.fly = 1.4;
     if (c.kind === "animal") { w.spar = (w.spar || 0) * 0.4; w.music = 0; w.tease = (w.tease || 0) * 0.5; }
     if (c.care.mood < 25) w.rest += 1;
+    /* the keeper's decor: something to do at it, more the more there is (and the sadder it is) */
+    const usable = (G.decor || []).filter(o => o.D.use && o.D.use !== "sleep" && !busyBy(o) && Math.hypot(o.d.x - e.x, o.d.z - e.z) < 42);
+    if (usable.length && !e.rig.aquatic) w.decor = 0.7 + 0.25 * Math.min(4, usable.length) + (c.care.mood < 50 ? 0.4 : 0);
     return task(e, pickW(w));
   }
   function task(e, k, o) {
@@ -369,7 +385,23 @@
     else if (k === "explore") { go(places.any()); T.until = 30; }
     else if (k === "run") { go(places.any()); T.until = 24; T.fast = true; T.laps = 3; }
     else if (k === "rest" || k === "watch") { go(Math.random() < 0.5 && places[like] ? places[like]() : near(5)); T.sit = rnd(8, 15); }
-    else if (k === "sleep") { go(places[like] && like !== "water" ? places[like]() : near(6)); T.until = 999; }
+    else if (k === "sleep") {
+      /* a free nest nearby, if the keeper has set any out; else where it likes */
+      const nest = (G.decor || []).filter(o => o.d.id === "nest" && !busyBy(o) && Math.hypot(o.d.x - e.x, o.d.z - e.z) < 30).sort((a, b) => Math.hypot(a.d.x - e.x, a.d.z - e.z) - Math.hypot(b.d.x - e.x, b.d.z - e.z))[0];
+      if (nest && !e.rig.aquatic) { T.nest = nest; go([nest.d.x, nest.d.z]); } else go(places[like] && like !== "water" ? places[like]() : near(6));
+      T.until = 999;
+    }
+    else if (k === "decor") {
+      const pick = (G.decor || []).filter(o => o.D.use && o.D.use !== "sleep" && !busyBy(o) && Math.hypot(o.d.x - e.x, o.d.z - e.z) < 42);
+      const wt = o => 1 + (o.D.attr && c.genes.apt[o.D.attr] > 0.6 ? 0.6 : 0) + (o.D.use === "splash" && (c.genes.traits.includes("swimmer") || like === "water") ? 1.2 : 0) + (o.D.use === "dance" && c.genes.traits.includes("musician") ? 1.5 : 0)
+        + (o.d.id === "perch" && (e.rig.gait === "fly" || e.rig.gait === "bird" || like === "high") ? 1 : 0) + (o.d.id === "flowers" && like === "flowers" ? 1 : 0) + (o.D.mood && c.care.mood < 50 ? 0.8 : 0);
+      let tot = 0; for (const o of pick) tot += wt(o); let r = Math.random() * tot, o = pick[0];
+      for (const p of pick) { r -= wt(p); if (r <= 0) { o = p; break; } }
+      if (!o) { T.k = "wander"; go(near(8)); return T; }
+      /* where to be: in it (a pool, a flower bed), else just in front of it */
+      const inside = o.D.use === "splash" || o.d.id === "flowers", fa = (o.d.a || 0), off = inside ? 0 : 0.6 + (o.D.solid || 0.3);
+      T.dec = o; go([o.d.x + Math.sin(fa) * off + rnd(-0.15, 0.15), o.d.z + Math.cos(fa) * off + rnd(-0.15, 0.15)]); T.sit = rnd(8, 15); T.until = 40;
+    }
     else if (k === "swim") { go(places.water()); T.until = rnd(12, 22); }
     else if (k === "fly") { go(places.any()); T.fly = true; T.until = 14; }
     else if (k === "follow") { T.until = rnd(10, 18); }
@@ -449,7 +481,27 @@
     }
     else if (K === "sleep") {
       if (T.x != null && !T.down && !steer(e, T.x, T.z, dt)) st = "walk";
-      else { T.down = true; st = "sleep"; if (Math.random() < dt * 0.3) floatText(e, "z", 0xb8d4ff, true); if (c.care.energy > 96 && (!isNight() || c.genes.traits.includes("night"))) e.task = null; }
+      else {
+        T.down = true; st = "sleep"; if (Math.random() < dt * 0.3) floatText(e, "z", 0xb8d4ff, true);
+        if (T.nest) { c.care.energy = clamp(c.care.energy + dt * 1.2, 0, 100); c.care.mood = clamp(c.care.mood + dt * 0.1, 0, 100); }    // (a nest: twice as restful)
+        if (c.care.energy > 96 && (!isNight() || c.genes.traits.includes("night"))) e.task = null;
+      }
+    }
+    else if (K === "decor") {
+      const o = T.dec;
+      if (!o || !G.decor.includes(o)) { e.task = null; }
+      else if (T.x != null && !T.down && !steer(e, T.x, T.z, dt)) st = "walk";
+      else {
+        T.down = true; T.sit -= dt;
+        e.a += angTo(e.a, o.D.use === "splash" || o.d.id === "flowers" ? e.a + dt : Math.atan2(o.d.x - e.x, o.d.z - e.z)) * Math.min(1, dt * 4);
+        st = { sit: "sit", train: "train", dance: "dance", splash: "happy" }[o.D.use] || "sit";
+        if (o.D.attr) practise(e, o.D.attr, dt * (o.D.use === "train" ? 2.2 : 1.6));
+        if (o.D.mood) c.care.mood = clamp(c.care.mood + dt * 0.9 * o.D.mood, 0, 100);
+        if (o.D.align && c.kind === "chao") G.L.raise(c, o.D.align, dt * 0.05);
+        if (o.D.use === "dance" && Math.random() < dt * 0.6) { G.M.emote(e.rig, "note"); e.bub = 1.2; }
+        if (o.D.use === "splash" && Math.random() < dt * 1.5) floatText(e, "~", 0x8ad8f8, true);
+        if (T.sit <= 0) e.task = null;
+      }
     }
     else if (K === "rest" || K === "watch" || K === "hide" || K === "music") {
       if (T.x != null && !T.down && !steer(e, T.x, T.z, dt)) st = "walk";
@@ -668,7 +720,8 @@
   /* an egg warms (faster in arms, faster still on the incubator, faster rubbed), wobbles, hatches */
   function eggTick(it, dt) {
     const e = it.data, sp = G.W.spots.incubator;
-    const onInc = !!sp && Math.hypot(it.x - sp.x, it.z - sp.z) < 1.8;              // (only the Central Garden has one)
+    const onInc = (!!sp && Math.hypot(it.x - sp.x, it.z - sp.z) < 1.8)              // (only the Central Garden has one; an egg warmer, anywhere)
+      || (G.decor || []).some(o => o.d.id === "warmer" && Math.hypot(it.x - o.d.x, it.z - o.d.z) < 1.0);
     e.warm += dt * (it.held ? 1.6 : onInc ? 2.2 : 0.8);
     const k = e.warm / e.need;
     it.m.rotation.z = k > 0.75 ? Math.sin(G.t * (10 + k * 10)) * 0.12 * (k - 0.6) : 0;
@@ -700,7 +753,7 @@
     const mag = Math.min(1, Math.hypot(mx, mz));
     const run = (G.keys.Shift || I.run || mag > 0.92 && I.pad) && mag > 0.1;
     const wade = W.depth(k.x, k.z) > 0.15 && W.standAt(k.x, k.z) == null;
-    const spd = (run ? 6.2 : 3.3) * (wade ? 0.55 : 1) * (G.held && G.held.kind === "creature" ? 0.9 : 1);
+    const spd = (run ? 6.2 : 3.3) * (wade ? 0.55 : 1) * (G.held && G.held.kind === "creature" ? 0.9 : 1) * (G.onMap ? 0.72 : 1);
     if (mag > 0.05) { const n = Math.hypot(mx, mz); mx /= n; mz /= n; }
     const tvx = mx * spd * mag, tvz = mz * spd * mag;
     k.vx = lerp(k.vx, tvx, Math.min(1, dt * 10)); k.vz = lerp(k.vz, tvz, Math.min(1, dt * 10));
@@ -722,8 +775,8 @@
     if (G.held) {
       /* what's held goes in front, in the arms */
       k.rig.arms.forEach((a, i) => { a.rotation.x = -1.3; a.rotation.z = (i ? 1 : -1) * 0.2; });
-      const h = G.held, ox = Math.sin(k.a) * 0.42, oz = Math.cos(k.a) * 0.42, hy = k.y + 0.82;
-      if (h.kind === "creature") { const e = h.e; e.x = k.x + ox; e.z = k.z + oz; e.y = hy - 0.15; e.a = k.a + PI; e.rig.g.position.set(e.x, e.y, e.z); e.rig.g.rotation.y = e.a; }
+      const ks = G.onMap ? MAP_K : 1, h = G.held, ox = Math.sin(k.a) * 0.42 * ks, oz = Math.cos(k.a) * 0.42 * ks, hy = k.y + 0.82 * ks;
+      if (h.kind === "creature") { const e = h.e; e.x = k.x + ox; e.z = k.z + oz; e.y = hy - 0.15 * ks; e.a = k.a + PI; e.rig.g.position.set(e.x, e.y, e.z); e.rig.g.rotation.y = e.a; }
       else { h.it.x = k.x + ox; h.it.z = k.z + oz; h.it.y = hy; h.it.m.position.set(h.it.x, hy, h.it.z); }
     }
     W.update(k.x, k.z);
@@ -736,7 +789,7 @@
     /* drift behind the keeper as they walk, gently */
     const sp = Math.hypot(k.vx, k.vz);
     if (sp > 1 && !G.dragging && Math.abs(rot) < 0.01) U.yaw += angTo(U.yaw, k.a + PI) * Math.min(1, dt * 0.6 * (sp / 4));
-    U.tx = lerp(U.tx, k.x, Math.min(1, dt * 8)); U.tz = lerp(U.tz, k.z, Math.min(1, dt * 8)); U.ty = lerp(U.ty, k.y + 1.0, Math.min(1, dt * 6));
+    U.tx = lerp(U.tx, k.x, Math.min(1, dt * 8)); U.tz = lerp(U.tz, k.z, Math.min(1, dt * 8)); U.ty = lerp(U.ty, k.y + (G.onMap ? 0.45 : 1.0), Math.min(1, dt * 6));
     const cp = Math.cos(U.pitch), d = U.dist;
     let cx = U.tx + Math.sin(U.yaw) * d * cp, cz = U.tz + Math.cos(U.yaw) * d * cp, cy = U.ty + Math.sin(U.pitch) * d;
     /* never inside the hill behind */
@@ -761,15 +814,26 @@
     for (const t of G.W.trees) if (t.fruit) consider({ kind: "tree", t }, score(t.x, t.z, 2.4) - 0.2);
     for (const n in G.W.spots) { const s = G.W.spots[n]; consider({ kind: "spot", n, s }, score(s.x, s.z, s.r + 0.6) - 0.1); }
     for (const n of G.npcs || []) if (n.rig.g.visible) consider({ kind: "npc", n }, score(n.x, n.z, 2.2) + 0.1);
+    for (const o of G.decor || []) consider({ kind: "decor", o }, score(o.d.x, o.d.z, 1.3 + (o.D.solid || 0.3) + (o.D.wide || 0)) - 0.15);
     return best;
   }
   function prompts() {
+    if (G.placing) {
+      const html = [["Z", G.placing.ok ? "Set it down here" : "Not here"], ["C", "Turn"], ["V", "Paint"], ["X", "Cancel"]].map(([k, t]) => `<span class="cg-p"><b>${k}</b>${esc(t)}</span>`).join("");
+      if (html !== G.lastPrompt) { G.lastPrompt = html; G.hud.querySelector(".cg-prompt").innerHTML = html; }
+      G.reach = null; return;
+    }
     const r = G.reach = reach(), h = G.held, P = [];
     const name = o => o.kind === "creature" ? o.e.c.name : o.kind === "fruit" ? G.D.food(o.it.id).name : o.kind === "toy" ? G.D.toy(o.it.id).name : o.kind === "egg" ? "the egg" : "";
     if (h) {
       if (h.kind === "fruit" && r && r.kind === "creature") P.push(["Z", `Feed ${r.e.c.name}`]);
       else if (h.kind === "toy" && r && r.kind === "creature") P.push(["Z", `Give ${r.e.c.name} the ${G.D.toy(h.it.id).name.toLowerCase()}`]);
       else if (h.kind === "egg" && r && r.kind === "spot" && r.n === "incubator") P.push(["Z", "Set it on the incubator"]);
+      else if (h.kind === "egg" && r && r.kind === "decor" && r.o.d.id === "warmer") P.push(["Z", "Set it on the egg warmer"]);
+      else if (r && r.kind === "spot" && ((r.n.startsWith("gate") && r.s.gate.open) || r.n === "exit")) P.push(["Z", `Out to the world map, carrying ${h.kind === "creature" ? h.e.c.name : "it"}`]);
+      else if (r && r.kind === "spot" && r.s.lm) P.push(["Z", `Into the ${r.s.name}`]);
+      else if (h.kind === "creature" && r && r.kind === "spot" && r.s.shard) P.push(["Z", `${h.e.c.name}: try for the shard`]);
+      else if (h.kind === "creature" && r && r.kind === "spot" && r.n === "altar" && heart().done) P.push(["Z", `Set ${h.e.c.name} by the carvings`]);
       else P.push(["Z", "Put down"]);
       if (h.kind === "creature") P.push(["C", "Cuddle"]); else if (h.kind === "egg") P.push(["C", "Rub it warm"]);
       P.push(["X", h.kind === "creature" ? "Throw" : "Toss"]);
@@ -777,8 +841,9 @@
     } else if (r) {
       if (r.kind === "creature") { P.push(["Z", `Pick up ${r.e.c.name}`], ["C", "Pet"], ["V", "Look"]); }
       else if (r.kind === "tree") P.push(["Z", "Shake the tree"]);
-      else if (r.kind === "spot") { const n = r.n; P.push(["Z", n === "incubator" ? "The incubator" : n === "mailbox" ? (G.save.mail && G.save.mail.length ? `Mailbox (${G.save.mail.length})` : "Mailbox") : n === "book" ? "The encyclopedias" : n === "hall" ? "The Garden Hall" : n === "yard" ? "The training ground" : n.startsWith("gate") ? (r.s.gate.open ? `Into the ${r.s.gate.name}` : `The way to the ${r.s.gate.name}`) : n === "exit" ? "Back to the Central Garden" : r.s.raid ? "The badniks' cage" : r.s.dojo ? "The dojo" : r.s.arena ? "The Garden League's arena" : n === "pier" ? "The pier" : n === "lake" ? "The frozen lake" : n === "altar" ? "The altar" : n === "observatory" ? "The observatory" : ""]); }
+      else if (r.kind === "spot") { const n = r.n; P.push(["Z", n === "incubator" ? "The incubator" : n === "mailbox" ? (G.save.mail && G.save.mail.length ? `Mailbox (${G.save.mail.length})` : "Mailbox") : n === "book" ? "The encyclopedias" : n === "hall" ? "The Garden Hall" : n === "yard" ? "The training ground" : n.startsWith("gate") ? (r.s.gate.open ? `Out on the road to the ${r.s.gate.name}` : `The way to the ${r.s.gate.name}`) : n === "exit" ? "Out to the world map" : r.s.lm ? (lmOpen(r.s.lm) ? `Into the ${r.s.name}` : `The ${r.s.name}: the way's shut`) : r.s.raid ? "The badniks' cage" : r.s.shard ? "The glint of light" : r.s.dojo ? "The dojo" : r.s.arena ? "The Garden League's arena" : n === "pier" ? "The pier" : n === "lake" ? "The frozen lake" : n === "altar" ? "The altar" : n === "observatory" ? "The observatory" : ""]); }
       else if (r.kind === "npc") P.push(["Z", `Talk to ${r.n.name}`]);
+      else if (r.kind === "decor") P.push(["Z", `The ${r.o.D.name.toLowerCase()}`]);
       else { P.push(["Z", `Pick up ${name(r)}`]); if (r.kind === "egg") P.push(["V", "Look"]); }
     }
     if (!h && !(r && r.kind === "creature")) P.push(["X", "Whistle"]);
@@ -787,8 +852,16 @@
   }
   /* -- the actions */
   function actZ() {
+    if (G.placing) { placeKey("Z"); return; }
     const r = G.reach, h = G.held, k = G.keeper, L = G.L;
     if (h) {
+      /* (through a gate or out of a garden with it in your arms: it comes too) */
+      if (r && r.kind === "spot" && r.n.startsWith("gate") && r.s.gate.open) { travel("world", r.s.gate.id); return; }
+      if (r && r.kind === "spot" && r.n === "exit") { travel("world", G.W.id); return; }
+      if (r && r.kind === "spot" && r.s.lm) { enterLm(r.s.lm); return; }
+      if (h.kind === "creature" && r && r.kind === "spot" && r.s.shard) { shardTry(h.e); return; }
+      if (h.kind === "creature" && r && r.kind === "spot" && r.n === "altar" && heart().done) { altarGo(h.e); return; }
+      if (h.kind === "egg" && r && r.kind === "decor" && r.o.d.id === "warmer") { const it = h.it, o = r.o; drop(); it.x = o.d.x + rnd(-0.2, 0.2); it.z = o.d.z + rnd(-0.2, 0.2); it.y = G.W.ground(o.d.x, o.d.z) + 0.5; it.m.position.set(it.x, it.y, it.z); it.warmer = true; toast("The egg is warm on the egg warmer", "flame"); return; }
       if (h.kind === "fruit" && r && r.kind === "creature") { const e = r.e, it = h.it; G.held = null; it.held = false; eatItem(e, it); e.c.bond = clamp(e.c.bond + 1.5, 0, 100); G.L.raise(e.c, "hero", 2); sfx("grab"); return; }
       if (h.kind === "toy" && r && r.kind === "creature") { const e = r.e, it = h.it; drop(); it.x = e.x + Math.sin(e.a) * 0.4; it.z = e.z + Math.cos(e.a) * 0.4; e.task = null; task(e, "play", { toy: it }); e.c.bond = clamp(e.c.bond + 1, 0, 100); if (e.c.genes.likes.toy === it.id) { G.M.emote(e.rig, "heart"); e.bub = 1.6; floatText(e, "Favourite!", 0xf07ab0); e.c.care.mood = clamp(e.c.care.mood + 12, 0, 100); } return; }
       if (h.kind === "egg" && r && r.kind === "spot" && r.n === "incubator") { const it = h.it; drop(); const s = G.W.spots.incubator; it.x = s.x + rnd(-0.3, 0.3); it.z = s.z + rnd(-0.3, 0.3); it.y = s.y; it.m.position.set(it.x, it.y, it.z); toast("The egg is warm on the incubator", "flame"); return; }
@@ -799,6 +872,7 @@
     if (r.kind === "fruit" || r.kind === "toy" || r.kind === "egg") { pickUp({ kind: r.kind, it: r.it, id: r.it.id }); return; }
     if (r.kind === "tree") { const f = G.W.shake(r.t); sfx("stumble"); r.t.m.rotation.z = 0.06; setTimeout(() => { if (r.t.m) { r.t.m.rotation.z = 0; r.t.m.updateMatrix(); } }, 160); r.t.m.updateMatrix(); if (f) dropFruit(f); else toast("No fruit on it yet: it'll grow more", "clover"); return; }
     if (r.kind === "npc") { r.n.f.talk(); return; }
+    if (r.kind === "decor") { decorMenu(r.o); return; }
     if (r.kind === "spot") {
       const n = r.n;
       if (n === "mailbox") { const S = G.save; if (!S.mail || !S.mail.length) { toast("The mailbox is empty", "mail"); return; } let i = 0; for (const e of S.mail) { addItem("egg", null, r.s.x + Math.cos(i) * 1.2 - 0.6, r.s.z - 1 + Math.sin(i) * 0.6, e); i++; } toast(`${S.mail.length} egg${S.mail.length > 1 ? "s" : ""} from the mailbox`, "mail"); S.mail = []; persist(); sfx("grab"); return; }
@@ -806,14 +880,16 @@
       if (n === "hall") { hallMenu(); return; }
       if (n === "yard") { yardMenu(); return; }
       if (n === "incubator") { toast("Eggs set here hatch twice as fast", "flame"); return; }
-      if (n.startsWith("gate")) { const g = r.s.gate; if (g.open) travel(g.id); else talk([["Sign", `To the ${g.name}. ${(GATE_RULES[g.id] || {}).why || g.need}`]]); return; }
-      if (n === "exit") { travel("central", G.W.id); return; }
+      if (n.startsWith("gate")) { const g = r.s.gate; if (g.open) travel("world", g.id); else talk([["Sign", `To the ${g.name}. ${(GATE_RULES[g.id] || {}).why || g.need}`]]); return; }
+      if (n === "exit") { travel("world", G.W.id); return; }
+      if (r.s.lm) { enterLm(r.s.lm); return; }
       if (r.s.raid) { raidGo(); return; }
       if (r.s.dojo) { dojoMenu(r.s.dojo); return; }
       if (r.s.arena) { leagueMenu(); return; }
       if (n === "pier") { talk([["", "The pier creaks underfoot. Fish dart in the clear water below; the swimmers love it here."]]); return; }
       if (n === "lake") { talk([["", "The lake is frozen solid. Something glints under the ice."]]); return; }
-      if (n === "altar") { talk([["", "An old altar at the court's heart. Carvings round its edge show Chao, and a great light over them."]]); return; }
+      if (n === "altar") { altarGo(null); return; }
+      if (r.s.shard) { const sh = G.shardAt && G.shardAt.sh; if (sh) talk([["", `${sh.find} (Carry one of your creatures here, and let it try: it needs ${G.D.ATTRS.find(a => a.id === sh.attr).name} ${SHARD_NEED} or more.)`]]); return; }
       if (n === "observatory") { talk([["", "The old observatory. Its telescope points at a patch of sky where the stars gather thickest."]]); return; }
     }
   }
@@ -826,6 +902,7 @@
     } else { h.it.held = true; G.held = h; sfx("grab"); }
   }
   function drop(toss) {
+    if (G.onMap && G.held) { toast("Not out here: carry it into a garden first", "info"); return; }
     const h = G.held; if (!h) return; G.held = null;
     const k = G.keeper, fx = Math.sin(k.a), fz = Math.cos(k.a);
     if (h.kind === "creature") {
@@ -841,6 +918,7 @@
     }
   }
   function actC() {
+    if (G.placing) { placeKey("C"); return; }
     const r = G.reach, h = G.held, L = G.L;
     if (h && h.kind === "creature") { const e = h.e; L.pet(e.c); L.pet(e.c); G.M.emote(e.rig, "heart"); e.bub = 1.5; e.face = "happy"; setTimeout(() => e.face = null, 900); chirp(1100); return; }
     if (h && h.kind === "egg") { h.it.data.warm += 3; floatAt(h.it.x, h.it.y + 0.5, h.it.z, "Warm", 0xff8a10); return; }
@@ -854,6 +932,7 @@
     }
   }
   function actX() {
+    if (G.placing) { placeKey("X"); return; }
     if (G.held) { drop(true); return; }
     /* a whistle: those who are fond of the keeper come; the rest look round */
     sfx("check");
@@ -861,6 +940,7 @@
     floatAt(G.keeper.x, G.keeper.y + 2.1, G.keeper.z, "♪", 0xffd21a);
   }
   function actV() {
+    if (G.placing) { placeKey("V"); return; }
     const r = G.reach, h = G.held;
     const e = h && h.kind === "creature" ? h.e : r && r.kind === "creature" ? r.e : null;
     if (e) { card(e.c); return; }
@@ -897,14 +977,14 @@
     const paused = !!G.menu;
     if (!paused) {
       G.t += dt; G.save.day += dt / DAY;
-      keeperTick(dt);
+      keeperTick(dt); placeTick();
       for (const e of G.ents.slice()) { live(e, dt); place(e); }
       separate();
       itemsTick(dt);
       G.W.growFruit(dt, t => G.ents.some(e => e.c.genes.traits.includes("greenthumb") && Math.hypot(e.x - t.x, e.z - t.z) < 8) ? 1.6 : 1);
       G.W.tick(dt);
       for (const n of G.npcs || []) { n.rig.g.visible = folkIn(n); if (n.rig.g.visible) n.rig.anim(G.t, dt, "idle"); }
-      raidTick(dt);
+      raidTick(dt); habitatTick(dt); mapTick(dt);
       G.saveT += dt; if (G.saveT > 25) { G.saveT = 0; persist(); gates(); milestones(); storyCheck(); }
       elsewhere(dt);
       const dn = Math.floor(G.save.day); if (G.dayN !== dn) { if (G.dayN != null) dawn(dn); G.dayN = dn; }
@@ -917,6 +997,7 @@
   function dawn(n) {
     toast(`Day ${n + 1}`, "sun");
     const S = G.save;
+    dawnDecor();
     if (Math.random() < 0.35 && (S.mail || []).length < 8) { S.mail = S.mail || []; const pool = G.D.ANIMALS.filter(a => a.region === "central" && a.rarity <= 2); const sp = pool[Math.floor(Math.random() * pool.length)]; S.mail.push(G.L.egg(Math.random() < 0.5 ? "chao-neutral-child" : sp.id, { from: "sent by the Garden Society, with its compliments" })); toast("Something arrived in the mailbox", "mail"); }
     persist();
   }
@@ -961,6 +1042,8 @@
     G.hud.innerHTML = `
       <div class="cg-clock"><span class="cg-sun"></span><b></b><i></i></div>
       <div class="cg-rings"><span class="cg-ring"></span><b></b></div>
+      <div class="cg-mini" style="display:none"><canvas width="132" height="132"></canvas></div>
+      <div class="cg-mapname" style="display:none"></div>
       <div class="cg-toasts"></div>
       <div class="cg-prompt"></div>
       <button class="cg-menu-btn" data-cgmenu>${ico("chevrons")}<span>Menu</span></button>`;
@@ -972,6 +1055,7 @@
     const s = `${h % 12 || 12}:${String(m).padStart(2, "0")}<small>${h < 12 ? "AM" : "PM"}</small>`, d = `Day ${Math.floor(G.save.day) + 1}`;
     if (s !== G.hudS) { G.hudS = s; const c = G.hud.querySelector(".cg-clock"); c.querySelector("b").innerHTML = s; c.querySelector("i").textContent = d; c.querySelector(".cg-sun").innerHTML = ico(isNight() ? "moon" : "sun"); }
     const rings = G.save.rings; if (rings !== G.hudR) { G.hudR = rings; G.hud.querySelector(".cg-rings b").textContent = rings; }
+    mapHud();
   }
   const V3 = new THREE.Vector3();
   function project(x, y, z) { V3.set(x, y, z).project(G.cam); if (V3.z > 1) return null; return [(V3.x + 1) / 2 * G.w, (1 - V3.y) / 2 * G.h]; }
@@ -1071,13 +1155,14 @@
         <button class="cg-mi" data-f data-focus data-go="creatures">${ico("heart")}<b>Garden</b><i>${nC} Chao, ${nA} animal${nA === 1 ? "" : "s"}${G.items.filter(i => i.kind === "egg").length ? `, ${G.items.filter(i => i.kind === "egg").length} egg${G.items.filter(i => i.kind === "egg").length === 1 ? "" : "s"}` : ""}</i></button>
         <button class="cg-mi" data-f data-go="book">${ico("book")}<b>Encyclopedias</b><i>${Object.keys(S.seen).filter(k => k.startsWith("chao")).length}/${G.D.CHAO.length} Chao, ${Object.keys(S.seen).filter(k => k.startsWith("an-")).length}/${G.D.ANIMALS.length} animals</i></button>
         <button class="cg-mi" data-f data-go="bag">${ico("clipboard")}<b>Bag</b><i>Fruit and things to take out</i></button>
+        <button class="cg-mi" data-f data-go="habitat">${ico("clover")}<b>Habitat</b><i>${decorList().length}/${decorCap()} decor set out here${Object.values(S.decorBag || {}).reduce((a, b) => a + b, 0) ? `, ${Object.values(S.decorBag).reduce((a, b) => a + b, 0)} in the bag` : ""}</i></button>
         <button class="cg-mi" data-f data-go="keeper">${ico("person")}<b>Keeper</b><i>${esc(S.avatar.name || "You")}: change how you look</i></button>
         <button class="cg-mi" data-f data-go="leave">${ico("door")}<b>Save and leave</b><i>Back to the cabinet's menu</i></button>
       </div>
       <p class="cg-keys"><b>Arrows</b> move &nbsp; <b>Shift</b> run &nbsp; <b>Space</b> jump &nbsp; <b>Z</b> pick up / use &nbsp; <b>C</b> pet &nbsp; <b>X</b> throw / whistle &nbsp; <b>V</b> look &nbsp; <b>Q E</b> or drag: camera</p>`, "cg-small"));
     G.menu.el.querySelectorAll("[data-go]").forEach(b => b.onclick = () => {
       const k = b.dataset.go;
-      if (k === "creatures") creaturesList(); else if (k === "book") encyclopedia(); else if (k === "bag") bag(); else if (k === "keeper") creator(false); else if (k === "leave") { menuClose(); persist(); close(); }
+      if (k === "creatures") creaturesList(); else if (k === "book") encyclopedia(); else if (k === "bag") bag(); else if (k === "habitat") habitatMenu(); else if (k === "keeper") creator(false); else if (k === "leave") { menuClose(); persist(); close(); }
     });
   }
   function creaturesList() {
@@ -1085,7 +1170,7 @@
     const row = c => { const sp = G.D.species(c.sp); return `<button class="cg-crow" data-f data-c="${c.id}"><canvas width="96" height="96" data-thumb="${c.id}"></canvas><span><b>${esc(c.name)}</b><i>${esc(sp.name)}</i><em>${ico("heart")} ${Math.round(c.bond)} &nbsp; Lv ${G.L.lvSum(c)}</em></span></button>`; };
     const el = menuOpen(sec("The garden's own", "heart", `
       ${all.length ? `<div class="cg-grid">${all.map(row).join("")}</div>` : `<p class="cg-empty">Nobody yet: the eggs by the incubator will hatch soon.</p>`}
-      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`, "cg-wide"), () => mainMenu());
+      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`, "cg-wide"), () => { menuClose(); mainMenu(); });
     el.querySelector("[data-back]").onclick = () => { menuClose(); mainMenu(); };
     el.querySelectorAll("[data-c]").forEach(b => b.onclick = () => { const c = all.find(x => x.id === b.dataset.c); card(c, () => creaturesList()); });
     thumbs(el, id => all.find(c => c.id === id));
@@ -1155,7 +1240,7 @@
     const rows = Object.keys(inv).filter(k => inv[k] > 0).map(k => { const f = G.D.food(k); return f ? `<button class="cg-irow" data-f data-take="${k}"><span class="cg-dot" style="background:#${f.c.toString(16).padStart(6, "0")}"></span><b>${esc(f.name)}</b><i>${esc(f.text)}</i><em>x${inv[k]}</em></button>` : ""; }).join("");
     const el = menuOpen(sec("Bag", "clipboard", `${rows ? `<div class="cg-list">${rows}</div>` : `<p class="cg-empty">Empty. Fruit you put in it (pick it up, then Bag) waits here.</p>`}
       ${G.held && G.held.kind === "fruit" ? `<div class="cg-foot"><button class="btn" data-f data-stow>${ico("check")}Put the ${esc(G.D.food(G.held.it.id).name)} away</button></div>` : ""}
-      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`, "cg-small"), () => mainMenu());
+      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`, "cg-small"), () => { menuClose(); mainMenu(); });
     el.querySelector("[data-back]").onclick = () => { menuClose(); mainMenu(); };
     const st = el.querySelector("[data-stow]"); if (st) st.onclick = () => { const it = G.held.it; G.held = null; inv[it.id] = (inv[it.id] || 0) + 1; removeItem(it); persist(); bag(); };
     el.querySelectorAll("[data-take]").forEach(b => b.onclick = () => {
@@ -1310,7 +1395,8 @@
       const id = v.fixed ? v.fixed[i % v.fixed.length] : v.pool[Math.floor(Math.random() * v.pool.length)], c = L.make(id, { name: v.named ? D.species(id).name : L.NAMES[Math.floor(Math.random() * L.NAMES.length)] });
       if (c.kind === "animal") c.grown = 1;
       let guard = 0;
-      while (L.lvSum(c) < want && guard++ < 400) { const a = D.ATTRS[Math.floor(Math.random() * 7)].id; L.train(c, a, 40 + c.genes.apt[a] * 60); }
+      const wantI = want * (v.boss && id === v.boss.id ? v.boss.mul : 1);          // (a story boss grows well past its side)
+      while (L.lvSum(c) < wantI && guard++ < 600) { const a = D.ATTRS[Math.floor(Math.random() * 7)].id; L.train(c, a, 40 + c.genes.apt[a] * 60); }
       out.push(c);
     }
     return out;
@@ -1418,20 +1504,22 @@
     if (tab === "food") rows = SHOP.food.map(([id, p]) => { const f = G.D.food(id); return row("food:" + id, f.name, f.text + ((S.inv[id] || 0) ? ` (${S.inv[id]} in the bag)` : ""), p, f.c); }).join("");
     if (tab === "toys") rows = SHOP.toys.map(([id, p]) => { const t = G.D.toy(id); return row("toy:" + id, t.name, t.text, p, t.c); }).join("");
     if (tab === "eggs") rows = SHOP.eggs.map(([id, p, name, text]) => row("egg:" + id, name, text, p, id === "animal" ? 0xd8c8a0 : (G.D.ALIGNS[G.D.species(id).align] || {}).c ? G.D.ALIGNS[G.D.species(id).align].c[0] : 0xf4f0e4)).join("");
+    if (tab === "decor") rows = G.D.DECOR.filter(d => !d.story).map(d => row("decor:" + d.id, d.name, d.text + ((S.decorBag || {})[d.id] ? ` (${S.decorBag[d.id]} in the bag)` : ""), d.price, G.Wd.PAINT[S.paint || 0])).join("");
     if (tab === "room") { const cur = (S.habitat && S.habitat.room) || 0, nx = SHOP.room.find(([r]) => r > cur); rows = nx ? row("room:" + nx[0], `A bigger garden (room for ${30 + nx[0]})`, "The Society's carpenters widen your plots and build more nests.", nx[1], 0x6ad050) : `<p class="cg-empty">The garden's as big as it gets: room for ${30 + cur}.</p>`; }
     const el = menuOpen(`<div class="panel cg-panel"><div class="panel-hd">${ico("ticket")}Pip's garden shop<small>${S.rings} rings</small></div>
-      <div class="cg-tabs">${[["food", "Food"], ["toys", "Toys"], ["eggs", "Eggs"], ["room", "Room"]].map(([k, n]) => `<button class="${tab === k ? "sel" : ""}" data-f data-tab="${k}">${n}</button>`).join("")}</div>
+      <div class="cg-tabs">${[["food", "Food"], ["toys", "Toys"], ["eggs", "Eggs"], ["decor", "Decor"], ["room", "Room"]].map(([k, n]) => `<button class="${tab === k ? "sel" : ""}" data-f data-tab="${k}">${n}</button>`).join("")}</div>
       <div class="cg-list">${rows}</div>
       <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div></div>`, menuClose, "cg-small");
     el.querySelector("[data-back]").onclick = menuClose;
     el.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => shopMenu(b.dataset.tab));
     el.querySelectorAll("[data-buy]").forEach(b => b.onclick = () => {
-      const [kind, id] = b.dataset.buy.split(":"), list = kind === "food" ? SHOP.food : kind === "toy" ? SHOP.toys : kind === "egg" ? SHOP.eggs : SHOP.room;
+      const [kind, id] = b.dataset.buy.split(":"), list = kind === "food" ? SHOP.food : kind === "toy" ? SHOP.toys : kind === "egg" ? SHOP.eggs : kind === "decor" ? G.D.DECOR.filter(d => !d.story).map(d => [d.id, d.price]) : SHOP.room;
       const it = list.find(x => String(x[0]) === id); if (!it || S.rings < it[1]) return;
       if (kind === "egg" && !room()) { toast("The garden's full: buy more room first", "info"); return; }
       S.rings -= it[1]; sfx("coin");
       const k = G.keeper, fx = k.x + Math.sin(k.a) * 0.8, fz = k.z + Math.cos(k.a) * 0.8;
       if (kind === "food") { S.inv[id] = (S.inv[id] || 0) + 1; toast(`${G.D.food(id).name}: into the bag`, "check"); }
+      else if (kind === "decor") { S.decorBag = S.decorBag || {}; S.decorBag[id] = (S.decorBag[id] || 0) + 1; toast(`${G.D.decor(id).name}: into the habitat bag (the menu's Habitat sets it out)`, "check"); }
       else if (kind === "toy") { addItem("toy", id, fx, fz); toast(`A new ${G.D.toy(id).name.toLowerCase()}`, "check"); }
       else if (kind === "egg") {
         let sp = id;
@@ -1505,6 +1593,185 @@
     el.querySelector("[data-again]").onclick = () => trainGo(c, g.id);
   }
 
+  /* ---------------------------------------------------------------- the world map
+     The gardens' island, the way a JRPG has its world map: leave any garden and you're out on
+     it beside that garden's landmark, the keeper at four tenths of his size; walk onto a
+     landmark to go in (not straight back into the one you just left). A locked garden's landmark
+     shows what's in the way, and says what would clear it. A minimap in the corner, as FF7's. */
+  const MAP_K = 0.42;
+  function mapMode(on) {
+    const U = G.cam.userData;
+    if (on && !G.onMap) { G.camGarden = { dist: U.dist, pitch: U.pitch }; U.dist = 10.5; U.pitch = 0.5; }
+    if (!on && G.onMap && G.camGarden) { U.dist = G.camGarden.dist; U.pitch = G.camGarden.pitch; }
+    G.onMap = on;
+    G.keeper.rig.g.scale.setScalar(on ? MAP_K : 1);
+    const mm = G.hud.querySelector(".cg-mini"), nm = G.hud.querySelector(".cg-mapname");
+    if (mm) mm.style.display = on ? "" : "none"; if (nm) nm.style.display = "none";
+    if (on) { G.miniImg = null; mapGates(); }
+  }
+  /* the barriers come down as the gardens open */
+  function mapGates() {
+    const S = G.save; if (!G.W || G.W.id !== "world") return;
+    for (const k in GATE_RULES) if (S.open && S.open[k]) G.W.RG.openBarrier(G.W, G.W.put, k);
+    if (S.story && S.story.outpost && !G.W.landmarks.outpost) G.W.RG.landmark(G.W, G.W.put, G.W.block, "outpost");
+  }
+  const lmOpen = k => k === "central" || k === "outpost" || !!(G.save.open || {})[k];
+  function enterLm(k) {
+    const S = G.save, L = G.W.RG.LM[k]; if (!L || G.traveling) return;
+    G.graceLm = k;
+    if (k === "outpost") { outpostGo(); return; }
+    if (!lmOpen(k)) { talk([["", `The ${L.name}. ${(GATE_RULES[k] || {}).why || "The way in is shut."}`]]); return; }
+    if (k === "central") { travel("central", null); return; }        // (in by the main way, at the hall)
+    travel(k, "world");
+  }
+  function mapTick(dt) {
+    if (!G.onMap || G.traveling || G.menu || G.talking) return;
+    const k = G.keeper;
+    for (const n in G.W.spots) {
+      const s = G.W.spots[n]; if (!s.lm) continue;
+      const d = Math.hypot(s.x - k.x, s.z - k.z);
+      if (s.lm === G.graceLm) { if (d > 3) G.graceLm = null; continue; }
+      if (d < 1.0) { enterLm(s.lm); return; }
+    }
+  }
+  /* the name of the nearest landmark, and the minimap */
+  function mapHud() {
+    if (!G.onMap) return;
+    const k = G.keeper, nm = G.hud.querySelector(".cg-mapname");
+    let near = null, nd = 7;
+    for (const n in G.W.spots) { const s = G.W.spots[n]; if (!s.lm) continue; const d = Math.hypot(s.x - k.x, s.z - k.z); if (d < nd) { nd = d; near = s; } }
+    const txt = near ? near.name + (lmOpen(near.lm) ? "" : " (the way's shut)") : "";
+    if (nm && nm._t !== txt) { nm._t = txt; nm.textContent = txt; nm.style.display = txt ? "" : "none"; }
+    const cv = G.hud.querySelector(".cg-mini canvas"); if (!cv) return;
+    const c = cv.getContext("2d"), N = cv.width, SC = 120 / N;
+    if (!G.miniImg) {
+      const RG = G.W.RG, img = c.createImageData(N, N);
+      for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+        const x = (i + 0.5) * SC - 60, z = (j + 0.5) * SC - 60, h = RG.heightAt(x, z), s = RG.surfaceAt(x, z, h), p = (j * N + i) * 4;
+        const col = h < RG.sea - 0.05 ? null : s === "path" ? [200, 170, 120] : s === "sand" ? [232, 214, 160] : s === "snow" ? [240, 244, 250] : s === "rock" ? [150, 144, 130] : s === "forest" ? [56, 120, 58] : s === "bed" ? [90, 160, 220] : s === "metal" ? [140, 146, 156] : s === "stone" ? [196, 188, 164] : [96, 168, 72];
+        if (!col) { img.data[p + 3] = 0; continue; }
+        const sh = 0.82 + Math.min(1, h / 10) * 0.3; img.data[p] = col[0] * sh; img.data[p + 1] = col[1] * sh; img.data[p + 2] = col[2] * sh; img.data[p + 3] = 235;
+      }
+      const bc = document.createElement("canvas"); bc.width = bc.height = N; bc.getContext("2d").putImageData(img, 0, 0); G.miniImg = bc;
+    }
+    c.clearRect(0, 0, N, N); c.drawImage(G.miniImg, 0, 0);
+    const px = x => (x + 60) / SC;
+    for (const n in G.W.spots) { const s = G.W.spots[n]; if (!s.lm) continue; const L = G.W.RG.LM[s.lm]; c.fillStyle = "#1a1a22"; c.fillRect(px(L.x) - 3, px(L.z) - 3, 6, 6); c.fillStyle = lmOpen(s.lm) ? (s.lm === "outpost" ? "#ff4a3a" : "#ffd21a") : "#8a8a9a"; c.fillRect(px(L.x) - 2, px(L.z) - 2, 4, 4); }
+    const yaw = G.cam.userData.yaw + PI, dx = Math.sin(yaw), dz = Math.cos(yaw), sx = Math.cos(yaw), sz = -Math.sin(yaw), X = px(k.x), Z = px(k.z);
+    c.fillStyle = "rgba(255,236,80,0.75)"; c.beginPath(); c.moveTo(X, Z); c.lineTo(X + dx * 12 + sx * 6, Z + dz * 12 + sz * 6); c.lineTo(X + dx * 12 - sx * 6, Z + dz * 12 - sz * 6); c.closePath(); c.fill();
+    c.fillStyle = Math.floor(G.t * 4) % 2 ? "#ff2020" : "#ff8080"; c.beginPath(); c.arc(X, Z, 2.5, 0, PI * 2); c.fill();
+  }
+
+  /* ---------------------------------------------------------------- habitats
+     Decor of your own (Pip sells it, into the habitat bag), set out wherever you like in any
+     garden -- placed in front of the keeper, turned, painted -- and used: the creatures sleep in
+     the nests, train on the perches and dummies, sit by the lamps, splash in the pools, dance to
+     the music boxes; the feeders and toy chests fill each morning; an egg warmer hatches eggs in
+     any garden. Each garden holds 8 pieces, 4 more for each step of room bought. */
+  const decorCap = () => 8 + Math.round(((G.save.habitat && G.save.habitat.room) || 0) / 10) * 4;
+  const decorList = rg => { const S = G.save; S.decor = S.decor || {}; const k = rg || S.region || "central"; return S.decor[k] = S.decor[k] || []; };
+  const busyBy = o => G.ents.find(x => x.task && (x.task.dec === o || x.task.nest === o));
+  function decorHere() { G.decor = []; for (const d of decorList()) addDecor(d); }
+  function addDecor(d) {
+    const D = G.D.decor(d.id); if (!D) return null;
+    const m = G.Wd.decorMesh(d.id, d.p); m.position.set(d.x, G.W.ground(d.x, d.z), d.z); m.rotation.y = d.a || 0; m.updateMatrix(); shadowsOn(m); G.W.props.add(m);
+    let ob = null;
+    if (D.solid) { ob = D.wide ? { x: d.x, z: d.z, r: 0, w: D.wide, d: D.solid, box: true, a: d.a || 0 } : { x: d.x, z: d.z, r: D.solid, w: 0, d: 0 }; G.W.obst.push(ob); }
+    const o = { d, D, m, ob }; G.decor.push(o); return o;
+  }
+  function removeDecor(o) { G.W.props.remove(o.m); if (o.ob) o.ob.off = true; G.decor.splice(G.decor.indexOf(o), 1); }
+  /* -- setting a piece out: it stands in front of the keeper till Z puts it down */
+  function placeStart(id, from) {
+    menuClose(); if (G.placing) placeKey("X");
+    const S = G.save, D = G.D.decor(id);
+    if (!from && decorList().length >= decorCap()) { talk([["", `This garden's full of decor (${decorCap()} pieces). A bigger garden from Pip's shop makes room for more.`]]); return; }
+    const p = from ? from.d.p || 0 : S.paint || 0, m = G.Wd.decorMesh(id, p); G.scene.add(m);
+    if (from) { from.m.visible = false; if (from.ob) from.ob.off = true; }
+    G.placing = { id, D, p, a: from ? from.d.a || 0 : Math.round((G.keeper.a + PI) / (PI / 4)) * (PI / 4), m, from, ok: false };
+    toast(`${D.name}: Z to set it down`, "clover");
+  }
+  function placeTick() {
+    const P = G.placing; if (!P) return; const k = G.keeper, W = G.W;
+    const dist = 1.3 + (P.D.solid || 0.4) + (P.D.wide || 0) * 0.6;
+    const x = Math.round((k.x + Math.sin(k.a) * dist) * 4) / 4, z = Math.round((k.z + Math.cos(k.a) * dist) * 4) / 4;
+    P.x = x; P.z = z; P.m.position.set(x, W.ground(x, z), z); P.m.rotation.y = P.a;
+    const r = Math.max(0.35, P.D.solid || 0.4);
+    P.ok = Math.hypot(x, z) < ((W.RG && W.RG.radius) || 44) - 1 && !W.blocked(x, z, r) && W.depth(x, z) < 0.05 && Math.abs(W.ground(x + 0.5, z) - W.ground(x - 0.5, z)) < 0.6 && Math.abs(W.ground(x, z + 0.5) - W.ground(x, z - 0.5)) < 0.6
+      && !G.decor.some(o => o !== P.from && Math.hypot(o.d.x - x, o.d.z - z) < 0.9) && !Object.values(W.spots).some(s => Math.hypot(s.x - x, s.z - z) < s.r + 0.3);
+    P.m.visible = P.ok || Math.floor(G.t * 6) % 2 === 0;
+  }
+  function placeKey(k) {
+    const P = G.placing; if (!P) return false;
+    if (k === "Z") {
+      if (!P.ok) { toast("It won't go there", "info"); sfx("stumble"); return true; }
+      const S = G.save; G.scene.remove(P.m);
+      if (P.from) { Object.assign(P.from.d, { x: P.x, z: P.z, a: P.a, p: P.p }); removeDecor(P.from); addDecor(P.from.d); }
+      else { const d = { id: P.id, x: P.x, z: P.z, a: P.a, p: P.p }; decorList().push(d); S.decorBag[P.id]--; if (!S.decorBag[P.id]) delete S.decorBag[P.id]; addDecor(d); }
+      S.paint = P.p; G.placing = null; sfx("set"); persist();
+    } else if (k === "C") { P.a += PI / 4; sfx("grab"); }
+    else if (k === "V") { P.p = (P.p + 1) % G.Wd.PAINT.length; G.scene.remove(P.m); P.m = G.Wd.decorMesh(P.id, P.p); G.scene.add(P.m); sfx("grab"); }
+    else if (k === "X") { G.scene.remove(P.m); if (P.from) { P.from.m.visible = true; if (P.from.ob) P.from.ob.off = false; } G.placing = null; }
+    return true;
+  }
+  /* -- the bag of decor, and a piece already out */
+  function habitatMenu() {
+    const S = G.save, D = G.D; S.decorBag = S.decorBag || {};
+    if (G.onMap) { menuClose(); talk([["", "Decor goes in a garden: set it out once you're inside one."]]); return; }
+    const bag = Object.entries(S.decorBag).filter(([, n]) => n > 0), here = decorList().length;
+    const el = menuOpen(sec("Habitat", "clover", `<p class="cg-text">Decor of your own for this garden: ${here} of ${decorCap()} set out here. Pick one to set it out; walk up to one that's out and press Z to move, turn, paint or put it away.</p>
+      ${bag.length ? `<div class="cg-list">${bag.map(([id, n], i) => { const d = D.decor(id); return `<button class="cg-irow" data-f ${i === 0 ? "data-focus" : ""} data-d="${id}" ${here >= decorCap() ? "disabled" : ""}><span class="cg-dot" style="background:#${G.Wd.PAINT[S.paint || 0].toString(16).padStart(6, "0")}"></span><b>${esc(d.name)}</b><i>${esc(d.text)}</i><em>x${n}</em></button>`; }).join("")}</div>`
+        : `<p class="cg-empty">The habitat bag is empty. Pip's shop by the hall sells decor (the Decor tab).</p>`}
+      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`), () => { menuClose(); mainMenu(); }, "cg-small");
+    el.querySelector("[data-back]").onclick = () => { menuClose(); mainMenu(); };
+    el.querySelectorAll("[data-d]").forEach(b => b.onclick = () => placeStart(b.dataset.d));
+  }
+  function decorMenu(o) {
+    const S = G.save, D = o.D, users = G.ents.filter(e => e.task && (e.task.dec === o || e.task.nest === o)).map(e => e.c.name);
+    const el = menuOpen(sec(D.name, "clover", `<p class="cg-text">${esc(D.text)}${users.length ? `<br>${esc(users.join(" and "))} ${users.length > 1 ? "are" : "is"} using it.` : ""}</p>
+      <div class="cg-mm">
+        <button class="cg-mi" data-f data-focus data-go="move">${ico("swap")}<b>Move it</b><i>Pick it up and set it down somewhere else</i></button>
+        <button class="cg-mi" data-f data-go="turn">${ico("chevrons")}<b>Turn it</b><i>An eighth of a turn</i></button>
+        <button class="cg-mi" data-f data-go="paint">${ico("sparkle")}<b>Paint it</b><i>The next colour in the paint pots</i></button>
+        ${D.story ? "" : `<button class="cg-mi" data-f data-go="away">${ico("back")}<b>Put it away</b><i>Back into the habitat bag</i></button>`}
+      </div>
+      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`), menuClose, "cg-small");
+    el.querySelector("[data-back]").onclick = menuClose;
+    el.querySelectorAll("[data-go]").forEach(b => b.onclick = () => {
+      const k = b.dataset.go;
+      if (k === "move") { placeStart(o.d.id, o); return; }
+      if (k === "turn") { o.d.a = (o.d.a || 0) + PI / 4; removeDecor(o); addDecor(o.d); }
+      if (k === "paint") { o.d.p = ((o.d.p || 0) + 1) % G.Wd.PAINT.length; S.paint = o.d.p; removeDecor(o); addDecor(o.d); }
+      if (k === "away") { removeDecor(o); const L = decorList(); L.splice(L.indexOf(o.d), 1); S.decorBag = S.decorBag || {}; S.decorBag[o.d.id] = (S.decorBag[o.d.id] || 0) + 1; toast(`${D.name}: back in the bag`, "check"); }
+      persist(); menuClose(); sfx("grab");
+    });
+  }
+  /* -- what the decor does to whoever's near it, every couple of seconds */
+  function habitatTick(dt) {
+    G.habT = (G.habT || 0) + dt; if (G.habT < 2) return; const n = G.habT; G.habT = 0;
+    for (const o of G.decor || []) {
+      const D = o.D, R = D.bless ? 10 : D.use ? 0 : 2.2; if (!R || !(D.mood || D.align || D.bless)) continue;
+      for (const e of G.ents) {
+        if (Math.hypot(e.x - o.d.x, e.z - o.d.z) > R) continue;
+        const c = e.c;
+        if (D.mood) c.care.mood = clamp(c.care.mood + D.mood * n * 0.5, 0, 100);
+        if (D.align && c.kind === "chao") G.L.raise(c, D.align, 0.05 * n);
+        if (D.bless) { c.care.mood = clamp(c.care.mood + n * 0.4, 0, 100); c.bond = clamp(c.bond + n * 0.02, 0, 100); practise(e, "cha", n * 0.3); }
+      }
+    }
+  }
+  /* -- each morning: the feeders fill, the toy chests have something new */
+  function dawnDecor() {
+    const S = G.save, here = S.region || "central", fr = ["round", "round", "triangle", "square", "berry"];
+    for (const rg in S.decor || {}) for (const d of S.decor[rg]) {
+      const drops = d.id === "feeder" ? [0, 1, 2].map(() => ["fruit", fr[Math.floor(Math.random() * fr.length)]]) : d.id === "toybox" ? [["toy", G.D.TOYS[Math.floor(Math.random() * G.D.TOYS.length)].id]] : [];
+      if (d.id === "toybox" && (rg === here ? G.items : (S.items || []).filter(i => i.region === rg).map(i => ({ x: i.pos[0], z: i.pos[1], kind: i.kind }))).some(i => i.kind === "toy" && Math.hypot(i.x - d.x, i.z - d.z) < 3)) continue;
+      drops.forEach(([kind, id], i) => {
+        const a = (d.a || 0) + i * 1.3 + 0.5, x = d.x + Math.sin(a) * 1.1, z = d.z + Math.cos(a) * 1.1;
+        if (rg === here) addItem(kind, id, x, z); else { S.items = S.items || []; S.items.push({ kind, id, region: rg, pos: [+x.toFixed(2), +z.toFixed(2)] }); }
+      });
+    }
+  }
+
   /* ---------------------------------------------------------------- the badnik raids
      A light story through the gardens: Eggman's badniks (Sonic 1's own -- Motobugs, Buzz
      Bombers, Crabmeats) have been raiding them, caging the animals, digging for something.
@@ -1536,7 +1803,7 @@
   const raidNow = () => { const S = G.save; S.story = S.story || { done: {}, told: {}, at: {} }; return RAIDS.find(r => !S.story.done[r.id]); };
   /* a raid begins: someone tells you (once), and if you're in its garden, the cage is here */
   function storyCheck() {
-    const S = G.save, r = raidNow(); if (!r || !G.keeper || G.battle || G.menu || G.talking || G.traveling) return;
+    const S = G.save, r = raidNow(); if (!r) { heartCheck(); return; } if (!G.keeper || G.battle || G.menu || G.talking || G.traveling) return;
     S.open = S.open || {};
     if (!r.when(S)) return;
     if (!S.story.told[r.id]) { S.story.told[r.id] = true; persist(); talk(r.hint.concat([["", `(The ${G.Wd.REGIONS[r.region] ? G.Wd.REGIONS[r.region].name : r.region}: look for the badniks' cage.)`]])); }
@@ -1576,6 +1843,96 @@
       } }));
   }
 
+  /* ---------------------------------------------------------------- the Chaos Heart
+     The story after the raids. The Crabmeats were digging for it: the Chaos Heart, an old light
+     of the gardens, broken long ago into five shards and hidden where only a creature grown
+     strong in the right way can reach -- a deep pool (Resilience), a dead tree's crown
+     (Agility), under a boulder (Power), in Eggman's puzzle box (Instinct), inside a column of
+     light (Chaos). Carry a creature to each and let it try. Set the five on the Mystic Garden's
+     altar and the Heart forms -- and Eggman's Egg Warden snatches it and flies to his outpost,
+     which appears on the world map. Win it back there, bring it home, and the altar's deepest
+     chamber opens (an Emerald Chao's egg; the Heart's shrine for your garden). After: the
+     sleeper in the ruins wakes at night for a creature that loves you, and Doctor Nell can
+     rebuild the Warden's core. */
+  const SHARDS = [
+    { id: "s-trop", region: "tropical", kind: "pool", attr: "res", find: "A shard of light glints at the bottom of a deep rock pool, too deep to reach by hand.", get: "dives down, and comes up with the shard in its arms!" },
+    { id: "s-forest", region: "forest", kind: "stump", attr: "agi", find: "A shard is wedged high in the split crown of an old dead tree.", get: "scrambles up the trunk and knocks the shard loose!" },
+    { id: "s-mount", region: "mountain", kind: "boulder", attr: "pow", find: "A shard's light shows from under a great boulder.", get: "puts its back into it, and rolls the boulder aside!" },
+    { id: "s-mech", region: "mech", kind: "lock", attr: "ins", find: "A shard sits locked in one of Eggman's puzzle boxes, all dials and blinking lights.", get: "studies the dials, turns three of them, and the box clicks open!" },
+    { id: "s-sky", region: "sky", kind: "beam", attr: "cha", find: "A shard floats in a column of light that pushes anything back.", get: "glows with Chaos Energy, walks into the light, and out again with the shard!" },
+  ];
+  const SHARD_NEED = 8;
+  const heart = () => { const S = G.save; return S.heart = S.heart || { told: false, shards: {}, at: {} }; };
+  const heartOn = () => !!(G.save.story && G.save.story.done && G.save.story.done.r4);
+  function heartCheck() {
+    const S = G.save, H = heart(); if (!heartOn() || !G.keeper || G.battle || G.menu || G.talking || G.traveling) return;
+    if (!H.told) { H.told = true; persist(); talk([["Wren Ashby", "Keeper! The carvings round the altar -- I've read them at last. The Crabmeats were digging for the Chaos Heart: the gardens' old light, broken into five shards long ago and hidden away."], ["Wren Ashby", "Only a creature grown strong in the right way can reach each one: something deep in the Tropical Garden, high in the Forest, heavy in the Mountains, clever in the Mechanical Garden, bright in the Sky. Carry one of yours to each, and let it try."]]); heartHere(); return; }
+    if (Object.keys(H.shards).length >= SHARDS.length && !H.allTold) { H.allTold = true; persist(); talk([["Wren Ashby", "All five! Bring them to the altar in the Mystic Garden's court."]]); }
+  }
+  /* the shard of the garden you're in, if it's still out there */
+  function heartHere() {
+    G.shardAt = null;
+    const S = G.save, H = heart(), here = S.region || "central"; if (!heartOn() || !H.told) return;
+    const sh = SHARDS.find(s => s.region === here && !H.shards[s.id]); if (!sh) return;
+    let at = H.at[sh.id];
+    if (!at) { const E = G.W.RG.entry; for (let i = 0; i < 60; i++) { const p = G.W.places.any(); if (Math.hypot(p[0] - E[0], p[1] - E[1]) > 10 && !G.W.blocked(p[0], p[1], 1.8) && G.W.depth(p[0], p[1]) < 0.05) { at = p; break; } } at = at || [E[0] - 5, E[1] - 5]; H.at[sh.id] = at; }
+    const m = G.Wd.buildingMesh("shard-" + sh.kind); m.position.set(at[0], G.W.ground(at[0], at[1]), at[1]); m.updateMatrix(); shadowsOn(m); G.W.props.add(m);
+    const ob = { x: at[0], z: at[1], r: 0.8, w: 0, d: 0 }; G.W.obst.push(ob);
+    G.W.spots.shard = { x: at[0], z: at[1] + 1.4, r: 2, shard: sh.id };
+    G.shardAt = { sh, m, ob };
+  }
+  function shardTry(e) {
+    const S = G.save, H = heart(), A = G.shardAt; if (!A) return;
+    const sh = A.sh, c = e.c, Att = G.D.ATTRS.find(a => a.id === sh.attr);
+    if (c.lv[sh.attr] >= SHARD_NEED) {
+      H.shards[sh.id] = true; c.bond = clamp(c.bond + 4, 0, 100); c.log.push([S.day, `Found a shard of the Chaos Heart.`]);
+      G.W.props.remove(A.m); A.ob.off = true; delete G.W.spots.shard; G.shardAt = null;
+      G.M.emote(e.rig, "heart"); e.bub = 2; jingle("born-change"); persist();
+      talk([["", `${c.name} ${sh.get}`], ["", `A shard of the Chaos Heart. (${Object.keys(H.shards).length} of ${SHARDS.length})`]], () => heartCheck());
+    } else { sfx("stumble"); G.M.emote(e.rig, "swirl"); e.bub = 1.6; talk([["", `${c.name} tries, but can't manage it. (It needs ${Att.name} ${SHARD_NEED} or more; ${c.name}'s is ${c.lv[sh.attr]}.)`]]); }
+  }
+  /* the altar: the shards set down, the Heart taken; later, brought home -- and at night, the sleeper */
+  function altarGo(held) {
+    const S = G.save, H = heart();
+    if (held && H.done && isNight() && !H.ancient) {
+      if (held.c.bond >= 80) { H.ancient = true; const k = G.keeper; addItem("egg", null, k.x + 1, k.z + 1, G.L.egg("chao-neutral-child", { legend: "chao-ancient", from: "the sleeper in the Mystic Garden's ruins" })); persist(); jingle("born-change");
+        talk([["", `The carvings glow under ${held.c.name}'s feet. Deep in the stone something stirs, and rolls out to you: an old egg, warm, covered in the ruins' own marks.`], ["", "The sleeper in the ruins has woken. (An egg at your feet.)"]]); }
+      else talk([["", `The carvings flicker under ${held.c.name}, and go dark. (The sleeper wakes, the carvings say, for a creature that loves its keeper with all its heart: a bond of 80.)`]]);
+      return;
+    }
+    if (H.won && !H.done) {
+      H.done = true; const k = G.keeper;
+      addItem("egg", null, k.x + 1, k.z + 0.6, G.L.egg("chao-neutral-child", { legend: "chao-emerald", from: "the Mystic Garden's deepest chamber" }));
+      S.decorBag = S.decorBag || {}; S.decorBag.shrine = (S.decorBag.shrine || 0) + 1; S.ach.heart = 1; persist(); jingle("born-change");
+      talk([["", "You set the Chaos Heart on the altar. Its light runs down the carvings, into the stones, out across the court -- and the floor of the court slides open on a chamber nobody has seen in a thousand years."],
+        ["", "In it, on a plinth, an egg as green as a Chaos Emerald."], ["Wren Ashby", "The Heart's home. Keep a little of its light with you: here."], ["", "An egg at your feet, and the Chaos Heart shrine in your habitat bag."],
+        ["Hazel", "Well done, love. Truly. The gardens will remember this one."]], () => toast("The Chaos Heart is home!", "star"));
+      return;
+    }
+    if (H.formed && !H.won) { talk([["", "Empty now, the altar. The Egg Warden flew off north-west with the Heart: Eggman's outpost is on the world map."]]); return; }
+    if (heartOn() && H.told && Object.keys(H.shards).length >= SHARDS.length && !H.formed) {
+      H.formed = true; S.story.outpost = true; persist();
+      talk([["", "You set the five shards round the altar. They lift, turn, and fly together with a sound like a bell: the Chaos Heart, whole, its light filling the court."],
+        ["", "Then a shadow. A great red robot drops out of the sky, closes its claws round the Heart, and is gone over the treetops to the north-west."],
+        ["Wren Ashby", "Eggman's Egg Warden! He must have had it watching us all along. There's an outpost of his on the north-west of the island -- it's on the world map now."]], () => toast("Eggman's outpost has appeared on the world map", "flag"));
+      return;
+    }
+    talk([["", heartOn() && H.told ? `An old altar at the court's heart, five hollows round its edge. (${Object.keys(H.shards).length} of ${SHARDS.length} shards found.)` : "An old altar at the court's heart. Carvings round its edge show Chao, and a great light over them."]]);
+  }
+  /* Eggman's outpost, on the world map: the Egg Warden, and two badniks guarding it */
+  function outpostGo() {
+    const S = G.save, H = heart();
+    if (H.won) { talk([["", "Eggman's outpost stands empty, its lights dark."]]); return; }
+    const v = { id: "warden", name: "The Egg Warden", look: null, pool: ["an-eggwarden"], fixed: ["an-eggwarden", "an-buzzbomber", "an-crabmeat"], named: true, boss: { id: "an-eggwarden", mul: 2.4 }, hi: "CHAOS HEART SECURED. INTRUDERS WILL BE REMOVED.", win: "", lose: "" };
+    talk([["", "A dome of grey steel in Eggman's colours, a red light blinking on its mast. Inside, the Chaos Heart glows in a glass case -- and the Egg Warden turns to face you, a Buzz Bomber and a Crabmeat at its side."], ["Egg Warden", v.hi]],
+      () => duelParty(v, 3, [], {}, { title: "Eggman's outpost", sub: "3 against 3", hi: v.hi, mul: 1.3, rings: 800, music: "runaway", go: "Take the Heart back!", back: menuClose,
+        onDone: won => {
+          if (!won) { talk([["", "The Egg Warden stands its ground. Train your team up, and come back for the Heart."]]); return; }
+          H.won = true; persist();
+          talk([["", "The Egg Warden staggers, sparks, and folds up with a groan of steel. The glass case cracks; the Chaos Heart floats free, and settles in your hands."], ["", "Take it home to the altar in the Mystic Garden."]]);
+        } }));
+  }
+
   /* ---------------------------------------------------------------- requests
      The garden's folk each want something done; the notice board in the hall keeps them, and
      pays out when they're done. A request shows once you've been to its giver's garden. */
@@ -1595,12 +1952,14 @@
     { id: "q-family", who: "marlo", text: "Have three eggs of your creatures' own.", n: S => S.ach.eggs || 0, of: 3, rings: 300 },
     { id: "q-climb", who: "otto", text: "Win the Cliffside Race.", n: S => Object.keys(S.races || {}).filter(k => k.startsWith("cliff:") && S.races[k].best === 1).length, of: 1, item: ["chaosdrive-r", 2] },
     { id: "q-raids", who: "nell", text: "Put an end to the badnik raids.", n: S => S.ach.raids || 0, of: RAIDS.length, rings: 500 },
+    { id: "q-gizoid", who: "nell", when: S => S.heart && S.heart.done, text: "Bring three Chaos Drives of every colour, and I'll rebuild the Egg Warden's core into something kinder.", n: S => Math.min(...["g", "p", "r", "y"].map(c => (S.inv || {})["chaosdrive-" + c] || 0)), of: 3,
+      take: ["g", "p", "r", "y"].map(c => ["chaosdrive-" + c, 3]), legend: "chao-omega", from: "Doctor Nell's sealed lab, rebuilt from the Egg Warden's core" },
   ];
   function boardMenu() {
     const S = G.save; S.reqs = S.reqs || {};
     const seen = id => { const f = FOLK.find(x => x.id === id); return f && (f.region === "central" || (S.visited || {})[f.region]); };
-    const list = REQUESTS.filter(q => seen(q.who));
-    const gift = q => q.rings ? `${q.rings} rings` : q.item ? `${q.item[1]} ${G.D.food(q.item[0]).name}${q.item[1] > 1 ? "s" : ""}` : q.egg === "animal-rare" ? "a rare egg" : "an egg";
+    const list = REQUESTS.filter(q => seen(q.who) && (!q.when || q.when(S)));
+    const gift = q => q.rings ? `${q.rings} rings` : q.item ? `${q.item[1]} ${G.D.food(q.item[0]).name}${q.item[1] > 1 ? "s" : ""}` : q.legend ? "a strange egg" : q.egg === "animal-rare" ? "a rare egg" : "an egg";
     const el = menuOpen(sec("The notice board", "clipboard", `<p class="cg-text">The garden folk's requests, pinned up in the hall. Done ones pay out here.</p>
       <div class="cg-list">${list.map((q, i) => { const n = Math.min(q.n(S), q.of), done = S.reqs[q.id], ready = !done && n >= q.of, f = FOLK.find(x => x.id === q.who);
         return `<button class="cg-irow" data-f ${i === 0 ? "data-focus" : ""} data-q="${q.id}" ${ready ? "" : "disabled"}><span class="cg-dot" style="background:${done ? "#3ad86a" : ready ? "#ffd21a" : "#5a6a9a"}"></span><b>${esc(f.name)}</b><i>${esc(q.text)} ${done ? "Done, thank you!" : ready ? "Done! Take the reward." : `(${n}/${q.of})`}</i><em>${esc(gift(q))}</em></button>`; }).join("")}</div>
@@ -1611,6 +1970,8 @@
       S.reqs[q.id] = true;
       if (q.rings) S.rings += q.rings;
       if (q.item) S.inv[q.item[0]] = (S.inv[q.item[0]] || 0) + q.item[1];
+      if (q.take) for (const [id, n] of q.take) S.inv[id] = Math.max(0, (S.inv[id] || 0) - n);
+      if (q.legend) { const k = G.keeper; addItem("egg", null, k.x + 0.8, k.z + 0.8, G.L.egg("chao-neutral-child", { legend: q.legend, from: q.from })); }
       if (q.egg) { const k = G.keeper; let sp = q.egg; if (sp === "animal-rare") { const pool = G.D.ANIMALS.filter(a => a.rarity === 3 && !a.badnik && a.plan !== "fish" && a.plan !== "jelly"); sp = pool[Math.floor(Math.random() * pool.length)].id; } addItem("egg", null, k.x + 0.8, k.z + 0.8, G.L.egg(sp, { from: `a thank-you from ${FOLK.find(x => x.id === q.who).name}` })); }
       sfx("coin"); toast(`${FOLK.find(x => x.id === q.who).name}: thank you! ${gift(q)}`, "star"); persist(); boardMenu();
     });

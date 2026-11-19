@@ -162,11 +162,12 @@
   const rimUp = (x, z, r0, ex, k) => { const r = Math.hypot(x, z); if (r <= r0) return 0; const g = Math.hypot(x - ex[0], z - ex[1]); return Math.min(8, (r - r0) * (k || 0.9)) * sm(3.5, 7.5, g); };
   const RAND = seed => { let a = seed | 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
   /* trees scattered by a rule: n tries, kept where `ok` says, apart from each other */
-  function scatterTrees(seed, n, rad, ok, make) {
+  function scatterTrees(seed, n, rad, ok, make, gap) {
     const R = RAND(seed), out = [];
+    gap = gap || 3.2;
     for (let i = 0; i < n * 6 && out.length < n; i++) {
       const a = R() * PI * 2, r = Math.sqrt(R()) * rad, x = Math.cos(a) * r, z = Math.sin(a) * r;
-      if (!ok(x, z) || out.some(t => Math.hypot(t.x - x, t.z - z) < 3.2)) continue;
+      if (!ok(x, z) || out.some(t => Math.hypot(t.x - x, t.z - z) < gap)) continue;
       out.push(Object.assign({ x, z }, make(R, x, z)));
     }
     return out;
@@ -430,6 +431,84 @@
   })();
   const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
 
+  /* -- the world map: the gardens' island, at a small scale (the keeper walks it at four tenths
+     of his size, as a JRPG's party walks its world map). A landmark for each garden, roads out
+     from the Central Garden's, a river from the northern range down to the western sea; the sea
+     all round. Walking onto a landmark goes in; leaving a garden comes back out beside it. */
+  REGIONS.world = (() => {
+    const sea = 0.5;
+    const LM = { central: { x: 0, z: 4, name: "Central Garden" }, tropical: { x: -35, z: 9, name: "Tropical Garden" }, forest: { x: 33, z: -2, name: "Forest Garden" }, mountain: { x: 2, z: -27, name: "Mountain Garden" },
+      mystic: { x: -23, z: 31, name: "Mystic Garden" }, mech: { x: 25, z: 30, name: "Mechanical Garden" }, sky: { x: 24, z: -22, name: "Sky Garden" }, outpost: { x: -30, z: -24, name: "Eggman's outpost", hidden: true } };
+    for (const k in LM) { const L = LM[k]; L.face = k === "central" ? 0 : Math.atan2(LM.central.x - L.x, LM.central.z - L.z); }
+    const roads = Object.keys(LM).filter(k => k !== "central").map(k => { const A = LM.central, B = LM[k], mx = (A.x + B.x) / 2, mz = (A.z + B.z) / 2, n = Math.hypot(B.x - A.x, B.z - A.z) || 1, bend = (hash(k.length, 3, 9) - 0.5) * 8; return { k, pts: [[A.x, A.z], [mx - (B.z - A.z) / n * bend, mz + (B.x - A.x) / n * bend], [B.x + Math.sin(B.face) * 3, B.z + Math.cos(B.face) * 3]] }; });
+    const river = [[-12, -18], [-16, -8], [-20, 0], [-25, 10], [-31, 17], [-40, 22], [-50, 24]];
+    const land = (x, z) => 1 - Math.hypot(x, z * 1.08) / 47 + (fbm(x * 0.05, z * 0.05, 501) - 0.5) * 0.32;
+    function h0(x, z) {
+      const m = land(x, z);
+      if (m < 0) return Math.max(-3, sea - 0.5 + m * 8);
+      let h = sea + 0.25 + Math.min(1, m * 5) * (0.7 + fbm(x * 0.06, z * 0.06, 502) * 1.3);
+      const mn = Math.hypot(x / 1.7, (z + 38) / 1.05); h += Math.pow(Math.max(0, 1 - mn / 13), 1.4) * 13 * (0.7 + fbm(x * 0.12, z * 0.12, 503) * 0.6);
+      h += Math.max(0, 1 - Math.hypot(x - LM.sky.x, z - LM.sky.z) / 8) * 2.4;
+      const mp = Math.hypot(x - LM.mech.x, z - LM.mech.z); if (mp < 9) h = lerp(h, 2.4, sm(9, 6, mp));
+      return h;
+    }
+    const pad = {}; for (const k in LM) pad[k] = Math.max(sea + 0.5, h0(LM[k].x, LM[k].z));
+    const roadD = (x, z) => { let b = 1e9; for (const r of roads) if (!LM[r.k].hidden) b = Math.min(b, segDist(x, z, r.pts)); return b; };
+    const R = { id: "world", name: "", mini: 0.42, bound: 58, edge: 60, radius: 50, sea, music: "lobby", sky: [0x6ab8f0, 0xe0f4ff], waterCol: 0x2a90d0,
+      entry: [LM.central.x, LM.central.z + 4, 0], LM, roads, flowerK: 0, rockK: 0.04,
+      COL: { grass: C(0x4aa03a, 0x7ac455), forest: C(0x1f5a26, 0x2f7030), sand: (x, z, y) => grain(mixC(0xf0e0b0, 0xe0cc90, hash(x * 4 | 0, z * 4 | 0, 8)), x * 4, y, z * 4, 0.03),
+        path: (x, z, y) => grain(mixC(0xc8a878, 0xa88a5a, hash(x * 2 | 0, z * 2 | 0, 5) * 0.6), x * 4, y, z * 4, 0.04), rock: (x, z, y) => grain(mixC(0x8a8478, 0x9a9488, hash(x * 2 | 0, z * 2 | 0, 6)), x * 4, y, z * 4, 0.05),
+        snow: (x, z, y) => grain(0xf4f8fc, x * 4, y, z * 4, 0.03), bed: (x, z, y) => grain(0x9a9a6a, x * 4, y, z * 4, 0.05),
+        metal: (x, z, y) => grain(((Math.floor(x * 2) + Math.floor(z * 2)) & 1) ? 0x8a909a : 0x7a808a, x * 4, y, z * 4, 0.03), stone: (x, z, y) => grain(((Math.floor(x * 2) + Math.floor(z * 2)) & 1) ? 0xc8c0a8 : 0xb8b098, x * 4, y, z * 4, 0.04) } };
+    R.heightAt = (x, z) => {
+      let h = h0(x, z);
+      if (h > sea - 0.2) {
+        const rd = segDist(x, z, river); if (rd < 2.4) h = lerp(sea - 0.25, h, sm(1.1, 2.4, rd));
+        const pd = roadD(x, z); if (pd < 1.6 && h > sea + 0.2) h = lerp(Math.min(h, h0(x, z) * 0.85 + 0.3), h, sm(0.8, 1.6, pd));
+        for (const k in LM) { if (LM[k].hidden) continue; const d = Math.hypot(x - LM[k].x, z - LM[k].z); if (d < 6.5) h = lerp(pad[k], h, sm(4.5, 6.5, d)); }
+      }
+      return h;
+    };
+    R.waterAt = (x, z, g) => (g < sea + 0.05 && segDist(x, z, river) < 2.4 && land(x, z) > 0) ? sea + 0.12 : null;
+    R.surfaceAt = (x, z, h) => {
+      if (h < sea - 0.1) return "bed";
+      if (segDist(x, z, river) < 1.2 && land(x, z) > 0) return "bed";
+      if (roadD(x, z) < 0.85) return "path";
+      if (Math.hypot(x - LM.mech.x, z - LM.mech.z) < 5.5) return "metal";
+      if (Math.hypot(x - LM.mystic.x, z - LM.mystic.z) < 5) return "stone";
+      if (h < sea + 0.55) return "sand";
+      if (h > 8.5) return "snow";
+      if (h > 5.5) return "rock";
+      if (Math.hypot(x - LM.forest.x, z - LM.forest.z) < 15 || fbm(x * 0.08, z * 0.08, 506) > 0.68) return "forest";
+      return "grass";
+    };
+    R.trees = () => scatterTrees(507, 260, 48, (x, z) => { const h = R.heightAt(x, z), s = R.surfaceAt(x, z, h); if (s === "path" || s === "bed" || s === "sand" && Math.hypot(x - LM.tropical.x, z - LM.tropical.z) > 10 || s === "metal" || s === "stone" || h > 9) return false; if (Object.values(LM).some(L => Math.hypot(x - L.x, z - L.z) < 6)) return false; return s === "forest" || hash(x | 0, z | 0, 508) < 0.22 || (Math.hypot(x - LM.tropical.x, z - LM.tropical.z) < 12); },
+      (rr, x, z) => { const h = R.heightAt(x, z), s = R.surfaceAt(x, z, h); return Math.hypot(x - LM.tropical.x, z - LM.tropical.z) < 12 ? { k: "palm", s: 0.32 + rr() * 0.08 } : h > 5 ? { k: "pine", s: 0.3 + rr() * 0.1, snow: h > 7 } : s === "forest" ? { k: rr() < 0.6 ? "pine" : "oak", s: 0.3 + rr() * 0.12 } : { k: rr() < 0.3 ? "fruit" : "oak", s: 0.3 + rr() * 0.1 }; }, 1.5);
+    /* the landmarks, each facing the Central Garden's; a locked one shows what's in the way */
+    const BAR = { tropical: "lb-bridge", forest: "lb-logs", mountain: "lb-rocks", mystic: "lb-slab", mech: "lb-pylon" };
+    R.build = (W, put, block) => {
+      W.landmarks = {}; W.barriers = {};
+      for (const k in LM) {
+        const L = LM[k];
+        if (L.hidden) continue;
+        R.landmark(W, put, block, k);
+      }
+    };
+    R.landmark = (W, put, block, k) => {
+      const L = LM[k], m = put(buildingMesh(k === "sky" ? "lm-sky-off" : "lm-" + k), L.x, L.z, L.face);
+      const ob = block(L.x, L.z, k === "mountain" ? 3 : 2.4);
+      W.landmarks[k] = { m, ob, L };
+      W.spots["lm-" + k] = { x: L.x + Math.sin(L.face) * 3.6, z: L.z + Math.cos(L.face) * 3.6, r: 1.5, lm: k, name: L.name };
+      if (BAR[k]) { const bx = L.x + Math.sin(L.face) * 2.9, bz = L.z + Math.cos(L.face) * 2.9; W.barriers[k] = { m: put(buildingMesh(BAR[k]), bx, bz, L.face) }; }
+    };
+    R.openBarrier = (W, put, k) => {
+      const B = W.barriers[k]; if (B && B.m) { W.props.remove(B.m); B.m = null; }
+      if (k === "sky" && W.landmarks.sky && !W.landmarks.sky.up) { const lm = W.landmarks.sky; W.props.remove(lm.m); lm.m = put(buildingMesh("lm-sky"), lm.L.x, lm.L.z, lm.L.face); lm.up = true; }
+    };
+    R.places = W => placesOf(W, R);
+    return R;
+  })();
+
   /* ---------------------------------------------------------------- the world */
   function make(scene, id) {
     const RG = (id && REGIONS[id]) || CENTRAL, central = RG === CENTRAL;
@@ -585,6 +664,8 @@
     /* ---------------------------------------------------------------- things */
     const put = (o, x, z, a, y) => { o.position.set(x, y != null ? y : W.ground(x, z), z); if (a) o.rotation.y = a; o.matrixAutoUpdate = false; o.updateMatrix(); W.props.add(o); return o; };
     const block = (x, z, r, o) => { const b = Object.assign({ x, z, r: r || 0.4, w: 0, d: 0 }, o || {}); W.obst.push(b); return b; };
+    W.put = put; W.block = block;
+    const mini = RG.mini || 1;                          // (the world map: everything at its small scale)
     /* trees: fruit trees keep track of their fruit */
     for (const T of (central ? PLAN.trees : RG.trees())) {
       const s = T.s || 1, y = W.ground(T.x, T.z);
@@ -593,7 +674,7 @@
       const rec = { x: T.x, z: T.z, y, k: T.k, s, m: tr, fruit: T.fruit || null, hang: [], grow: 0, spots: T.k === "fruit" ? M.fruitSpots(s) : [] };
       if (rec.fruit) for (let i = 0; i < rec.spots.length; i++) if (hash(i, T.x | 0, T.z | 0) < 0.6) addFruit(rec, i);
       W.trees.push(rec);
-      block(T.x, T.z, T.k === "oak" ? 0.9 * s : T.k === "mushroom" ? 0.6 : 0.45 * s);
+      block(T.x, T.z, T.k === "oak" ? 0.9 * s : T.k === "mushroom" ? 0.6 * s : 0.45 * s);
     }
     function addFruit(rec, i) {
       const f = M.prop("fruit", { id: rec.fruit }), sp = rec.spots[i];
@@ -622,8 +703,8 @@
       const x = (R(n) - 0.5) * RG.radius * 2.1, z = (hash(n, 17, 5) - 0.5) * RG.radius * 2.1, h = W.ground(x, z), s = RG.surfaceAt(x, z, h);
       if (Math.hypot(x, z) > RG.radius || W.blocked(x, z, 0.6) || W.waterAt(x, z) != null) continue;
       const fl = RG.flowers || [0xf05a7a, 0xf8e040, 0xf8f8f8, 0xb070f0, 0xf08a3a, 0x6ab0f8];
-      if (s === "meadow" || (s === "grass" && hash(n, 3, 3) < (RG.flowerK || 0.3))) put(M.prop("flower", { c: fl[n % fl.length], k: n % 3 }), x, z, R(n * 3) * 6);
-      else if ((s === "grass" || s === "rock" || s === "high" || s === "snow") && hash(n, 4, 4) < (RG.rockK || 0.1)) { put(M.prop("rock", { s: 0.6 + R(n * 7) * 0.7, k: n % 3, c: RG.rockCol }), x, z, R(n * 5) * 6); block(x, z, 0.4); }
+      if (s === "meadow" || (s === "grass" && hash(n, 3, 3) < (RG.flowerK != null ? RG.flowerK : 0.3))) { const fm = M.prop("flower", { c: fl[n % fl.length], k: n % 3 }); fm.scale.setScalar(mini); put(fm, x, z, R(n * 3) * 6); }
+      else if ((s === "grass" || s === "rock" || s === "high" || s === "snow") && hash(n, 4, 4) < (RG.rockK || 0.1)) { put(M.prop("rock", { s: (0.6 + R(n * 7) * 0.7) * mini, k: n % 3, c: RG.rockCol }), x, z, R(n * 5) * 6); block(x, z, 0.4 * mini); }
     }
     /* grass: tufts of blades all over the lawns (one mesh, drawn many times) */
     {
@@ -639,7 +720,7 @@
         const h = W.ground(x, z), sf = RG.surfaceAt(x, z, h);
         if (sf !== "grass" && sf !== "meadow" && sf !== "high") continue;
         if (W.blocked(x, z, 0.2)) continue;
-        at.push([x, h, z, hash(n, 7, 7) * PI * 2, 0.55 + hash(n, 8, 8) * 0.5]);
+        at.push([x, h, z, hash(n, 7, 7) * PI * 2, (0.55 + hash(n, 8, 8) * 0.5) * mini]);
       }
       const im = new THREE.InstancedMesh(geo, M.mat("vox"), at.length), o = new THREE.Object3D();
       at.forEach(([x, y, z, a, k], i) => { o.position.set(x, y, z); o.rotation.y = a; o.scale.setScalar(k); o.updateMatrix(); im.setMatrixAt(i, o.matrix); });
@@ -883,6 +964,84 @@
         /* a basket of fruit */
         shape(v, 0, 0, 10, 6, 3, 16, (x, y, z) => Math.hypot(x - 3, z - 13) <= 3.2, (x, y, z) => y < 3 ? grain(((x + y + z) & 1) ? 0xc89a50 : 0xa87a3a, x, y, z, 0.05) : null);
         for (const [x, z, c] of [[2, 12, 0xffd21a], [4, 13, 0xf05a3a], [3, 14, 0x8ad84a], [2, 14, 0xffd21a]]) v.set(x, 3, z, c);
+      } else if (k.startsWith("lm-") || k.startsWith("lb-")) {
+        /* the world map's landmarks (each garden in little) and what bars the locked ones */
+        const st = (x, y, z) => grain(((y + (hash(x >> 1, 0, z >> 1) * 3 | 0)) % 4 === 0) ? 0x8a8478 : 0xa8a090, x, y, z, 0.06), cream = (x, y, z) => grain((y % 4 === 0) ? 0xe0d0b0 : 0xf0e4c8, x, y, z, 0.03);
+        const wood = (x, y, z) => grain(0x8a5a32, x, y, z, 0.06), leafy = (x, y, z) => grain(mixC(0x2f7a2e, 0x5aa040, hash(x >> 1, y >> 1, z >> 1)), x, y, z, 0.08);
+        const solidEll = (cx, cy, cz, rx, ry, rz, col, skip) => { for (let x = Math.floor(cx - rx); x <= cx + rx; x++) for (let y = Math.max(0, Math.floor(cy - ry)); y <= cy + ry; y++) for (let z = Math.floor(cz - rz); z <= cz + rz; z++) { if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 + ((z - cz) / rz) ** 2 > 1) continue; if (skip && skip(x, y, z)) continue; const c = typeof col === "function" ? col(x, y, z) : col; if (c != null) v.set(x, y, z, c); } };
+        const pine = (x, z, h) => { blk(v, x, 0, z, x, 2, z, wood); for (let i = 0; i < h; i++) { const r = Math.max(0, Math.round((h - i) * 0.45)); blk(v, x - r, 3 + i, z - r, x + r, 3 + i, z + r, (xx, y, zz) => Math.abs(xx - x) + Math.abs(zz - z) <= r + 0.5 ? leafy(xx, y, zz) : null); } };
+        const palm = (x, z, h, lean) => { for (let i = 0; i < h; i++) v.set(x + Math.round(i * lean), i, z, ((i & 1) ? 0x8a6a3a : 0xa8804a)); const tx = x + Math.round(h * lean), ty = h; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) for (let j = 1; j <= 3; j++) v.set(tx + dx * j, ty - (j > 2 ? 1 : 0), z + dz * j, j === 3 ? 0x3a8a2a : 0x4aa83a); v.set(tx, ty, z, 0x4aa83a); };
+        if (k === "lm-central") {
+          blk(v, -10, 0, -6, 9, 8, 5, cream);
+          for (let i = 0; i < 7; i++) blk(v, -11, 9 + i, -7 + i, 10, 9 + i, 6 - i, (x, y, z) => grain((x + y) % 4 === 0 ? 0xa83a2a : 0xc8482e, x, y, z, 0.05));
+          blk(v, -1, 0, 6, 0, 4, 6, 0x6a4022); for (const x of [-7, -4, 3, 6]) blk(v, x, 4, 6, x + 1, 6, 6, 0x9ad0f0);
+          blk(v, 5, 12, -2, 6, 17, -1, 0x8a8478);
+          solidEll(0, 0.5, 12, 3.5, 1.2, 3.5, (x, y) => y >= 1 ? 0x5ac0f0 : 0xc8c0b0); blk(v, 0, 2, 12, 0, 4, 12, 0xd8f0ff);
+          for (const [x, z] of [[-14, 9], [13, 10], [-14, -4]]) { blk(v, x, 0, z, x, 3, z, wood); solidEll(x, 6, z, 3, 3, 3, leafy); }
+        } else if (k === "lm-tropical") {
+          for (const [x, z] of [[-6, -4], [5, -4], [-6, 5], [5, 5]]) blk(v, x, 0, z, x, 3, z, wood);
+          blk(v, -7, 4, -5, 6, 4, 6, (x, y, z) => grain(((x + z) & 3) === 0 ? 0x7a5a32 : 0xa8804a, x, y, z, 0.05));
+          blk(v, -6, 5, -4, 5, 9, 5, (x, y, z) => (z === 5 && Math.abs(x + 0.5) < 2 && y < 9) ? null : (x === -6 || x === 5 || z === -4 || z === 5) ? grain(((x + y) & 1) ? 0xc8a868 : 0xd8b878, x, y, z, 0.05) : null);
+          for (let i = 0; i < 6; i++) blk(v, -8 + i, 10 + i, -6 + i, 7 - i, 10 + i, 7 - i, (x, y, z) => grain(((x + y + z) & 1) ? 0xd8b860 : 0xc8a048, x, y, z, 0.06));
+          palm(-12, 2, 12, 0.15); palm(11, -2, 14, -0.12); palm(9, 10, 10, 0.1);
+          blk(v, -2, 0, 7, 1, 0, 14, (x, y, z) => grain(((z & 1) ? 0x7a5a32 : 0xa8804a), x, y, z, 0.05)); v.set(3, 1, 9, 0xf05a3a); v.set(3, 2, 9, 0xf05a3a);
+        } else if (k === "lm-forest") {
+          blk(v, -7, 0, -6, 6, 1, 5, st);
+          for (const [x, z] of [[-6, -5], [5, -5], [-6, 4], [5, 4]]) blk(v, x, 2, z, x, 8, z, 0x8a2a1a);
+          blk(v, -5, 2, -4, 4, 7, 3, (x, y, z) => grain(0xe8dcc0, x, y, z, 0.03)); blk(v, -1, 2, 4, 0, 5, 4, 0x3a2a1a);
+          for (let i = 0; i < 4; i++) blk(v, -9 + i * 2, 9 + i, -8 + i * 2, 8 - i * 2, 9 + i, 7 - i * 2, (x, y, z) => grain(0x2a5a5a, x, y, z, 0.05));
+          for (let i = 0; i < 3; i++) blk(v, -5 + i, 14 + i, -4 + i, 4 - i, 14 + i, 3 - i, (x, y, z) => grain(0x2a5a5a, x, y, z, 0.05)); v.set(-1, 17, -1, 0xe8c040);
+          pine(-13, -6, 14); pine(12, -8, 16); pine(-12, 7, 11); pine(13, 6, 12); pine(0, -12, 15);
+        } else if (k === "lm-mountain") {
+          solidEll(0, 0, -4, 16, 20, 11, (x, y, z) => y > 14 ? grain(0xf4f8fc, x, y, z, 0.03) : st(x, y, z), (x, y, z) => Math.abs(x) <= 2 && y <= 5 && z > -2);
+          for (const x of [-3, 3]) blk(v, x, 0, 6, x, 6, 6, wood); blk(v, -3, 6, 6, 3, 6, 6, wood);
+          blk(v, 6, 0, 9, 6, 9, 9, wood); blk(v, 7, 6, 9, 9, 8, 9, 0xe42630);
+        } else if (k === "lm-mystic") {
+          for (let i = 0; i < 7; i++) { const a = i / 7 * PI * 2 + 0.3, x = Math.round(Math.cos(a) * 10), z = Math.round(Math.sin(a) * 8) - 2, h = 6 + Math.round(hash(i, 4, 4) * 8); blk(v, x - 1, 0, z - 1, x, h, z, st); if (h > 10) blk(v, x - 1, h + 1, z - 1, x + 1, h + 1, z, st); }
+          for (const x of [-4, 3]) blk(v, x, 0, 7, x + 1, 11, 8, st); blk(v, -5, 12, 7, 5, 13, 8, st);
+          for (const [x, y, z] of [[0, 0, -2], [1, 0, -1], [-1, 0, -3]]) { blk(gl, x, y, z, x, y + 4 + (x & 1), z, 0xb070f0); }
+          blk(v, -3, 0, -6, 2, 0, 1, (x, y, z) => grain(((x + z) & 1) ? 0xc8c0a8 : 0xb8b098, x, y, z, 0.04));
+        } else if (k === "lm-mech") {
+          blk(v, -10, 0, -7, 9, 10, 5, (x, y, z) => grain(((y & 3) === 0) ? 0x5a606a : 0x8a909a, x, y, z, 0.04));
+          for (let i = 0; i < 5; i++) { const x0 = -10 + i * 4; for (let j = 0; j < 4; j++) blk(v, x0 + j, 11 + Math.min(j, 3 - j), -7, x0 + j, 11 + Math.min(j, 3 - j), 5, j === 0 ? 0x9ad0f0 : 0x6a707a); }
+          blk(v, 6, 11, -5, 8, 22, -3, (x, y, z) => ((y >> 1) & 1) ? 0xe42630 : 0xf4f4ec);
+          blk(v, -2, 0, 6, 1, 6, 6, 0x3a3a44); blk(v, -2, 7, 6, 1, 7, 6, (x) => (x & 1) ? 0xf0c020 : 0x2a2a2a);
+          for (let a = 0; a < 8; a++) v.set(-7 + Math.round(Math.cos(a / 8 * PI * 2) * 2), 6 + Math.round(Math.sin(a / 8 * PI * 2) * 2), 6, 0xe8c040);
+          blk(v, -12, 3, -2, -11, 4, 8, 0x5a606a); gl.set(-8, 9, 6, 0x40e8f0); gl.set(4, 9, 6, 0x40e8f0);
+        } else if (k === "lm-sky" || k === "lm-sky-off") {
+          blk(v, -3, 0, -3, 2, 3, 2, (x, y, z) => grain(((x + y + z) & 1) ? 0x8a5a32 : 0xa8743e, x, y, z, 0.05));
+          if (k === "lm-sky") {
+            for (const [x, z] of [[-3, -3], [2, -3], [-3, 2], [2, 2]]) blk(v, x, 4, z, x, 9, z, 0x3a2a1a);
+            solidEll(-0.5, 16, -0.5, 7, 7, 7, (x, y, z) => ((Math.floor(Math.atan2(z + 0.5, x + 0.5) / PI * 4) + 8) & 1) ? 0xe42630 : 0xffd21a);
+          } else { solidEll(6, 0.5, 0, 6, 1.5, 4, (x, y, z) => ((x + z) & 2) ? 0xa83a2a : 0xc8a020); for (let x = 2; x < 6; x++) v.set(x, 1, 0, 0x3a2a1a); }
+          blk(v, -10, 0, 4, -10, 7, 4, wood); blk(v, -13, 6, 4, -9, 8, 4, (x, y) => y === 7 ? 0x1f58e0 : 0xf4f4ec);
+        } else if (k === "lm-outpost") {
+          solidEll(0, 0, 0, 11, 9, 11, (x, y, z) => y < 2 ? ((((x + z) >> 1) & 1) ? 0xf0c020 : 0x2a2a2a) : grain(((y & 3) === 0) ? 0x6a707a : 0x8a909a, x, y, z, 0.04), (x, y, z) => Math.abs(x) <= 2 && y <= 4 && z > 6);
+          blk(v, -1, 9, -1, 0, 18, 0, 0x5a606a); gl.set(-1, 19, -1, 0xff3a2a); gl.set(0, 19, 0, 0xff3a2a);
+          for (const x of [-3, 2]) blk(v, x, 0, 10, x, 5, 10, 0xe42630);
+        } else if (k === "lb-bridge") {
+          for (const x of [-4, 3]) for (const z of [-3, 3]) blk(v, x, 0, z, x, 4, z, wood);
+          for (let z = -3; z <= 3; z++) if (Math.abs(z) > 1) blk(v, -4, 1, z, 3, 1, z, (x, y, zz) => grain(((x + zz) & 1) ? 0x7a5a32 : 0xa8804a, x, y, zz, 0.05));
+          blk(v, -5, 0, 0, -4, 1, 0, (x, y, z) => grain(0xa8804a, x, y, z, 0.05)); v.set(2, 0, 0, 0xa8804a); v.set(3, 0, 1, 0x7a5a32);
+        } else if (k === "lb-logs") {
+          for (const [y, a] of [[1, 0.25], [3, -0.2], [1, -0.6]]) for (let i = -9; i <= 9; i++) { const x = Math.round(i * Math.cos(a)), z = Math.round(i * Math.sin(a)); blk(v, x, y - 1, z, x, y, z, (xx, yy, zz) => Math.abs(i) === 9 ? 0xd8b880 : grain(0x6a4a2a, xx, yy, zz, 0.08)); }
+        } else if (k === "lb-rocks") {
+          for (let i = 0; i < 6; i++) { const x = Math.round((hash(i, 1, 2) - 0.5) * 14), z = Math.round((hash(i, 2, 2) - 0.5) * 4), r = 2 + Math.round(hash(i, 3, 2) * 2); solidEll(x, r * 0.8, z, r, r, r, st); }
+        } else if (k === "lb-slab") {
+          blk(v, -6, 0, -1, 5, 12, 0, st); for (const [x, y] of [[-2, 8], [1, 8], [-1, 5], [0, 5], [-3, 3], [2, 3]]) v.set(x, y, 1, 0x6a5a8a); gl.set(-1, 9, 1, 0xb070f0); gl.set(0, 9, 1, 0xb070f0);
+        } else if (k === "lb-pylon") {
+          blk(v, -1, 0, -1, 0, 14, 0, 0x5a606a); blk(v, -5, 12, -1, 4, 12, 0, 0x5a606a); v.set(-5, 11, 0, 0x3a3a44); v.set(4, 11, 0, 0x3a3a44);
+          blk(v, -3, 6, 1, 2, 9, 1, (x, y) => ((x + y) & 1) ? 0xf0c020 : 0x2a2a2a); v.set(-1, 14, 1, 0x5a1a1a); v.set(0, 14, 1, 0x5a1a1a);
+        }
+      } else if (k.startsWith("shard-")) {
+        /* where a shard of the Chaos Heart is hidden: each needs a creature good at something */
+        const kind = k.slice(6), st = (x, y, z) => grain(((y + (hash(x >> 1, 0, z >> 1) * 3 | 0)) % 4 === 0) ? 0x7a7468 : 0x9a9484, x, y, z, 0.06);
+        const shard = (y) => { for (let i = 0; i < 4; i++) { const r = i === 0 || i === 3 ? 0 : 1; blk(gl, -r, y + i, -r, r - (r ? 1 : 0), y + i, r - (r ? 1 : 0), i === 2 ? 0x8af8d0 : 0x40e8a0); } };
+        if (kind === "pool") { shape(v, -5, 0, -5, 5, 2, 5, (x, y, z) => { const d = Math.hypot(x, z); return d <= 5 && (y === 0 || d >= 3.6); }, st); shape(v, -4, 1, -4, 4, 1, 4, (x, y, z) => Math.hypot(x, z) < 3.6, (x, y, z) => grain(0x2a80c0, x, y, z, 0.04)); shard(-1); }
+        else if (kind === "stump") { for (let y = 0; y < 16; y++) { const r = y < 3 ? 3 : 2; blk(v, -r, y, -r, r - 1, y, r - 1, (x, yy, z) => (y > 13 && Math.abs(x + 0.5) < 1) ? null : grain(((x + z + yy) & 1) ? 0x6a5a4a : 0x5a4a3a, x, yy, z, 0.06)); } for (const [x, z] of [[2, 0], [-3, 1]]) blk(v, x, 9, z, x, 9, z, 0x5a4a3a); shard(14); }
+        else if (kind === "boulder") { for (let x = -5; x <= 5; x++) for (let y = 0; y <= 8; y++) for (let z = -5; z <= 5; z++) if ((x / 5.5) ** 2 + ((y - 3.5) / 4.5) ** 2 + (z / 5) ** 2 <= 1) v.set(x, y, z, st(x, y, z)); gl.set(5, 0, 2, 0x40e8a0); gl.set(5, 1, 2, 0x8af8d0); gl.set(4, 0, 4, 0x40e8a0); }
+        else if (kind === "lock") { blk(v, -4, 0, -3, 3, 6, 2, (x, y, z) => grain(((y & 3) === 0) ? 0x5a606a : 0x8a909a, x, y, z, 0.04)); for (const x of [-3, -1, 1]) { v.set(x, 4, 3, 0xe8c040); gl.set(x, 2, 3, x === 1 ? 0xff3a2a : 0x3aff6a); } blk(v, -4, 7, -3, 3, 7, 2, (x, y, z) => ((x + z) & 1) ? 0xf0c020 : 0x2a2a2a); shard(8); }
+        else if (kind === "beam") { shape(v, -4, 0, -4, 4, 1, 4, (x, y, z) => Math.hypot(x, z) <= 4, (x, y, z) => grain(0xd8d4c8, x, y, z, 0.04)); for (let y = 2; y < 22; y++) gl.set(0, y, 0, y % 3 === 0 ? 0xffffff : 0xfff8c0); for (const [x, z] of [[-3, 0], [3, 0], [0, -3], [0, 3]]) blk(v, x, 2, z, x, 4, z, 0xc8c0b0); shard(6); }
       } else if (k === "camp") {
         /* a badnik raiders' cage (the animals they took, inside), and a hazard post with a lamp */
         blk(v, -6, 0, -6, 5, 0, 5, (x, y, z) => grain(0x5a606a, x, y, z, 0.05));
@@ -899,5 +1058,82 @@
     });
   }
 
-  root.ChaoWorld = { ok: true, make, PLAN, heightAt, surfaceAt, buildingMesh, VS, REGIONS, CENTRAL };
+  /* ---------------------------------------------------------------- the keeper's decor
+     The things a keeper sets out in a garden of their own, on the buildings' sixth-of-a-metre
+     grain, each painted one of the paint pots' colours (index pi into PAINT). */
+  const PAINT = [0xe42630, 0x1f58e0, 0xffd21a, 0x2fb844, 0xf4f4ec, 0xb06af0];
+  function decorMesh(id, pi) {
+    pi = (pi || 0) % PAINT.length;
+    const P = PAINT[pi], P2 = mulC(P, 0.78), PH = mixC(P, 0xffffff, 0.4);
+    return part(`decor:${id}:${pi}`, SB, (v, gl) => {
+      const wood = (x, y, z) => grain(0x8a5a32, x, y, z, 0.06), plank = (x, y, z) => grain(0xa8743e, x, y, z, 0.05);
+      const straw = (x, y, z) => grain(((x + y + z) & 1) ? 0xd8b860 : 0xc8a048, x, y, z, 0.06), stone = (x, y, z) => grain(0xc8c0b0, x, y, z, 0.05);
+      const paint = (x, y, z) => grain(P, x, y, z, 0.04), leaf = (x, y, z) => grain(mixC(0x3a8a34, 0x5aaa44, hash(x, y, z)), x, y, z, 0.06);
+      const disc = (r, y0, y1, col, hollow) => shape(v, -Math.ceil(r), y0, -Math.ceil(r), Math.ceil(r), y1, Math.ceil(r), (x, y, z) => { const d = Math.hypot(x, z); return d <= r && (!hollow || y <= y0 + 0.5 || d >= r - hollow); }, col);
+      if (id === "nest") {
+        disc(5, 0, 2, straw, 1.6);
+        shape(v, -3, 1, -3, 3, 1, 3, (x, y, z) => Math.hypot(x, z) <= 3, (x, y, z) => ((x + z) & 1) ? P : PH);
+      } else if (id === "feeder") {
+        blk(v, -1, 0, -1, 0, 7, 0, wood);
+        blk(v, -4, 3, -4, 3, 3, 3, plank); for (const [x, z, c] of [[-3, -3, 0xffd21a], [2, -2, 0xf05a3a], [-2, 2, 0x8ad84a]]) v.set(x, 4, z, c);
+        blk(v, -3, 8, -3, 2, 12, 2, (x, y, z) => (x === -3 || x === 2 || z === -3 || z === 2) ? plank(x, y, z) : y > 10 ? [0xffd21a, 0xf05a3a, 0x8ad84a][((x + z + y) % 3 + 3) % 3] : null);
+        blk(v, -4, 13, -4, 3, 13, 3, paint); blk(v, -3, 14, -3, 2, 14, 2, P2);
+      } else if (id === "perch") {
+        blk(v, -1, 0, -1, 0, 14, 0, wood);
+        for (let y = 2; y < 14; y += 3) blk(v, -3, y, 1, 2, y, 1, plank);
+        blk(v, -5, 15, -5, 4, 15, 4, plank);
+        for (const [x, z] of [[-5, -5], [4, -5], [-5, 4], [4, 4]]) blk(v, x, 16, z, x, 18, z, paint);
+        blk(v, -5, 18, -5, 4, 18, -5, paint); blk(v, -5, 18, 4, 4, 18, 4, paint);
+      } else if (id === "dummy") {
+        blk(v, -1, 0, -1, 0, 5, 0, wood); blk(v, -3, 0, -3, 2, 0, 2, wood);
+        blk(v, -3, 6, -2, 2, 11, 1, (x, y, z) => grain(0xd8c8a0, x, y, z, 0.06));
+        blk(v, -2, 12, -2, 1, 15, 1, (x, y, z) => grain(0xe0d0a8, x, y, z, 0.05)); v.set(-2, 14, 2, 0x2a2a2a); v.set(1, 14, 2, 0x2a2a2a);
+        for (const [x, y, c] of [[-2, 8, P], [1, 8, P], [-1, 9, PH], [0, 9, PH], [-1, 7, PH], [0, 7, PH], [-2, 9, P], [1, 7, P]]) v.set(x, y, 2, c);
+        blk(v, -7, 10, -1, -4, 10, 0, wood); blk(v, 3, 10, -1, 6, 10, 0, wood);
+      } else if (id === "lamp") {
+        blk(v, -2, 0, -2, 1, 1, 1, stone); blk(v, -1, 2, -1, 0, 10, 0, 0x3a3a44);
+        blk(gl, -2, 11, -2, 1, 13, 1, PH); blk(v, -2, 14, -2, 1, 14, 1, 0x3a3a44); v.set(-1, 15, -1, 0x3a3a44);
+      } else if (id === "splash") {
+        shape(v, -7, 0, -7, 7, 2, 7, (x, y, z) => { const d = Math.hypot(x, z); return d <= 7 && (y === 0 || d >= 5.6); }, (x, y, z) => ((Math.floor((Math.atan2(z, x) + PI) / PI * 4)) & 1) ? P : 0xf8f8f8);
+        shape(v, -6, 1, -6, 6, 1, 6, (x, y, z) => Math.hypot(x, z) < 5.6, (x, y, z) => grain(((x + z) & 3) === 0 ? 0x8ad8f8 : 0x5ac0f0, x, y, z, 0.04));
+      } else if (id === "flowers") {
+        blk(v, -5, 0, -3, 4, 1, 2, (x, y, z) => (x === -5 || x === 4 || z === -3 || z === 2) ? plank(x, y, z) : y === 0 ? grain(0x6a4a2a, x, y, z, 0.06) : null);
+        for (let x = -4; x <= 3; x++) for (let z = -2; z <= 1; z++) if (hash(x, 7, z) < 0.7) { v.set(x, 1, z, 0x3a8a3a); v.set(x, 2, z, [P, PH, 0xf8f8f8, 0xffd21a][Math.floor(hash(x, 8, z) * 4)]); }
+      } else if (id === "bench") {
+        for (const x of [-6, 5]) blk(v, x, 0, -1, x, 2, 0, wood);
+        blk(v, -6, 3, -2, 5, 3, 1, paint); blk(v, -6, 4, 1, 5, 7, 1, (x, y, z) => y === 7 ? P2 : plank(x, y, z));
+      } else if (id === "musicbox") {
+        blk(v, -3, 0, -2, 2, 4, 1, (x, y, z) => y === 4 ? 0xe8c040 : paint(x, y, z)); blk(v, -3, 5, 2, 2, 9, 2, P2);
+        v.set(-1, 5, -1, 0xf8f8f8); v.set(-1, 6, -1, PH); v.set(-1, 7, -1, 0xf8d8c0); v.set(3, 2, 0, 0xe8c040); v.set(4, 2, 0, 0xe8c040); v.set(4, 3, 0, 0xe8c040);
+      } else if (id === "toybox") {
+        blk(v, -4, 0, -3, 3, 5, 2, (x, y, z) => y === 5 ? P2 : y === 0 || y === 4 ? 0xe8c040 : paint(x, y, z));
+        v.set(-2, 6, -1, 0xf05a9a); v.set(-2, 7, -1, 0xf05a9a); v.set(1, 6, 0, 0xffd21a); v.set(1, 7, 1, 0xf08a2a); v.set(2, 6, -2, 0x3ad8a0);
+      } else if (id === "warmer") {
+        disc(4, 0, 2, stone); shape(gl, -3, 3, -3, 3, 3, 3, (x, y, z) => { const d = Math.hypot(x, z); return d <= 3.2 && Math.round(d) % 2 === 0; }, 0xff8a3a);
+        for (const [x, z] of [[-4, 0], [3, 0], [0, -4], [0, 3]]) v.set(x, 3, z, P);
+      } else if (id === "lantern") {
+        blk(v, -1, 0, -1, 0, 10, 0, wood); blk(v, 1, 10, -1, 3, 10, 0, wood);
+        blk(gl, 2, 5, -1, 4, 8, 1, PH); blk(v, 2, 9, -1, 4, 9, 1, P2); blk(v, 2, 4, -1, 4, 4, 1, P2);
+      } else if (id === "arch") {
+        for (const x of [-8, 7]) blk(v, x, 0, -1, x, 14, 0, plank);
+        for (let x = -8; x <= 7; x++) { const top = 15 + Math.round(3 * Math.cos((x + 0.5) / 8.5 * PI / 2)); blk(v, x, 14, -1, x, top, 0, (xx, y, zz) => hash(xx, y, zz) < 0.25 ? (hash(xx, y + 1, zz) < 0.5 ? P : PH) : leaf(xx, y, zz)); }
+      } else if (id === "statue") {
+        blk(v, -4, 0, -4, 3, 3, 3, stone);
+        blk(v, -2, 4, -2, 1, 7, 1, (x, y, z) => grain(0xd8d4c8, x, y, z, 0.04)); blk(v, -3, 8, -3, 2, 12, 2, (x, y, z) => grain(0xe4e0d4, x, y, z, 0.04));
+        for (const s of [-4, 3]) blk(v, s, 5, -1, s, 7, 0, (x, y, z) => grain(0xd8d4c8, x, y, z, 0.04));
+        blk(v, -1, 14, -1, 0, 15, 0, P);
+        for (let a = 0; a < 12; a++) gl.set(Math.round(Math.cos(a / 12 * PI * 2) * 3) - 1, 17, Math.round(Math.sin(a / 12 * PI * 2) * 3) - 1, 0xffe060);
+      } else if (id === "fence") {
+        for (const x of [-7, -2, 2, 7]) blk(v, x, 0, 0, x, 5, 0, 0xf4f4ec);
+        for (const y of [2, 4]) blk(v, -7, y, 0, 7, y, 0, paint);
+      } else if (id === "shrine") {
+        blk(v, -7, 0, -7, 6, 0, 6, stone); blk(v, -5, 1, -5, 4, 1, 4, stone);
+        for (const [x, z] of [[-5, -5], [4, -5], [-5, 4], [4, 4]]) blk(v, x, 2, z, x, 12, z, (xx, y, zz) => y === 12 ? 0xe8c040 : stone(xx, y, zz));
+        blk(v, -5, 13, -5, 4, 13, 4, (x, y, z) => ((x + z) & 1) ? 0xe8c040 : stone(x, y, z));
+        for (let y = 0; y < 5; y++) { const r = 2 - Math.abs(y - 2); blk(gl, -r - 1, 4 + y, -r - 1, r, 4 + y, r, y === 2 ? 0x8af8d0 : 0x40e8a0); }
+      }
+    });
+  }
+
+  root.ChaoWorld = { ok: true, make, decorMesh, PAINT, PLAN, heightAt, surfaceAt, buildingMesh, VS, REGIONS, CENTRAL };
 })(typeof globalThis !== "undefined" ? globalThis : this);

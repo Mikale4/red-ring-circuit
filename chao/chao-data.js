@@ -362,6 +362,7 @@
     // Eggman's badniks, as the raids on the gardens bring them (Sonic 1's own): beaten, and set right
     ["buzzbomber", "Buzz Bomber", "bug", 0.75, [0x1f78d8, 0x8ac8f8, 0xd8e0e8], "wings,antennae,rivets,bands", C, "agi", 4],
     ["crabmeat", "Crabmeat", "crab", 0.9, [0xe0302a, 0xc8ccd8, 0xf4f4f4], "claws,rivets", C, "pow", 4],
+    ["eggwarden", "Egg Warden", "robot", 1.6, [0xd83a2a, 0x8a909a, 0xffd21a], "rivets", C, "pow", 6],
     ["chopper", "Chopper", "fish", 0.7, [0xd83a2a, 0xc8ccd8, 0xf4f4f4], "rivets,teeth,fin:back,round", C, "vel", 4],
   ];
   const ANIMALS = A.map(([id, name, plan, size, cols, feat, region, lean, rarity, classic]) => ({
@@ -370,6 +371,7 @@
     text: "", how: classic ? "Freed from one of Eggman's badniks out in the zones: each one freed counts toward an egg." : "",
   }));
   for (const a of ANIMALS) if (["an-moto", "an-buzzbomber", "an-crabmeat", "an-chopper"].includes(a.id)) { a.badnik = true; a.how = "One of Eggman's badniks, beaten in the raids on the gardens and set right by Doctor Nell Voss."; }
+  { const w = ANIMALS.find(a => a.id === "an-eggwarden"); w.badnik = true; w.boss = true; w.how = "Eggman's robot, left to steal the Chaos Heart. Beaten at his outpost on the north-west of the island; never kept."; }
 
   /* ---------------------------------------------------------------- techniques
      What a creature can do in a fight: a kind (strike, special, guard, support, team), the
@@ -455,7 +457,31 @@
   const BY = {};
   for (const s of CHAO) BY[s.id] = s;
   for (const s of ANIMALS) BY[s.id] = s;
+  /* ---------------------------------------------------------------- the keeper's decor
+     Things to set out in a garden of your own (Pip sells them; the story gives the last). use:
+     what a creature does at it -- sleep in it, sit by it, train on it, splash in it, dance to it
+     -- and attr, what that trains; mood, align: what being near it does; solid: in the way. */
+  const DECOR = [
+    { id: "nest", name: "Nest bed", price: 150, use: "sleep", text: "A round bed of straw with a blanket in it. A creature asleep in it wakes rested in half the time." },
+    { id: "feeder", name: "Fruit feeder", price: 300, solid: 0.5, text: "It fills itself in the night: three fruit drop out of it every morning." },
+    { id: "perch", name: "Perch tower", price: 220, use: "train", attr: "agi", solid: 0.4, text: "A tall post with a ladder and a platform to leap from. Agility, for climbers and fliers." },
+    { id: "dummy", name: "Sparring dummy", price: 200, use: "train", attr: "pow", solid: 0.45, text: "A straw dummy on a post that wobbles back. Power." },
+    { id: "lamp", name: "Chaos lamp", price: 260, use: "sit", attr: "cha", solid: 0.3, text: "A lamp burning Chaos Energy, bright all night. Chaos, for whoever sits by it." },
+    { id: "splash", name: "Paddling pool", price: 320, use: "splash", attr: "res", mood: 1, text: "Shallow and splashy. Resilience, and a great deal of fun." },
+    { id: "flowers", name: "Flower bed", price: 120, use: "sit", mood: 1, align: "wild", text: "Flowers to sit among: a better mood, and a lean to the Wild." },
+    { id: "bench", name: "Bench", price: 90, use: "sit", attr: "vit", text: "A seat in the sun. Vitality, slowly." },
+    { id: "musicbox", name: "Music box", price: 300, use: "dance", attr: "cha", mood: 1, solid: 0.35, text: "It winds itself, and the Chao dance to it." },
+    { id: "toybox", name: "Toy chest", price: 400, solid: 0.55, text: "Every morning there's a new toy beside it." },
+    { id: "warmer", name: "Egg warmer", price: 350, text: "An incubator for any garden: an egg set on it hatches twice as fast." },
+    { id: "lantern", name: "Paper lantern", price: 60, solid: 0.2, text: "Just pretty, and lit at night." },
+    { id: "arch", name: "Flower arch", price: 160, mood: 0.5, text: "Walking under it puts anyone in a better mood." },
+    { id: "statue", name: "Chao statue", price: 500, align: "hero", solid: 0.6, text: "A hero's statue, halo and all: the Chao who stop by it lean a little to the Hero." },
+    { id: "fence", name: "Picket fence", price: 30, solid: 0.15, wide: 1.2, text: "A length of fence, to mark out a garden of your own." },
+    { id: "shrine", name: "Chaos Heart shrine", price: 0, use: "sit", attr: "cha", mood: 1, bless: 1, solid: 0.9, story: 1, text: "The Chaos Heart's light, kept: every creature in its garden grows a little happier, and a little stronger, near it." },
+  ];
+
   root.ChaoData = {
+    DECOR, decor: id => DECOR.find(d => d.id === id),
     ATTRS, TEMPERS, TEMPER_KEYS, ALIGNS, ALIGN_KEYS, PATHS, PATH_KEYS, CHAO, ANIMALS, TECHS, FOODS, TOYS, REGIONS,
     species: id => BY[id], chao: id => BY[id] && BY[id].kind === "chao" ? BY[id] : null, animal: id => BY[id] && BY[id].kind === "animal" ? BY[id] : null,
     tech: id => TECHS.find(t => t.id === id), food: id => FOODS.find(f => f.id === id), toy: id => TOYS.find(t => t.id === id),
