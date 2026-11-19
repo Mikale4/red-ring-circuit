@@ -152,7 +152,7 @@
     shadowsOn(G.keeper.rig.g); G.scene.add(G.keeper.rig.g);
     G.cam.userData.yaw = G.keeper.a + PI;
     /* the warden: the garden's own keeper of old, at the hall */
-    folkHere();
+    folkHere(); raidHere();
     /* everyone who lives here (each creature lives in one garden; carried through a gate, it lives in the next) */
     settle();
     gates(true);
@@ -163,6 +163,7 @@
     if (!S.met) intro();
     else toast(`Day ${Math.floor(S.day) + 1} in the ${W.RG.name || "Central Garden"}`, "sun");
     G.arrived = true;
+    setTimeout(() => { if (G) { milestones(); storyCheck(); } }, 2500);
   }
   const HAZEL = { sex: "f", skin: 2, hair: 6, style: "bun", eyes: 2, attire: "sweater", colour: 3, bottoms: "long", glasses: true, custom: { apron: 0x8a6a3a, hat: { c: 0xd8c08a, band: 0x3a6a3a, sun: true, flower: 0xf05a7a }, shoes: 0x6a4a2a } };
   function settle() {
@@ -222,7 +223,7 @@
         const g = G.W.gates.find(x => x.id === from), sp = g ? G.W.spots["gate-" + g.id] : null;
         if (sp) { const ix = Math.sin(g.face), iz = Math.cos(g.face); k.x = sp.x + ix * 1.5; k.z = sp.z + iz * 1.5; k.a = g.face; } else { k.x = 0; k.z = 29; k.a = PI; }
       } else { const E = G.W.RG.entry; k.x = E[0]; k.z = E[1]; k.a = E[2]; }
-      folkHere();
+      folkHere(); raidHere();
       k.y = G.W.ground(k.x, k.z); k.vx = k.vz = 0;
       G.cam.userData.yaw = k.a + PI; G.cam.userData.tx = k.x; G.cam.userData.tz = k.z; G.cam.userData.ty = k.y + 1;
       settle();
@@ -237,6 +238,7 @@
       persist();
       fade.classList.remove("on"); setTimeout(() => fade.remove(), 500);
       G.traveling = false;
+      setTimeout(() => { if (G) storyCheck(); }, 1400);
     }, 480);
   }
   /* the gardens you're not in: their creatures' days go on, more quietly */
@@ -666,7 +668,7 @@
   /* an egg warms (faster in arms, faster still on the incubator, faster rubbed), wobbles, hatches */
   function eggTick(it, dt) {
     const e = it.data, sp = G.W.spots.incubator;
-    const onInc = Math.hypot(it.x - sp.x, it.z - sp.z) < 1.8;
+    const onInc = !!sp && Math.hypot(it.x - sp.x, it.z - sp.z) < 1.8;              // (only the Central Garden has one)
     e.warm += dt * (it.held ? 1.6 : onInc ? 2.2 : 0.8);
     const k = e.warm / e.need;
     it.m.rotation.z = k > 0.75 ? Math.sin(G.t * (10 + k * 10)) * 0.12 * (k - 0.6) : 0;
@@ -775,7 +777,7 @@
     } else if (r) {
       if (r.kind === "creature") { P.push(["Z", `Pick up ${r.e.c.name}`], ["C", "Pet"], ["V", "Look"]); }
       else if (r.kind === "tree") P.push(["Z", "Shake the tree"]);
-      else if (r.kind === "spot") { const n = r.n; P.push(["Z", n === "incubator" ? "The incubator" : n === "mailbox" ? (G.save.mail && G.save.mail.length ? `Mailbox (${G.save.mail.length})` : "Mailbox") : n === "book" ? "The encyclopedias" : n === "hall" ? "The Garden Hall" : n === "yard" ? "The training ground" : n.startsWith("gate") ? (r.s.gate.open ? `Into the ${r.s.gate.name}` : `The way to the ${r.s.gate.name}`) : n === "exit" ? "Back to the Central Garden" : r.s.dojo ? "The dojo" : r.s.arena ? "The Garden League's arena" : n === "pier" ? "The pier" : n === "lake" ? "The frozen lake" : n === "altar" ? "The altar" : n === "observatory" ? "The observatory" : ""]); }
+      else if (r.kind === "spot") { const n = r.n; P.push(["Z", n === "incubator" ? "The incubator" : n === "mailbox" ? (G.save.mail && G.save.mail.length ? `Mailbox (${G.save.mail.length})` : "Mailbox") : n === "book" ? "The encyclopedias" : n === "hall" ? "The Garden Hall" : n === "yard" ? "The training ground" : n.startsWith("gate") ? (r.s.gate.open ? `Into the ${r.s.gate.name}` : `The way to the ${r.s.gate.name}`) : n === "exit" ? "Back to the Central Garden" : r.s.raid ? "The badniks' cage" : r.s.dojo ? "The dojo" : r.s.arena ? "The Garden League's arena" : n === "pier" ? "The pier" : n === "lake" ? "The frozen lake" : n === "altar" ? "The altar" : n === "observatory" ? "The observatory" : ""]); }
       else if (r.kind === "npc") P.push(["Z", `Talk to ${r.n.name}`]);
       else { P.push(["Z", `Pick up ${name(r)}`]); if (r.kind === "egg") P.push(["V", "Look"]); }
     }
@@ -806,6 +808,7 @@
       if (n === "incubator") { toast("Eggs set here hatch twice as fast", "flame"); return; }
       if (n.startsWith("gate")) { const g = r.s.gate; if (g.open) travel(g.id); else talk([["Sign", `To the ${g.name}. ${(GATE_RULES[g.id] || {}).why || g.need}`]]); return; }
       if (n === "exit") { travel("central", G.W.id); return; }
+      if (r.s.raid) { raidGo(); return; }
       if (r.s.dojo) { dojoMenu(r.s.dojo); return; }
       if (r.s.arena) { leagueMenu(); return; }
       if (n === "pier") { talk([["", "The pier creaks underfoot. Fish dart in the clear water below; the swimmers love it here."]]); return; }
@@ -901,7 +904,8 @@
       G.W.growFruit(dt, t => G.ents.some(e => e.c.genes.traits.includes("greenthumb") && Math.hypot(e.x - t.x, e.z - t.z) < 8) ? 1.6 : 1);
       G.W.tick(dt);
       for (const n of G.npcs || []) { n.rig.g.visible = folkIn(n); if (n.rig.g.visible) n.rig.anim(G.t, dt, "idle"); }
-      G.saveT += dt; if (G.saveT > 25) { G.saveT = 0; persist(); gates(); }
+      raidTick(dt);
+      G.saveT += dt; if (G.saveT > 25) { G.saveT = 0; persist(); gates(); milestones(); storyCheck(); }
       elsewhere(dt);
       const dn = Math.floor(G.save.day); if (G.dayN !== dn) { if (G.dayN != null) dawn(dn); G.dayN = dn; }
     }
@@ -1164,6 +1168,7 @@
     const el = menuOpen(sec("The Garden Hall", "door", `<p class="cg-text">Hazel's hall: the warden's desk, the Society's notices, a kettle always on, and the door through to the race track.</p>
       <div class="cg-mm"><button class="cg-mi" data-f data-focus data-go="duel">${ico("trophy")}<b>Today's visitor</b><i>${esc(visitor().name)} is here, and wants a duel</i></button>
       <button class="cg-mi" data-f data-go="race">${ico("flag")}<b>The Chao races</b><i>Eight courses, three classes each: ribbons and rings</i></button>
+      <button class="cg-mi" data-f data-go="board">${ico("clipboard")}<b>The notice board</b><i>${(() => { const S = G.save, r = (S.reqs = S.reqs || {}); const n = REQUESTS.filter(q => !r[q.id] && q.n(S) >= q.of).length; return n ? `${n} request${n > 1 ? "s" : ""} done: rewards waiting` : "What the garden's folk would like done"; })()}</i></button>
       <button class="cg-mi" data-f data-go="pens">${ico("heart")}<b>The Society's pens</b><i>Pair two grown creatures who are fond of each other</i></button>
       <button class="cg-mi" data-f data-go="rest">${ico("moon")}<b>Rest till morning</b><i>Sleep here; the garden goes on through the night</i></button>
       <button class="cg-mi" data-f data-go="look">${ico("person")}<b>The mirror</b><i>Change how you look</i></button>
@@ -1175,6 +1180,7 @@
       if (k === "pens") { pens(); return; }
       if (k === "duel") { duelMenu(); return; }
       if (k === "race") { raceMenu(); return; }
+      if (k === "board") { boardMenu(); return; }
       if (k === "rest") { const t = tod(), add = (t < 0.27 ? 0.27 - t : 1.27 - t); for (const e of G.ents) { G.L.tick(e.c, add * DAY * 0.25, { dayLen: DAY, asleep: true }); e.c.care.energy = 100; e.task = null; } G.save.day += add; menuClose(); toast("Morning", "sun"); persist(); }
       else if (k === "look") creator(false);
       else if (k === "save") { persist(); menuClose(); toast("Saved", "check"); }
@@ -1301,7 +1307,7 @@
     const want = Math.max(7, avg * (v.easy || 1) * (v.hard || 1) * (o && o.mul || 1) * (o && o.mul ? 1 : 1 + rec.w * 0.06) * rnd(0.9, 1.08));
     const out = [];
     for (let i = 0; i < n; i++) {
-      const id = v.pool[Math.floor(Math.random() * v.pool.length)], c = L.make(id, { name: L.NAMES[Math.floor(Math.random() * L.NAMES.length)] });
+      const id = v.fixed ? v.fixed[i % v.fixed.length] : v.pool[Math.floor(Math.random() * v.pool.length)], c = L.make(id, { name: v.named ? D.species(id).name : L.NAMES[Math.floor(Math.random() * L.NAMES.length)] });
       if (c.kind === "animal") c.grown = 1;
       let guard = 0;
       while (L.lvSum(c) < want && guard++ < 400) { const a = D.ATTRS[Math.floor(Math.random() * 7)].id; L.train(c, a, 40 + c.genes.apt[a] * 60); }
@@ -1484,7 +1490,7 @@
     c.care.mood = clamp(c.care.mood + (r >= 0.6 ? 6 : -3), 0, 100); c.bond = clamp(c.bond + 1, 0, 100);
     S.trainBest = S.trainBest || {}; const best = S.trainBest[g.id], isBest = !best || res.score > best.score;
     if (isBest) S.trainBest[g.id] = { score: res.score, show: res.show, who: c.name };
-    S.ach.trained = (S.ach.trained || 0) + 1;
+    S.ach.trained = (S.ach.trained || 0) + 1; if (res.grade === "S") S.ach.trainS = (S.ach.trainS || 0) + 1;
     c.log.push([S.day, `Trained at ${g.name}: ${res.show} (${res.grade}).`]);
     for (const t of [g1.tech, g2.tech].filter(Boolean)) { const tt = D.tech(t); toast(`${c.name} learned ${tt.name}!`, "star"); c.log.push([S.day, `Learned ${tt.name}.`]); }
     persist();
@@ -1497,6 +1503,129 @@
     el.querySelector("[data-back]").onclick = menuClose;
     el.querySelector("[data-other]").onclick = () => yardMenu(g.id);
     el.querySelector("[data-again]").onclick = () => trainGo(c, g.id);
+  }
+
+  /* ---------------------------------------------------------------- the badnik raids
+     A light story through the gardens: Eggman's badniks (Sonic 1's own -- Motobugs, Buzz
+     Bombers, Crabmeats) have been raiding them, caging the animals, digging for something.
+     Each raid opens when the one before is done and its garden is open: someone tells you,
+     a cage appears in that garden with the badniks round it, and a duel sets the animals
+     free. At the end, a beacon in the Mechanical Garden, and Doctor Nell sets the badniks right. */
+  const RAIDS = [
+    { id: "r1", region: "tropical", when: S => S.open.tropical && (S.visited || {}).tropical, fixed: ["an-moto"], n: 1, mul: 0.8,
+      hint: [["Hazel", "There've been wheel tracks through the Tropical Garden's sand, and the fruit keeps going missing. Old Marlo thinks it's one of Eggman's machines. Would you look in on it?"]],
+      meet: [["", "A Motobug: one of Eggman's badniks, trundling round a cage with a Flicky and a Pocky shut inside."], ["Motobug", "BZZT. INTRUDER. PROTECT THE HAUL."]],
+      win: [["", "The Motobug sputters to a stop. The cage door swings open: a Flicky and a Pocky, blinking in the sun."], ["Old Marlo", "Eggman's badniks, all the way out here? Where there's one there's more, you mark me."]],
+      eggs: ["an-flicky", "an-pocky"], rings: 150, item: ["chaosdrive-g", 2] },
+    { id: "r2", region: "forest", when: S => S.open.forest, fixed: ["an-buzzbomber", "an-buzzbomber"], n: 2, mul: 0.95,
+      hint: [["Master Bram Oakheart", "Buzzing in my forest, keeper. Metal buzzing. Wasps of Eggman's making have hung a cage in the trees."]],
+      meet: [["", "Two Buzz Bombers hover over a cage hung from a branch. Inside: a Picky and a Ricky."], ["Buzz Bomber", "ZZZT. TARGET ACQUIRED."]],
+      win: [["", "The Buzz Bombers drop out of the air in a clatter of tin, and the animals tumble free."], ["Master Bram Oakheart", "Your team stood like oaks. But those wasps flew in from somewhere. Keep your eyes open."]],
+      eggs: ["an-picky", "an-ricky"], rings: 250, item: ["chaosdrive-p", 2] },
+    { id: "r3", region: "mystic", when: S => S.open.mystic, fixed: ["an-crabmeat", "an-crabmeat", "an-moto"], n: 3, mul: 1.0,
+      hint: [["Wren Ashby", "The court's carvings are scratched all over. Crabmeats, a whole gang of them, digging round the old altar. They're looking for something."]],
+      meet: [["", "Crabmeats, clicking their claws over a cage of Cuckies, and a Motobug keeping watch."], ["Crabmeat", "KZZK. DIGGING IN PROGRESS. DO NOT INTERFERE."]],
+      win: [["", "The Crabmeats scuttle in circles and fall still. One had a scrap of paper in its claw: a map of the gardens, with the Mechanical Garden ringed in red."], ["Wren Ashby", "Eggman's after something in the machines' garden. Doctor Nell should know."]],
+      eggs: ["an-cucky", "an-becky"], rings: 350, item: ["chaosdrive-r", 2] },
+    { id: "r4", region: "mech", when: S => S.open.mech, fixed: ["an-buzzbomber", "an-crabmeat", "an-moto"], n: 3, mul: 1.15,
+      hint: [["Doctor Nell Voss", "Keeper! Something's been calling the badniks here: a beacon, in my own garden. And a whole squad of them guarding it."]],
+      meet: [["", "Eggman's beacon, blinking yellow on a hazard post. A Buzz Bomber, a Crabmeat and a Motobug close ranks round it."], ["Buzz Bomber", "ZZZT. BEACON SECURE. ELIMINATE."]],
+      win: [["", "With a last fizz the beacon goes dark. The badniks stand about, lost, their lights fading."], ["Doctor Nell Voss", "No orders, no harm in them. Let me set a few of them right: they'll make fine garden company. One of each, for you."], ["Hazel", "That's the last of the raids, I'd say. The gardens are yours again, love. Thank you."]],
+      eggs: ["an-moto", "an-buzzbomber", "an-crabmeat", "an-chopper"], rings: 600, item: ["chaosdrive-y", 3], end: true },
+  ];
+  const raidNow = () => { const S = G.save; S.story = S.story || { done: {}, told: {}, at: {} }; return RAIDS.find(r => !S.story.done[r.id]); };
+  /* a raid begins: someone tells you (once), and if you're in its garden, the cage is here */
+  function storyCheck() {
+    const S = G.save, r = raidNow(); if (!r || !G.keeper || G.battle || G.menu || G.talking || G.traveling) return;
+    S.open = S.open || {};
+    if (!r.when(S)) return;
+    if (!S.story.told[r.id]) { S.story.told[r.id] = true; persist(); talk(r.hint.concat([["", `(The ${G.Wd.REGIONS[r.region] ? G.Wd.REGIONS[r.region].name : r.region}: look for the badniks' cage.)`]])); }
+    if ((S.region || "central") === r.region && !G.raid) raidHere();
+  }
+  function raidHere() {
+    G.raid = null;
+    const S = G.save, r = raidNow(); if (!r || !S.story || !S.story.told[r.id] || (S.region || "central") !== r.region) return;
+    let at = S.story.at[r.id];
+    if (!at) { const E = G.W.RG.entry; for (let i = 0; i < 40; i++) { const p = G.W.places.any(); if (Math.hypot(p[0] - E[0], p[1] - E[1]) > 12 && !G.W.blocked(p[0], p[1], 2) && G.W.depth(p[0], p[1]) < 0.05) { at = p; break; } } at = at || [E[0] - 6, E[1] - 6]; S.story.at[r.id] = at; }
+    const [x, z] = at, m = G.Wd.buildingMesh("camp");
+    m.position.set(x, G.W.ground(x, z), z); m.updateMatrix(); shadowsOn(m); G.W.props.add(m);
+    const ob = { x, z, r: 1.2, w: 0, d: 0 }; G.W.obst.push(ob);
+    const rigs = r.fixed.map((sp, i) => { const c = G.L.make(sp, { name: G.D.species(sp).name }), rig = G.M.creature(c), a = i / r.fixed.length * PI * 2 + 0.6; const rx = x + Math.cos(a) * 2.2, rz = z + Math.sin(a) * 2.2; rig.g.position.set(rx, G.W.ground(rx, rz), rz); shadowsOn(rig.g); G.W.props.add(rig.g); return { rig, x: rx, z: rz, a: 0 }; });
+    G.W.spots.raid = { x, z: z + 2.4, r: 2.6, raid: r.id };
+    G.raid = { r, m, ob, rigs };
+  }
+  function raidTick(dt) {
+    const R = G.raid; if (!R) return; const k = G.keeper;
+    for (const b of R.rigs) { const want = Math.atan2(k.x - b.x, k.z - b.z); b.a += angTo(b.a, Math.hypot(k.x - b.x, k.z - b.z) < 8 ? want : b.a + dt * 0.6) * Math.min(1, dt * 4); b.rig.g.rotation.y = b.a; b.rig.anim(G.t, dt, "walk", 0.4); }
+  }
+  function raidGo() {
+    const R = G.raid; if (!R) return; const r = R.r;
+    const v = { id: "raid-" + r.id, name: "Eggman's badniks", look: null, pool: r.fixed, fixed: r.fixed, named: true, hi: r.meet[r.meet.length - 1][1], win: "", lose: "" };
+    talk(r.meet, () => duelParty(v, r.n, [], {}, {
+      title: "The badniks' raid", sub: `${r.n} against ${r.n}`, hi: r.meet[r.meet.length - 1][1], mul: r.mul, rings: r.rings, music: "runaway", go: "Free them!", back: menuClose,
+      onDone: won => {
+        if (!won) { talk([["", "The badniks hold their ground. Train your team up, and come back for the animals."]]); return; }
+        const S = G.save, k = G.keeper;
+        S.story.done[r.id] = true;
+        G.W.props.remove(R.m); for (const b of R.rigs) G.W.props.remove(b.rig.g); R.ob.off = true; delete G.W.spots.raid; G.raid = null;
+        r.eggs.forEach((sp, i) => addItem("egg", null, k.x + Math.cos(i * 1.6) * 1.1, k.z + Math.sin(i * 1.6) * 1.1, G.L.egg(sp, { from: G.D.species(sp).badnik ? "a badnik, set right by Doctor Nell" : "an animal freed from the badniks' cage" })));
+        if (r.item) S.inv[r.item[0]] = (S.inv[r.item[0]] || 0) + r.item[1];
+        S.ach.raids = (S.ach.raids || 0) + 1;
+        persist();
+        talk(r.win.concat([["", `${r.eggs.length} egg${r.eggs.length > 1 ? "s" : ""} at your feet, ${r.rings} rings, and ${r.item[1]} ${G.D.food(r.item[0]).name}s from the badniks' wreckage.`]]), () => { if (r.end) { toast("The badnik raids are over!", "star"); jingle("born-change"); } else storyCheck(); });
+      } }));
+  }
+
+  /* ---------------------------------------------------------------- requests
+     The garden's folk each want something done; the notice board in the hall keeps them, and
+     pays out when they're done. A request shows once you've been to its giver's garden. */
+  const REQUESTS = [
+    { id: "q-hatch", who: "hazel", text: "Hatch three eggs.", n: S => S.ach.hatched || 0, of: 3, rings: 100 },
+    { id: "q-change", who: "hazel", text: "Raise a Chao until it changes.", n: S => S.chao.filter(c => c.stage >= 1).length, of: 1, item: ["heart", 1] },
+    { id: "q-crowd", who: "pip", text: "Keep ten creatures in your gardens.", n: S => S.chao.length + S.animals.length, of: 10, rings: 200 },
+    { id: "q-train", who: "hazel", text: "Score an S at the training ground.", n: S => S.ach.trainS || 0, of: 1, rings: 150 },
+    { id: "q-duel", who: "hazel", text: "Win ten duels.", n: S => S.ach.duelWins || 0, of: 10, rings: 300 },
+    { id: "q-race", who: "skye", text: "Win a race at the track.", n: S => S.ach.raceWins || 0, of: 1, rings: 150 },
+    { id: "q-gold", who: "skye", text: "Win a Gold class race.", n: S => Object.keys(S.races || {}).filter(k => k.endsWith(":gold") && S.races[k].best === 1).length, of: 1, egg: "chao-hero-child" },
+    { id: "q-oak", who: "bram", text: "Take the Oakheart seal.", n: S => (S.seals || {}).forest ? 1 : 0, of: 1, item: ["chaosdrive-r", 3] },
+    { id: "q-summit", who: "yuki", text: "Take the Summit seal.", n: S => (S.seals || {}).mountain ? 1 : 0, of: 1, item: ["chaosdrive-g", 3] },
+    { id: "q-circuit", who: "nell", text: "Take the Circuit seal.", n: S => (S.seals || {}).mech ? 1 : 0, of: 1, item: ["chaosdrive-y", 3] },
+    { id: "q-cup", who: "ines", text: "Win a cup in the Garden League.", n: S => S.ach.cups || 0, of: 1, rings: 250 },
+    { id: "q-book", who: "wren", text: "Record fifty kinds in the encyclopedias.", n: S => Object.keys(S.seen || {}).length, of: 50, egg: "animal-rare" },
+    { id: "q-family", who: "marlo", text: "Have three eggs of your creatures' own.", n: S => S.ach.eggs || 0, of: 3, rings: 300 },
+    { id: "q-climb", who: "otto", text: "Win the Cliffside Race.", n: S => Object.keys(S.races || {}).filter(k => k.startsWith("cliff:") && S.races[k].best === 1).length, of: 1, item: ["chaosdrive-r", 2] },
+    { id: "q-raids", who: "nell", text: "Put an end to the badnik raids.", n: S => S.ach.raids || 0, of: RAIDS.length, rings: 500 },
+  ];
+  function boardMenu() {
+    const S = G.save; S.reqs = S.reqs || {};
+    const seen = id => { const f = FOLK.find(x => x.id === id); return f && (f.region === "central" || (S.visited || {})[f.region]); };
+    const list = REQUESTS.filter(q => seen(q.who));
+    const gift = q => q.rings ? `${q.rings} rings` : q.item ? `${q.item[1]} ${G.D.food(q.item[0]).name}${q.item[1] > 1 ? "s" : ""}` : q.egg === "animal-rare" ? "a rare egg" : "an egg";
+    const el = menuOpen(sec("The notice board", "clipboard", `<p class="cg-text">The garden folk's requests, pinned up in the hall. Done ones pay out here.</p>
+      <div class="cg-list">${list.map((q, i) => { const n = Math.min(q.n(S), q.of), done = S.reqs[q.id], ready = !done && n >= q.of, f = FOLK.find(x => x.id === q.who);
+        return `<button class="cg-irow" data-f ${i === 0 ? "data-focus" : ""} data-q="${q.id}" ${ready ? "" : "disabled"}><span class="cg-dot" style="background:${done ? "#3ad86a" : ready ? "#ffd21a" : "#5a6a9a"}"></span><b>${esc(f.name)}</b><i>${esc(q.text)} ${done ? "Done, thank you!" : ready ? "Done! Take the reward." : `(${n}/${q.of})`}</i><em>${esc(gift(q))}</em></button>`; }).join("")}</div>
+      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`), () => hallMenu(), "cg-small");
+    el.querySelector("[data-back]").onclick = () => hallMenu();
+    el.querySelectorAll("[data-q]").forEach(b => b.onclick = () => {
+      const q = REQUESTS.find(x => x.id === b.dataset.q); if (!q || S.reqs[q.id] || q.n(S) < q.of) return;
+      S.reqs[q.id] = true;
+      if (q.rings) S.rings += q.rings;
+      if (q.item) S.inv[q.item[0]] = (S.inv[q.item[0]] || 0) + q.item[1];
+      if (q.egg) { const k = G.keeper; let sp = q.egg; if (sp === "animal-rare") { const pool = G.D.ANIMALS.filter(a => a.rarity === 3 && !a.badnik && a.plan !== "fish" && a.plan !== "jelly"); sp = pool[Math.floor(Math.random() * pool.length)].id; } addItem("egg", null, k.x + 0.8, k.z + 0.8, G.L.egg(sp, { from: `a thank-you from ${FOLK.find(x => x.id === q.who).name}` })); }
+      sfx("coin"); toast(`${FOLK.find(x => x.id === q.who).name}: thank you! ${gift(q)}`, "star"); persist(); boardMenu();
+    });
+  }
+  /* the encyclopedias' milestones: Wren sends something for every so many kinds recorded */
+  const MILESTONES = [10, 25, 50, 80, 120, 160, 200, 300, 400];
+  function milestones() {
+    const S = G.save, n = Object.keys(S.seen || {}).length; S.mile = S.mile || 0;
+    while (S.mile < MILESTONES.length && n >= MILESTONES[S.mile]) {
+      const m = MILESTONES[S.mile++], rings = m * 4;
+      S.rings += rings;
+      if (m >= 50 && (S.mail || []).length < 8) { S.mail = S.mail || []; const pool = G.D.ANIMALS.filter(a => a.rarity === (m >= 160 ? 4 : 3) && !a.badnik && a.plan !== "fish" && a.plan !== "jelly"); S.mail.push(G.L.egg(pool[Math.floor(Math.random() * pool.length)].id, { from: "sent by Wren Ashby, for the encyclopedias" })); }
+      toast(`${m} kinds recorded! Wren sends ${rings} rings${m >= 50 ? ", and an egg to the mailbox" : ""}`, "book");
+      persist();
+    }
   }
 
   /* ---------------------------------------------------------------- the races

@@ -975,6 +975,7 @@
       if (f.spines) for (let i = 0; i < 10; i++) v.set(hash(i, 3, 1) < 0.5 ? -bw / 2 - 1 : bw / 2, Math.floor(hash(i, 4, 1) * bh), Math.floor(hash(i, 5, 1) * bl) - Math.floor(bl / 2), L.second);
       if (f.rivets) for (let z = -1; z <= 1; z++) v.set(-1, bh - 1, z * 2, 0x5a606a);
       if (f.key) bx(v, -1, bh, -1, -1, bh + 1, -1, 0xc8a040);
+      if (f.teeth) for (let z = 0; z < Math.ceil(bl / 2); z++) for (const x of [-bw / 2, bw / 2 - 1]) { v.set(x, Math.floor(bh / 2) - (z & 1), z, 0xf8f8f8); v.set(x, Math.floor(bh / 2) - 1 + (z & 1), z, 0x2a1a1a); }
       if (f.grooves) for (let z = 0; z < Math.ceil(bl / 2); z += 2) bx(v, -bw / 2, 0, z, bw / 2 - 1, 0, z, 0xd8d8e0);
       if (f.legs === "fish") for (const s of [-1, 1]) bx(v, mx(s, 0), -2, 0, mx(s, 0), -1, 0, 0xf8c040);
     });
@@ -1036,7 +1037,7 @@
   };
   /* bugs: a body, six legs, antennae, wings or a shell */
   BUILD.bug = (R, L, f, g, K, u) => {
-    const col = aCol(L, "body"), dome = /ladybug|beetle|stag|moto/.test(L.sp.id), w = Math.max(2, Math.round(u * 0.2) * 2), l = Math.max(3, Math.round(u * 0.45));
+    const col = aCol(L, "body"), dome = /ladybug|beetle|stag|moto/.test(L.sp.id), buzz = L.sp.id === "an-buzzbomber", w = Math.max(2, Math.round(u * 0.2) * 2), l = Math.max(3, Math.round(u * 0.45));
     const body = part(K + ":body", g, (v, gl) => {
       if (dome) rbx(v, -w / 2, 0, -Math.floor(l / 2), w / 2 - 1, Math.max(1, Math.round(w * 0.6)), Math.ceil(l / 2) - 1, (x, y, z) => { let c = col(x, y, z); if (L.sp.id === "an-ladybug" && (x === -1 || x === 0) && y > 0) c = 0x1a1a1a; if (L.sp.id === "an-beetle") c = mixC(c, 0x8ae0a0, (x + z) & 1 ? 0.2 : 0); return c; }, 2);
       else { rbx(v, -1, 0, 0, 0, 1, 1, (x, y, z) => col(x, y, z), 3); rbx(v, -w / 2, 0, -l + 1, w / 2 - 1, 1, -1, (x, y, z) => grain(f.bands && (z & 1) ? L.second : L.main, x, y, z), 3); }
@@ -1044,11 +1045,13 @@
       if (f.horn) { v.set(-1, 2, 1, mulC(L.main, 0.7)); v.set(-1, 3, 2, mulC(L.main, 0.7)); }
       if (f.wheel) for (const x of [-w / 2 - 1, w / 2]) rbx(v, x, -2, -1, x, 0, 1, 0x2a2a3a, 2);
       if (f.rivets) for (let z = -1; z <= 1; z++) v.set(-w / 2, 1, z * 2, 0x5a606a);
+      /* a Buzz Bomber: a black thorax, and the stinger's cannon under the tail, lit orange */
+      if (buzz) { bx(v, -1, 0, 0, 0, 1, 1, 0x1a1a22); bx(v, -1, -1, -l + 1, 0, -1, -l + 2, 0x3a3a44); bx(v, -1, -2, -l + 1, 0, -2, -l + 1, 0x8a909a); gl.set(-1, -3, -l + 1, 0xf08a2a); gl.set(0, -3, -l + 1, 0xf8c040); }
     });
     at(body, 0, 2, 0, g); R.inner.add(body); R.body = body;
     const head = aHead(R, L, f, g, K, 1, 2, 2, {}); at(head, 0, 2, dome ? Math.ceil(l / 2) : 2, g); R.inner.add(head); R.head = head;
     if (f.wings) for (const s of [-1, 1]) aWing(R, L, g, K, s, Math.max(3, Math.round(u * 0.45)), "clear", [s * 1, 4, -1]);
-    if (!f.wheel) for (const s of [-1, 1]) for (let i = 0; i < 3; i++) { const lg = part(`${K}:bleg${s}${i}`, g, v => { v.set(mx(s, 0), 0, 0, 0x2a2a2a); v.set(mx(s, 1), -1, 0, 0x2a2a2a); }); at(lg, s * (w / 2), 2, -1 + i, g); R.inner.add(lg); R.legs.push(lg); }
+    if (!f.wheel && !buzz) for (const s of [-1, 1]) for (let i = 0; i < 3; i++) { const lg = part(`${K}:bleg${s}${i}`, g, v => { v.set(mx(s, 0), 0, 0, 0x2a2a2a); v.set(mx(s, 1), -1, 0, 0x2a2a2a); }); at(lg, s * (w / 2), 2, -1 + i, g); R.inner.add(lg); R.legs.push(lg); }
     R.h = 7 * g; R.r = l * 0.5 * g; R.headY = 3 * g; R.gait = f.wings && !dome ? "fly" : "crawl"; R.hover = f.wings && !dome ? 0.5 : 0;
   };
   BUILD.butterfly = (R, L, f, g, K, u) => {

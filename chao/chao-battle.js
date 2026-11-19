@@ -66,6 +66,15 @@
     });
     arena.traverse(o => { if (o.isMesh) o.receiveShadow = true; });
     scene.add(arena);
+    /* the garden's ground all round the arena (voxels near, a flat field out to the fog), so the
+       keepers, the trees and the hills stand on something */
+    const ringR = (RING * 4 + 5.5) / 2;
+    const ground = M.part("arena-ground", 1 / 2, v => {
+      M.shape(v, -80, -3, -80, 80, -1, 80, (x, y, z) => { const d = Math.hypot(x, z); return d > ringR - 0.5 && d <= 79.5; },
+        (x, y, z) => y === -1 ? M.grain(M.mixC(0x4a9a3a, 0x6ab84a, M.hash(x >> 1, 0, z >> 1)), x, y, z, 0.07) : M.grain(0x7a5a3a, x, y, z, 0.06));
+    });
+    ground.traverse(o => { if (o.isMesh) o.receiveShadow = true; }); scene.add(ground);
+    const far = new THREE.Mesh(new THREE.CircleGeometry(220, 40), new THREE.MeshLambertMaterial({ color: 0x5aa040 })); far.rotation.x = -PI / 2; far.position.y = -0.03; scene.add(far);
     /* hills and trees round it, so it sits in the garden */
     const back = M.part("arena-back", 1 / 2, v => {
       for (let i = 0; i < 26; i++) { const a = i / 26 * TAU, r = 24 + (i % 3) * 2, x = Math.cos(a) * r, z = Math.sin(a) * r;

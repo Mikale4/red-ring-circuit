@@ -142,6 +142,8 @@
       for (let i = 0; i < 9; i++) { const a = i / 9 * TAU + 0.4; add(M.prop("tree", { k: i % 3 ? "fruit" : "oak", s: 0.9, seed: 20 + i }), Math.cos(a) * 9.5, 0.25, Math.sin(a) * 9.5); }
     }
     const GY = 0.25;                                              // (the top of the ground)
+    /* a field out to the fog, under everything, so no edge shows the sky below the horizon */
+    { const far = new THREE.Mesh(new THREE.CircleGeometry(260, 40), new THREE.MeshLambertMaterial({ color: 0x5aa040 })); far.rotation.x = -PI / 2; far.position.set(0, -0.6, -60); scene.add(far); }
 
     /* ================================================================ the games */
     const G = {};

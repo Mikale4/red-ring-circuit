@@ -859,6 +859,13 @@
         /* a basket of fruit */
         shape(v, 0, 0, 10, 6, 3, 16, (x, y, z) => Math.hypot(x - 3, z - 13) <= 3.2, (x, y, z) => y < 3 ? grain(((x + y + z) & 1) ? 0xc89a50 : 0xa87a3a, x, y, z, 0.05) : null);
         for (const [x, z, c] of [[2, 12, 0xffd21a], [4, 13, 0xf05a3a], [3, 14, 0x8ad84a], [2, 14, 0xffd21a]]) v.set(x, 3, z, c);
+      } else if (k === "camp") {
+        /* a badnik raiders' cage (the animals they took, inside), and a hazard post with a lamp */
+        blk(v, -6, 0, -6, 5, 0, 5, (x, y, z) => grain(0x5a606a, x, y, z, 0.05));
+        for (let i = -6; i <= 5; i += 2) for (const [x, z] of [[i, -6], [i, 5], [-6, i], [5, i]]) blk(v, x, 1, z, x, 8, z, 0x9aa0aa);
+        blk(v, -6, 9, -6, 5, 9, 5, (x, y, z) => grain(((x + z) & 3) === 0 ? 0xe8c040 : 0x5a606a, x, y, z, 0.05));
+        for (const [x, z, c] of [[-2, -1, 0x3a8ae8], [1, 1, 0xf0a0c0], [-1, 2, 0xf8f8f8]]) { blk(v, x, 1, z, x + 1, 2, z + 1, c); v.set(x, 3, z, c); }
+        blk(v, 9, 0, 0, 9, 12, 0, (x, y) => ((y >> 1) & 1) ? 0xe42630 : 0xf8f8f8); gl.set(9, 13, 0, 0xffd21a); gl.set(9, 13, 1, 0xffd21a);
       } else if (k === "sign") {
         cap(v, 0, 0, 0, 0, 8, 0, 0.6, 0.6, 0x6a4022);
         blk(v, -5, 8, -1, 5, 13, -1, (x, y) => (Math.abs(x) === 5 || y === 8 || y === 13 ? 0x6a4022 : 0xd8b070));

@@ -142,6 +142,7 @@
     const base = () => M.part("rc-base", G4, v => { for (const s of [-1, 1]) M.blk(v, s < 0 ? -60 : 18, -4, -79, s < 0 ? -18 : 59, -1, 0, (x, y, z) => y === -1 ? grass(x, y, z) : dirt(x, y, z)); });
     const hills = () => M.part("rc-hills", 1 / 2, v => { for (let i = 0; i < 4; i++) for (const s of [-1, 1]) M.ell(v, s * (30 + (i % 2) * 4), -2, -i * 10 - 5, 7 + (i % 3), 5 + (i % 2) * 3, 7, (x, y, z) => M.grain(M.mixC(0x4a9a3a, 0x6ab84a, M.hash(x >> 1, y >> 1, z >> 1)), x, y, z, 0.08)); });
     for (let z = 20; z > C.endZ - 30; z -= 20) { add(base(), 0, 0, z); add(hills(), 0, 0, z); }
+    { const far = new THREE.Mesh(new THREE.CircleGeometry(320, 40), new THREE.MeshLambertMaterial({ color: 0x5aa040 })); far.rotation.x = -PI / 2; far.position.set(0, -1.05, C.endZ / 2); scene.add(far); }
     for (let i = 0, z = 6; z > C.endZ - 10; i++, z -= 9) for (const s of [-1, 1]) if ((i + (s > 0)) % 2 === 0) add(M.prop("tree", { k: i % 3 ? "oak" : "fruit", s: 1, seed: i * 2 + (s > 0) }), s * rnd(6.5, 9), 0, z);
     const arch = (key, cols) => M.part("rc-arch:" + key, 1 / 6, v => {
       for (const x of [-34, 33]) M.blk(v, x, 0, -1, x + 1, 22, 0, (xx, y, zz) => M.grain(0xf0f0e8, xx, y, zz, 0.03));

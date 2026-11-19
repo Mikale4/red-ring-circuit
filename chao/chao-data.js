@@ -359,12 +359,17 @@
     ["mechbear", "Tin Bear", "quad", 1.0, [0x8a909a, 0xe8c040, 0x6a707a], "ears:round,rivets", C, "pow", 4],
     ["mechfish", "Wind-up Fish", "fish", 0.45, [0xf8c040, 0xd83a2a, 0xf8e080], "rivets,key", C, "agi", 3],
     ["moto", "Motobug", "bug", 0.55, [0xd83a2a, 0x3a3a4a, 0x8a909a], "wheel,antennae,rivets", C, "vel", 4],
+    // Eggman's badniks, as the raids on the gardens bring them (Sonic 1's own): beaten, and set right
+    ["buzzbomber", "Buzz Bomber", "bug", 0.75, [0x1f78d8, 0x8ac8f8, 0xd8e0e8], "wings,antennae,rivets,bands", C, "agi", 4],
+    ["crabmeat", "Crabmeat", "crab", 0.9, [0xe0302a, 0xc8ccd8, 0xf4f4f4], "claws,rivets", C, "pow", 4],
+    ["chopper", "Chopper", "fish", 0.7, [0xd83a2a, 0xc8ccd8, 0xf4f4f4], "rivets,teeth,fin:back,round", C, "vel", 4],
   ];
   const ANIMALS = A.map(([id, name, plan, size, cols, feat, region, lean, rarity, classic]) => ({
     id: "an-" + id, kind: "animal", name, plan, size, cols, region, lean, rarity: rarity || 1, classic: !!classic,
     feat: Object.fromEntries(String(feat || "").split(",").filter(Boolean).map(f => { const [k, v] = f.split(":"); return [k, v == null ? true : v]; })),
     text: "", how: classic ? "Freed from one of Eggman's badniks out in the zones: each one freed counts toward an egg." : "",
   }));
+  for (const a of ANIMALS) if (["an-moto", "an-buzzbomber", "an-crabmeat", "an-chopper"].includes(a.id)) { a.badnik = true; a.how = "One of Eggman's badniks, beaten in the raids on the gardens and set right by Doctor Nell Voss."; }
 
   /* ---------------------------------------------------------------- techniques
      What a creature can do in a fight: a kind (strike, special, guard, support, team), the
