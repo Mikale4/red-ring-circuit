@@ -68,6 +68,37 @@ Snowfield, Nakayama Grand Jump and Red Rock Quarry, and Seaside Camp went (the c
 seaside now). The old stages' text is kept outside the project, in the extras folder. The
 last seven are new: each opens when the one before it is cleared (its boss beaten).
 
+**Seabreeze Cape in Sonic Advance's own art** (2026-11-19, the first zone to leave the voxels).
+It is drawn in Neo Green Hill Zone's art, Sonic Advance's first zone, which is the same place:
+a tropical beach, palms, checkered soil, the sea, the Egg Hammer Tank. `tools/pack-zones.py`
+cuts the pieces from the rips into `assets/zones/cape.png` (32 pixels to a one-metre tile, the
+runners' own size) and `cape-bg.png`, and writes `adventure-zoneart.js`; adventure.js lays them
+(`artChunk`). How they go together comes from the maps of both Acts (Sonic Retro's raw maps;
+TerraEsperZ's on vgmaps.de): each tile's piece is chosen by which of its sides are open, so
+grass covers an open top, a cliff's left face is lit and its right face shaded, a floating mass
+has a ragged underside, and the soil stands in pillars with a seam down between them. Slopes
+carry the hill's own grass down them, and now and then the soil has Neo Green Hill's carved
+octagon. The stages start on the beach, sand with palms and parasols, as Act 1 does (Act 2
+picks up on the grass). The grass has palms, sunflowers, little flowers, hedges in flower and
+boulders on it, kept clear of anything that stands on the ground. Ledges are the beach's
+boardwalk, its deck on posts with a brace and a railing at its ends, cut from the map where it
+stands assembled. Water is the soil seen blue through it. Breakable rock and the stepping
+stones are Sonic Advance 3's stone blocks; crumbling ledges and moving platforms are Neo Green
+Hill's floating ground. Loops and corkscrews are its soil and paved kerb, drawn round the ride.
+Geysers are its falling water and spray. The zip line is its wooden posts, Sunset Hill's chain
+and anchor block (Sonic Advance 3) and Neo Green Hill's red grab bar. Behind is Neo Green
+Hill's own sky and sea, at the ground's pixel size: the clouds drift left, the sea's rows slide
+faster the lower they are, and its ripples cycle through their four sets of blues as on the
+GBA. The rings, springs, Star Posts and goal post are Sonic Advance's, the dash panels and
+spikes Sonic Advance 3's. The goal spins and stops on Sonic's V, or on the winner's own face.
+The art is SEGA's, Sonic Team's and Dimps'. The tile rip is Techokami's (holenet.info, credit
+asked: SEGA, Dimps and Techokami). The sheets are from The Spriters Resource: Neo Green Hill's
+objects, Sonic Advance 3's common objects and Sunset Hill's objects by Flare; its background by
+Paratiritis; the springs by Ice; the goal post by DJ Coco (its V frame from the Android
+version, by Tailikku); the rings and Star Posts by DanielSidney. Still in voxels on the cape:
+crates and conveyor belts (the story stage's), the Red Star Rings, the freed animals and the
+current's streaks. The other twelve zones are still voxels.
+
 **Zones, Acts and bosses.** The classic games (Sonic Retro, the Sonic Wiki, Wikipedia):
 Sonic 1's zones are three Acts with the boss at the end of the third; Sonic 2's and Sonic 3 &
 Knuckles' two, the boss ending Act 2 (S3&K has a mini-boss end Act 1 too). Sonic Advance has
