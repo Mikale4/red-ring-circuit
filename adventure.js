@@ -524,6 +524,9 @@
   /** Which frame `t` seconds into a run of `n` frames: looping, or held on the last. */
   const frameAt = (n, t, fps, loop) => { const i = Math.floor(t * fps); return loop ? i % n : Math.min(i, n - 1); };
   /** Show frame `i` of `name` on a card, facing `face`, its feet (or its middle) at x, y, `k` times size. */
+  /* which frame each runner hangs from a cable by: an arm up to the grip where its sheet has one
+     (most jumps start so), else its arms out as it falls; Gamma on his jets, Eggman in the Egg Mobile */
+  const ZIP_HANG = { tails: ["fall", 2], amy: ["fall", 1], rouge: ["fall", 1], shadow: ["fall", 3], cream: ["fall", 3], mighty: ["fall", 3], silver: ["fall", 2] };
   function setFrame(mesh, name, i, face, x, y, mid, z, k) {
     k = k || 1;
     const who = mesh.userData.who, A = SHEETS[who], list = A.f[name] || A.f.idle;
@@ -5515,10 +5518,20 @@
       const geo = z.k === "lowg" ? new THREE.BoxGeometry(0.09, 0.09, 0.09) : new THREE.BoxGeometry(z.k === "wind" ? 1.6 : 0.8, 0.05, 0.05);
       const mat = glow(z.k === "current" ? 0xe8f8ff : z.k === "wind" ? 0xffffff : 0xfff6c0, z.k === "wind" ? 0.45 : 0.7);
       for (let k = 0; k < n; k++) { const m = new THREE.Mesh(geo, mat); m.position.set(z.x0 + Math.random() * (z.x1 - z.x0), z.y0 + Math.random() * (z.y1 - z.y0), z.k === "wind" ? 0.6 : 0.35); group.add(m); z.bits.push(m); }
-    } else if (z.k === "geyser") {                                   // a vent, and its spout
-      const v = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.3, 1.2), lamb(0x3a3430)); v.position.set(z.x, z.y + 0.15, -0.1); group.add(v);
-      z.col = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.75, 1, 10, 1, true), glow(z.c || T.geyser || 0xd8f4ff, 0.42));
-      z.col.renderOrder = 4; z.col.visible = false; group.add(z.col);
+    } else if (z.k === "geyser") {                                   // a vent in the rock, and its spout: chunks of water (or fire, steam...) going up, foam bursting off the top
+      const rock = lamb(0x3a3430), rim = lamb(0x5a524a);
+      const v = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.25, 1.3), rock); v.position.set(z.x, z.y + 0.12, -0.1); group.add(v);
+      for (const [dx, w2] of [[-0.62, 0.36], [0.62, 0.36]]) { const r = new THREE.Mesh(new THREE.BoxGeometry(w2, 0.45, 1.3), rim); r.position.set(z.x + dx, z.y + 0.22, -0.1); group.add(r); }
+      const hex = z.c || T.geyser || 0xbfe8ff, c = new THREE.Color(hex), box = new THREE.BoxGeometry(1, 1, 1);
+      const see = (h, op) => new THREE.MeshLambertMaterial({ color: h, transparent: true, opacity: op, depthWrite: false });
+      const air = hex === 0xffffff || hex === 0xdddddd, water = !air && c.b > 0.75 && c.b >= c.r && c.g > 0.7;   // (a fan's air or steam: puffs; water: blue and white; fire, lava, plasma: its own colours)
+      let mats, foam, core = null;
+      if (air) { mats = [see(0xffffff, 0.55), see(0xeef4f8, 0.45), see(hex, 0.4)]; foam = see(0xffffff, 0.5); }
+      else if (water) { mats = [lamb(0xffffff), see(0x9fdcff, 0.92), see(0x4fb4ec, 0.88)]; foam = lamb(0xffffff); core = see(0x7fcaf4, 0.5); }
+      else { const light = c.clone().lerp(new THREE.Color(0xffffff), 0.55), deep = c.clone().multiplyScalar(0.75); mats = [lamb(light.getHex()), lamb(hex), lamb(deep.getHex())]; foam = lamb(light.getHex()); core = see(hex, 0.45); }
+      if (core) { z.core = new THREE.Mesh(box, core); z.core.visible = false; z.core.renderOrder = 3; group.add(z.core); }   // (the stream itself, the chunks tumbling round it)
+      z.blobs = []; for (let k = 0; k < 16; k++) { const m = new THREE.Mesh(box, mats[k % 3]); m.visible = false; m.renderOrder = 4; group.add(m); z.blobs.push(m); }
+      z.crown = []; for (let k = 0; k < 7; k++) { const m = new THREE.Mesh(box, k % 2 ? foam : mats[0]); m.visible = false; m.renderOrder = 4; group.add(m); z.crown.push(m); }
     } else if (z.k === "devil") {                                    // a funnel of dust, turning
       z.rings = [];
       for (let k = 0; k < 7; k++) { const m = new THREE.Mesh(new THREE.TorusGeometry(0.35 + k * 0.17, 0.06, 5, 14), glow(z.c || 0xe0c090, 0.5)); m.rotation.x = PI / 2; m.renderOrder = 4; group.add(m); z.rings.push(m); }
@@ -5535,9 +5548,27 @@
         if (m.position.x > z.x1) m.position.x = z.x0; else if (m.position.x < z.x0) m.position.x = z.x1;
       }
       if (z.k === "geyser") {
-        const on = geyserOn(z, w.t);
-        z.col.visible = on; if (on) { const h = z.h * (0.9 + Math.sin(w.t * 30) * 0.05); z.col.scale.set(1, h, 1); z.col.position.set(z.x, z.y + h / 2, 0); }
-        if (on && Math.abs(z.x - camX) < 20 && Math.random() < 0.6) burst(z.x, z.y + z.h * Math.random(), [0xffffff, z.c || 0xd8f4ff], 1, 3);
+        const on = geyserOn(z, w.t), per = z.on + z.off, ph = (((w.t + (z.ph || 0)) % per) + per) % per, warn = !on && ph > per - 0.45;
+        const h = z.h * (0.94 + Math.sin(w.t * 23) * 0.04), n = z.blobs.length;
+        if (z.core) { z.core.visible = on; if (on) { z.core.scale.set(0.62 + Math.sin(w.t * 31) * 0.05, h, 0.5); z.core.position.set(z.x, z.y + h / 2, 0); } }
+        z.blobs.forEach((m, k) => {
+          if (on) {                                        // the column: chunks rising through it, wider and looser toward the top
+            const f = (w.t * 1.9 + k / n) % 1, s = 0.55 + 0.55 * f + 0.12 * Math.sin(w.t * 17 + k * 2.3);
+            m.visible = true; m.scale.set(s, 0.5 + 0.35 * f, s * 0.8);
+            m.position.set(z.x + Math.sin(w.t * 11 + k * 1.7) * (0.06 + 0.16 * f), z.y + 0.3 + f * (h - 0.6), 0.05 + (k % 3) * 0.04);
+            m.rotation.z = Math.sin(w.t * 7 + k) * 0.25 * f;
+          } else if (warn && k < 3) {                      // about to go: a gurgle in the vent
+            m.visible = true; const s = 0.28 + 0.12 * Math.sin(w.t * 26 + k * 2); m.scale.set(s, s, s);
+            m.position.set(z.x + (k - 1) * 0.3, z.y + 0.35 + Math.abs(Math.sin(w.t * 19 + k * 1.3)) * 0.35, 0.05); m.rotation.z = 0;
+          } else m.visible = false;
+        });
+        z.crown.forEach((m, k) => {                        // the crown: foam bursting out round the top and falling away
+          m.visible = on; if (!on) return;
+          const a = (k / z.crown.length) * PI * 2 + w.t * 1.3, f = (w.t * 1.6 + k * 0.37) % 1, s = 0.42 + 0.3 * (1 - f);
+          m.scale.set(s, s, s); m.rotation.z = w.t * 3 + k;
+          m.position.set(z.x + Math.cos(a) * (0.45 + 0.9 * f), z.y + h + 0.15 + Math.sin(f * PI) * 0.7 - f * f * 0.9, 0.05 + Math.sin(a) * 0.3);
+        });
+        if (on && Math.abs(z.x - camX) < 20 && Math.random() < 0.5) burst(z.x + (Math.random() - 0.5) * 1.6, z.y + h + 0.3, [0xffffff, z.c || 0xd8f4ff], 1, 3);   // (spray off the top)
       } else if (z.k === "devil") {
         const x = devilX(z, w.t);
         z.rings.forEach((m, k) => { m.position.set(x + Math.sin(w.t * 6 + k) * 0.12 * k, z.y + 0.3 + k * (z.h / 7), 0.2); m.rotation.z = w.t * (8 + k); });
@@ -6054,7 +6085,10 @@
       case "jet": name = "jet"; fps = 14; break;
       case "ride": {                                       // carried: hanging from a cable, crouched on a rail, or a ball (a loop, a pipe, a cannon)
         const k = p.ride && p.ride.R.k, ball = framesOf(id, "spin") ? "spin" : framesOf(id, "fly") ? "fly" : "jump";   // (no ball for Gamma or Eggman: flying, or a jump)
-        if (k === "zip") { name = framesOf(id, "jump") ? "jump" : "idle"; loop = false; }
+        if (k === "zip") {                                 // hanging from the cable: one pose all the way down, an arm up to the grip (or both out)
+          const h = ZIP_HANG[id] || ["jump", 0];
+          name = framesOf(id, h[0]) ? h[0] : framesOf(id, "jump") ? "jump" : "idle"; const hi = h[1]; pick = () => Math.min(hi, count(name) - 1);
+        }
         else if ((k === "loop" || k === "cork") && framesOf(id, "run")) { name = "run"; fps = 22; face = 1; spin = Math.atan2(p.vy, p.vx); }   // (a corkscrew too: along it on its feet, leaning with it)   // (round a loop on its feet, as Sonic does: up the side, over the top upside down)
         else if (k === "rail" && framesOf(id, "land")) { name = "land"; const L = framesOf(id, "land"); let kk = 0; L.forEach((f, j) => { if (f[3] < L[kk][3]) kk = j; }); pick = () => kk; }
         else { name = ball; fps = 24; }
@@ -6107,6 +6141,15 @@
        drawn from the jets' tips, which are longer in some than others) */
     const jets = id === "eggman" && /^(fly|jump|fall)$/.test(name) ? -((framesOf(id, name)[i] || [0, 0, 0, 36])[3] - 36) * PX : 0;
     setFrame(p.spr, name, i, face, p.x, p.y + lift + jets);
+    /* on a cable: its grip in the runner's hand, on a strap from the cable, carried down with them */
+    const zipR = p.state === "ride" && p.ride && p.ride.R.k === "zip" ? p.ride.R : null;
+    if (zipR && !p.grip && p.spr.parent) {
+      p.grip = new THREE.Group();
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 0.12), zipR.handle ? zipR.handle.material : lamb(0xffd23a)); bar.position.set(0, -1.05, 0.14);
+      const strap = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.05, 0.06), lamb(0x2a2a30)); strap.position.set(0, -0.52, 0.1);
+      p.grip.add(bar, strap); p.spr.parent.add(p.grip);
+    }
+    if (p.grip) { p.grip.visible = !!zipR && p.spr.visible !== false; if (zipR) p.grip.position.set(p.x, p.y + 2.2, 0); }
     if (spin) {                                                     // (turned about its feet)
       const dx = p.spr.position.x - p.x, dy = p.spr.position.y - p.y, cs = Math.cos(spin), sn = Math.sin(spin);
       p.spr.position.x = p.x + dx * cs - dy * sn; p.spr.position.y = p.y + dx * sn + dy * cs;
