@@ -38,7 +38,7 @@ request. The credits for every sprite sheet, track and sound are below.
 | `voxkit.js` | The voxel grid and AO mesher (from Post Parade's race renderer). |
 | `settings.js`, `icons.js` | The settings (music, sound, dialogue speed, shake) and the interface's icons. |
 | `theme.css`, `game.css` | The base styles (from Post Parade) and the game's own Sonic look. |
-| `chao/` | The Chao Garden (loaded when it's first opened): `chao-data.js` (every Chao form and animal species, the attributes, temperaments, techniques, food and toys), `chao-life.js` (a creature's genes, growth, care, friendships, breeding), `chao-models.js` (the voxel Chao, animals, the keeper and the garden's things), `chao-world.js` (the land), `chao.js` (the mode), `chao.css`. |
+| `chao/` | The Chao Garden (loaded when it's first opened): `chao-data.js` (every Chao form and animal species, the attributes, temperaments, techniques, food and toys), `chao-life.js` (a creature's genes, growth, care, friendships, breeding), `chao-models.js` (the voxel Chao, animals, the keeper and the garden's things), `chao-world.js` (the seven gardens' land and buildings), `chao-battle.js` (duels), `chao-train.js` (the training ground's games), `chao-race.js` (the races), `chao.js` (the mode), `chao.css`. |
 | `audio/` | The music (the Sonic soundtracks below, at 96 kbps; the grand prix's, Mario Kart 64's, `mk64-*`, at 128) and `audio/sfx/`, the sound effects. |
 | `tools/` | Local only (not in the repository): the stage generator, the packers, the validator, the source art. |
 
@@ -253,9 +253,9 @@ attire and its colour, bottoms and glasses, each a row of words or swatches, the
 beside them as you pick (up and down between rows, left and right through each). Hazel, the garden's warden, meets you at the Garden Hall with two Chao
 eggs and a Flicky's. The Central Garden is half-metre voxels: the hall and its plaza with the
 fountain, the orchard of fruit trees, the flower meadow, the pond under the waterfall cliff
-(stepping stones to the palm island), a ramp up the cliff, and gates round the rim to the other
-gardens (Tropical, Forest, Mountain, Mystic, Mechanical, and the Sky Garden's balloon), which
-open in later visits. Walk with the arrows (Shift runs, Space jumps); Z picks up and uses (an
+(stepping stones to the palm island), a ramp up the cliff, the training ground's fenced yard, and
+gates round the rim to the other gardens (Tropical, Forest, Mountain, Mystic, Mechanical, and the
+Sky Garden's balloon), which open as you get on. The clock reads in 12-hour time. Walk with the arrows (Shift runs, Space jumps); Z picks up and uses (an
 egg, a fruit, a toy, a creature; shakes a tree; the mailbox, the encyclopedias, the hall), C pets
 (or cuddles what you hold, or rubs an egg warm), X throws what you hold or whistles the fond ones
 over, V looks closer; Q and E or a drag turn the camera, the wheel zooms; Enter is the menu. A
@@ -318,8 +318,47 @@ by side hit harder and cover each other; the front row takes the blows. Keepers 
 visit the hall, a different one each day with their own kinds of team (a forest ranger, a sea
 captain, a Chao researcher, two village children, an old gardener, someone who only comes after
 dark, a coach, a bird-watcher); what each creature did in a fight it gets better at, and fighting
-side by side makes friends. The other gardens, races and training, the shop and quests come in
-the stages after this one.
+side by side makes friends.
+
+**The gardens.** Six more round the Central Garden, each a map of its own with its own ground,
+sky, music and folk: the Tropical Garden (beach, palms and a pier), the Forest Garden (deep woods
+and a dojo), the Mountain Garden (cliffs, a frozen lake, a cave dojo), the Mystic Garden (ruins
+round a sunken court, the league's old arena), the Mechanical Garden (pipes, a lab and its dojo)
+and the Sky Garden (islands in the air, an observatory). Their gates open as you get on: a bridge
+mended once a Chao has changed, fallen trees cleared once four creatures live with you, a pass
+for a keeper who has won a duel, a stone door for one whose creatures have had an egg, a lift
+with eight in your care (or three eggs from the zones), and the balloon once the other five are
+open. What you carry comes through; the creatures in the other gardens live on there, and each
+garden trains them a little just by living in it. The folk keep hours, open in the day.
+
+**The training ground.** Seven games in the Central Garden's yard, one for each attribute,
+played with one of your creatures in a little scene of its own: Dash Lane (Velocity, left and
+right in turn), Hurdle Run (Agility, jump and duck), Rock Smash (Power, strike in the gold),
+Ball Machine (Resilience, block from three sides), Long Swim (Vitality, stroke on the beat),
+Fruit Catch (Instinct, read the shadows) and Drive Echo (Chaos, play the tune back). You do the
+timing; a stronger creature gets a wider window, a longer jump, a slower show. It grows by how
+well it went, graded S to D, three goes a day, and the best of each is kept on the board. Enter
+starts and pauses, X backs out.
+
+**The races.** Through the hall to the track: eight courses (the Daisy Run, then Ripple, Dash,
+Cliffside, Breeze, Hedge, Spark and the Grand Race), each in Bronze, Silver and Gold classes,
+eight Chao a race. Running is Velocity, swimming Resilience and Vitality, the climbing walls
+Power, gliding off them Agility, the hedge of doors Instinct, the Chaos pads Chaos, and stamina
+Vitality. The race runs itself; you cheer, three times a race, best spent when yours stops to
+watch a butterfly or nods off. Ribbons, rings, records; a class won opens the next one up.
+
+**Dojos, the league and the shop.** Three dojo masters (Forest, Mountain, Mechanical) train two
+attributes for rings, or set a trial of three duels for their seal and a technique taught nowhere
+else. The Garden League's commissioner runs five cups in the Mystic Garden's arena; the
+Champion's Cup gives a silver egg. Pip's shop by the hall sells fruit, Chaos Drives, toys, eggs
+of each line, and more room for the garden.
+
+**The badnik raids and the notice board.** A light story: Eggman's badniks (Sonic 1's own:
+Motobugs, Buzz Bombers, Crabmeats, Choppers) have been raiding the gardens. Each raid is told by
+the garden's folk when its garden is open; a cage appears there with its badniks round it, and a
+duel frees the animals inside. The last is Eggman's beacon in the Mechanical Garden, and Doctor
+Nell sets a badnik of each kind right for you. The hall's notice board holds the folk's fifteen
+requests, paid out when done, and Wren sends a gift for every so many kinds in the encyclopedias.
 
 **Story** is *The Red Star Rings*, told the way Sonic Battle tells its story: one plot, an
 episode for each of the fourteen. Eggman means to set every Red Star Ring in his Star Engine
