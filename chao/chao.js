@@ -333,7 +333,9 @@
     const s = (e.c.genes.size || 1) * (two("giant") ? 1.35 : two("tiny") ? 0.7 : 1) * (e.c.kind === "animal" ? lerp(0.55, 1, clamp(e.c.grown || 0, 0, 1)) : 1);
     e.rig.g.scale.setScalar(s);
   }
-  const isFlier = e => e.rig.gait === "fly" || e.rig.gait === "bird" && e.task && e.task.fly;
+  const isFlier = e => e.rig.gait === "fly" || (e.alt || 0) > 0.6;
+  /* a winged animal that takes off and lands (the always-airborne -- bees, bats -- just fly) */
+  const canFly = e => { const H = e.rig.habits || {}; return e.rig.gait !== "fly" && (H.fly || 0) > 0 && !!(e.rig.wings && e.rig.wings.length); };
   function groundFor(e, x, z) {
     const W = G.W, g = W.smooth(x, z), w = W.waterAt(x, z), st = W.standAt(x, z);
     if (st != null && st > g) return st;
@@ -346,7 +348,7 @@
   function canStand(e, x, z) {
     const W = G.W, r = (e.rig.r || 0.25) * 0.6;
     if (Math.hypot(x, z) > ((G.W.RG && G.W.RG.radius) || 44)) return false;
-    if (e.rig.gait === "fly") return !W.blocked(x, z, r) || true;
+    if (e.rig.gait === "fly" || (e.alt || 0) > 0.3) return true;                   // (in the air: over water, past the trunks)
     const dep = W.depth(x, z), st = W.standAt(x, z);
     if (e.rig.aquatic) return dep > 0.35;
     if (dep > 0.4 && st == null && !(e.c.kind === "chao" || e.rig.swims)) return false;
@@ -356,8 +358,11 @@
   function think(e) {
     const c = e.c, D = G.D, L = G.L, T1 = D.TEMPERS[c.genes.temper[0]], T2 = D.TEMPERS[c.genes.temper[1]];
     const night = isNight(), tr = L.traitsOf(c), has = id => c.genes.traits.includes(id);
-    if (c.care.food < 30 && !e.rig.aquatic && !(e.fails >= 2)) return task(e, "eat");
-    if (c.care.energy < 18 || (night && !has("night") && Math.random() < (has("early") ? 0.8 : 0.45)) || (has("sleepy") && Math.random() < 0.08)) return task(e, "sleep");
+    const H = e.rig.habits || {};
+    if (c.care.food < 30 && !e.rig.aquatic && !(e.fails >= 2)) return task(e, H.graze ? "graze" : "eat");
+    /* (a night animal sleeps the day away, and is about in the dark) */
+    const sleepy = H.night ? !night && Math.random() < 0.55 : night && !has("night") && Math.random() < (has("early") ? 0.8 : 0.45);
+    if (c.care.energy < 18 || sleepy || (has("sleepy") && Math.random() < 0.08)) return task(e, "sleep");
     if (c.care.food < 22 && (e.fails || 0) >= 2 && G.keeper) { e.fails = 0; return task(e, "beg"); }
     const w = { wander: 1.2, rest: 0.7, social: 0.9, play: 0.6, explore: 0.4, run: 0.3, watch: 0.4, follow: 0.25 };
     for (const [T, k] of [[T1, 1], [T2, 0.5]]) for (const a in T.day) w[a] = (w[a] || 0) + T.day[a] * k;
@@ -368,8 +373,18 @@
     if (G.keeper && Math.hypot(G.keeper.x - e.x, G.keeper.z - e.z) < 6 && c.bond < 30 && w.hide) w.hide *= 2.5;
     if (!G.items.some(i => i.kind === "toy")) w.play *= 0.6;
     if (e.rig.aquatic) return task(e, "swim");
-    if (e.rig.gait === "fly" || e.rig.gait === "bird") w.fly = 1.4;
-    if (c.kind === "animal") { w.spar = (w.spar || 0) * 0.4; w.music = 0; w.tease = (w.tease || 0) * 0.5; }
+    if (e.rig.gait === "fly") w.fly = 1.4;
+    if (c.kind === "animal") {
+      w.spar = (w.spar || 0) * 0.4; w.music = 0; w.tease = (w.tease || 0) * 0.5;
+      /* its kind's own ways: fliers fly, swimmers swim, grazers graze, a herd keeps together */
+      if (canFly(e)) w.fly = 1.4 * H.fly;
+      if (H.swim) w.swim = (w.swim || 0) + 1.5;
+      if (H.graze) w.graze = 1.0;
+      if (H.herd) w.social = (w.social || 0) * 0.6;
+      if (H.likes === "water" && !H.swim) w.rest += 0.4;
+      if (H.sentinel) w.watch = (w.watch || 0) + 0.8;
+      if (!e.rig.swims && !H.swim) w.swim = 0;
+    }
     if (c.care.mood < 25) w.rest += 1;
     /* the keeper's decor: something to do at it, more the more there is (and the sadder it is) */
     const usable = (G.decor || []).filter(o => o.D.use && o.D.use !== "sleep" && !busyBy(o) && Math.hypot(o.d.x - e.x, o.d.z - e.z) < 42);
@@ -377,18 +392,33 @@
     return task(e, pickW(w));
   }
   function task(e, k, o) {
-    const W = G.W, c = e.c, places = W.places, like = c.genes.likes.place;
+    const W = G.W, c = e.c, places = W.places, H = e.rig.habits || {};
+    /* where it likes to be: its kind's place most of the time (a duck the water, a squirrel the trees), else its own */
+    const like = H.likes && Math.random() < 0.6 ? (H.likes === "water" && !H.swim && !e.rig.swims ? "shore" : H.likes) : c.genes.likes.place;
     const T = e.task = Object.assign({ k, t: 0, until: rnd(6, 12) }, o || {});
     const go = (p) => { if (p) { T.x = p[0]; T.z = p[1]; } };
     const near = (r) => { for (let i = 0; i < 10; i++) { const a = rnd(0, TAU), d = rnd(2, r), x = e.x + Math.cos(a) * d, z = e.z + Math.sin(a) * d; if (canStand(e, x, z)) return [x, z]; } return null; };
-    if (k === "wander") go(Math.random() < 0.3 && places[like] ? places[like]() : near(c.genes.temper.includes("adventurous") ? 22 : 9));
-    else if (k === "explore") { go(places.any()); T.until = 30; }
-    else if (k === "run") { go(places.any()); T.until = 24; T.fast = true; T.laps = 3; }
-    else if (k === "rest" || k === "watch") { go(Math.random() < 0.5 && places[like] ? places[like]() : near(5)); T.sit = rnd(8, 15); }
+    const herdMate = () => { const m = G.ents.filter(o => o !== e && o.c.kind === "animal" && (o.c.sp === c.sp || (H.herd && (o.rig.habits || {}).herd && o.sp.plan === e.sp.plan)) && Math.hypot(o.x - e.x, o.z - e.z) < 28).sort((a, b) => Math.hypot(a.x - e.x, a.z - e.z) - Math.hypot(b.x - e.x, b.z - e.z))[0]; if (!m) return null; const a = rnd(0, TAU), d = rnd(1.4, 3); return [m.x + Math.cos(a) * d, m.z + Math.sin(a) * d]; };
+    const flyThere = () => { if (canFly(e) && T.x != null && Math.hypot(T.x - e.x, T.z - e.z) > 8 && Math.random() < Math.min(0.85, 0.35 * H.fly + 0.2)) T.fly = true; };
+    if (k === "wander") { go(H.herd && Math.random() < 0.65 && herdMate() || (Math.random() < 0.35 && places[like] ? places[like]() : near(c.genes.temper.includes("adventurous") ? 22 : 9))); flyThere(); }
+    else if (k === "graze") { go(H.herd && Math.random() < 0.6 && herdMate() || near(5)); T.sit = rnd(6, 12); T.until = 30; }
+    else if (k === "explore") { go(places.any()); T.until = 30; flyThere(); }
+    else if (k === "run") { go(places.any()); T.until = 24; T.fast = true; T.laps = 3; flyThere(); }
+    else if (k === "rest" || k === "watch") {
+      T.sit = rnd(8, 15);
+      /* a bird rests up in a tree; a wader stands in the shallows; a meerkat stands to keep watch */
+      const tr = H.perch && canFly(e) && Math.random() < 0.55 && W.trees.length ? W.trees.filter(t => Math.hypot(t.x - e.x, t.z - e.z) < 30)[Math.floor(Math.random() * 6)] : null;
+      if (tr) { T.perch = tr; T.fly = true; go([tr.x + rnd(-0.3, 0.3), tr.z + rnd(-0.3, 0.3)]); T.perchH = 1.9 * (tr.s || 1) + 0.4; T.sit = rnd(12, 24); T.until = 40; }
+      else if (H.wade) { go(places.shore()); T.stand = true; }
+      else { go(Math.random() < 0.5 && places[like] ? places[like]() : near(5)); if (H.sentinel) T.stand = true; }
+      flyThere();
+    }
     else if (k === "sleep") {
       /* a free nest nearby, if the keeper has set any out; else where it likes */
       const nest = (G.decor || []).filter(o => o.d.id === "nest" && !busyBy(o) && Math.hypot(o.d.x - e.x, o.d.z - e.z) < 30).sort((a, b) => Math.hypot(a.d.x - e.x, a.d.z - e.z) - Math.hypot(b.d.x - e.x, b.d.z - e.z))[0];
-      if (nest && !e.rig.aquatic) { T.nest = nest; go([nest.d.x, nest.d.z]); } else go(places[like] && like !== "water" ? places[like]() : near(6));
+      const roost = H.perch && canFly(e) && Math.random() < 0.7 && W.trees.length ? W.trees.filter(t => Math.hypot(t.x - e.x, t.z - e.z) < 30)[Math.floor(Math.random() * 5)] : null;
+      if (roost) { T.perch = roost; T.fly = true; T.perchH = 1.9 * (roost.s || 1) + 0.4; go([roost.x + rnd(-0.3, 0.3), roost.z + rnd(-0.3, 0.3)]); }
+      else if (nest && !e.rig.aquatic) { T.nest = nest; go([nest.d.x, nest.d.z]); } else go(places[like] && like !== "water" ? places[like]() : near(6));
       T.until = 999;
     }
     else if (k === "decor") {
@@ -479,8 +509,13 @@
       else if (T.item) { eatItem(e, T.item); return; }
       else if (T.tree) { st = "idle"; e.a += angTo(e.a, Math.atan2(T.tree.x - e.x, T.tree.z - e.z)) * Math.min(1, dt * 4); if ((T.w = (T.w || 0) + dt) > 2.2) { const f = G.W.shake(T.tree); if (f) { const it = dropFruit(f); it.claim = e; T.item = it; T.tree = null; T.x = it.x; T.z = it.z; } else { e.task = null; } } }
     }
-    else if (K === "sleep") {
+    else if (K === "graze") {
+      /* head down in the grass, a few mouthfuls, a step on */
       if (T.x != null && !T.down && !steer(e, T.x, T.z, dt)) st = "walk";
+      else { T.down = true; T.sit -= dt; st = "eat"; c.care.food = clamp(c.care.food + dt * 1.4, 0, 100); if (T.sit <= 0) e.task = null; }
+    }
+    else if (K === "sleep") {
+      if (T.x != null && !T.down && !steer(e, T.x, T.z, dt, T.fly)) st = T.fly ? "fly" : "walk";
       else {
         T.down = true; st = "sleep"; if (Math.random() < dt * 0.3) floatText(e, "z", 0xb8d4ff, true);
         if (T.nest) { c.care.energy = clamp(c.care.energy + dt * 1.2, 0, 100); c.care.mood = clamp(c.care.mood + dt * 0.1, 0, 100); }    // (a nest: twice as restful)
@@ -504,9 +539,9 @@
       }
     }
     else if (K === "rest" || K === "watch" || K === "hide" || K === "music") {
-      if (T.x != null && !T.down && !steer(e, T.x, T.z, dt)) st = "walk";
+      if (T.x != null && !T.down && !steer(e, T.x, T.z, dt, T.fly)) st = T.fly ? "fly" : "walk";
       else {
-        T.down = true; T.sit -= dt; st = K === "music" ? "dance" : "sit";
+        T.down = true; T.sit -= dt; st = K === "music" ? "dance" : T.stand ? "idle" : "sit";
         practise(e, K === "watch" ? "ins" : K === "music" ? "cha" : K === "hide" ? "agi" : "vit", dt * 1.1);
         if (K === "music" && Math.random() < dt * 0.8) { G.M.emote(e.rig, "note"); e.bub = 1.2; for (const o of G.ents) if (o !== e && o.task && (o.task.k === "wander" || o.task.k === "rest") && Math.hypot(o.x - e.x, o.z - e.z) < 8) { task(o, "watch", { x: e.x + rnd(-2, 2), z: e.z + rnd(-2, 2), sit: 8 }); G.L.meet(e.c, o.c, "share", 0.5); } }
         if (T.sit <= 0) e.task = null;
@@ -519,7 +554,7 @@
     }
     else if (K === "fly") { if (!steer(e, T.x, T.z, dt, true)) st = "fly"; else e.task = null; practise(e, "agi", dt * 1.6); }
     else if (K === "run" || K === "explore" || K === "wander") {
-      if (!steer(e, T.x, T.z, dt, T.fast)) { st = T.fast ? "run" : "walk"; if (T.fast) practise(e, "vel", dt * 2.4); else practise(e, K === "explore" ? "ins" : "vit", dt * 0.8); }
+      if (!steer(e, T.x, T.z, dt, T.fast || T.fly)) { st = T.fly ? "fly" : T.fast ? "run" : "walk"; if (T.fly) practise(e, "agi", dt * 1.2); else if (T.fast) practise(e, "vel", dt * 2.4); else practise(e, K === "explore" ? "ins" : "vit", dt * 0.8); }
       else if (K === "run" && --T.laps > 0) { const p = G.W.places.any(); T.x = p[0]; T.z = p[1]; }
       else if (K === "explore" && !T.found) { T.found = true; find(e); T.until = T.t + 2; }
       else { T.until = Math.min(T.until, T.t + rnd(1, 3)); }
@@ -538,6 +573,14 @@
     }
     else if (K === "flee") { if (!steer(e, T.x, T.z, dt, true)) st = "run"; else st = "happy"; }
     else if (K === "social" || K === "play" || K === "tease" || K === "spar") st = withOther(e, T, dt);
+    /* the winged: up into the air to fly somewhere, up into a tree to perch, down again to land */
+    if (canFly(e)) {
+      const T2 = e.task, Hb = e.rig.habits || {}, perched = !!(T2 && T2.perch && T2.down);
+      const flying = !!(T2 && T2.fly && !T2.down && T2.x != null && Math.hypot(T2.x - e.x, T2.z - e.z) > 0.4) || (T2 && T2.k === "fly");
+      const want = flying ? Math.max(T2 && T2.perchH || 0, 2.4 + (Hb.fly > 1.5 ? 1.6 : 0)) : perched ? T2.perchH : 0;
+      e.alt = lerp(e.alt || 0, want, Math.min(1, dt * (want > (e.alt || 0) ? 1.5 : 2.2)));
+      if (e.alt > 0.25 && !perched) st = "fly";
+    }
     e.st = st;
     /* evolution: checked now and then */
     e.evo = (e.evo || 0) - dt;
@@ -1005,8 +1048,12 @@
   function place(e) {
     const r = e.rig;
     if (e.c) {
-      if (!e.held && !e.air) { const g = groundFor(e, e.x, e.z); e.y = lerp(e.y, g, 0.25); }
-      r.g.position.set(e.x, e.y, e.z); r.g.rotation.y = e.a;
+      let g = e.y;
+      if (!e.held && !e.air) { g = groundFor(e, e.x, e.z); e.y = lerp(e.y, g + (e.alt || 0), 0.25); }
+      /* (a crab goes sideways) */
+      const sideW = (r.habits || {}).sideways && (e.st === "walk" || e.st === "run") ? PI / 2 : 0; e.sideA = lerp(e.sideA || 0, sideW, 0.15);
+      r.g.position.set(e.x, e.y, e.z); r.g.rotation.y = e.a + e.sideA;
+      if (r.shadow) r.shadow.position.y = 0.02 + (e.alt ? (g - e.y) / (r.g.scale.y || 1) : 0);         // (the shadow stays on the ground)
       r.face = e.face || null;
       r.anim(G.t, 1 / 60, e.held ? "held" : e.st, e.v);
       if (e.bub > 0) { e.bub -= 1 / 60; if (e.bub <= 0) G.M.emote(r, "ball"); }

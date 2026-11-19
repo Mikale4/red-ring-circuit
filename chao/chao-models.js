@@ -600,7 +600,7 @@
       if (f.nose === "big") bx(v, -1, hh - 4, z0, 0, hh - 3, z0, 0x2a2a2a);
       if (f.bill) bx(v, -1, low, z0, 0, low, z0 + 1 + (hd > 3 ? 1 : 0), sid === "an-platypus" ? 0x3a3a3a : 0xf8a020);
       if (bk) {
-        const bc = /crow|raven|magpie|woodpecker|heron/.test(sid) ? 0x2a2a2a : sid === "an-flamingo" ? 0xf0b0b8 : 0xf8b030;
+        const bc = /crow|raven|magpie|woodpecker/.test(sid) ? 0x2a2a2a : sid === "an-heron" ? 0xd8b040 : sid === "an-stork" ? 0xd8503a : sid === "an-flamingo" ? 0xf0b0b8 : 0xf8b030;   // (a stork's bill red, a heron's yellow)
         const y = Math.max(low, Math.floor(hh / 2) - 1);
         if (bk === "short") bx(v, -1, y, z0, 0, y, z0, bc);
         else if (bk === "long" || bk === "needle") bx(v, -1, y, z0, 0, y, z0 + (bk === "needle" ? 3 : 2), (x, yy, z) => bk === "needle" && x === 0 ? null : bc);
@@ -736,7 +736,7 @@
   }
   /* -- a leg: a column of voxels, a hoof, a paw or a bird's foot at the bottom */
   function aLeg(R, L, g, K, name, pos, len, w, foot) {
-    const col = aCol(L, "leg");
+    const lc = L.f && L.f.legc ? parseInt(L.f.legc, 16) : null, col = lc != null ? (x, y, z) => grain(lc, x, y, z, 0.04) : aCol(L, "leg");   // (a stork's red legs, a flamingo's pink)
     const l = part(`${K}:leg:${name}:${len}:${w}:${foot || ""}`, g, v => {
       const x0 = w > 1 ? -1 : 0;
       bx(v, x0, -len, x0, w > 1 ? 0 : 0, -1, w > 1 ? 0 : 0, (x, y, z) => col(x, y, z, { low: -len + 1 }));
@@ -866,7 +866,7 @@
   /* birds: a body, a head, a beak, two wings, a tail, two thin legs */
   function bird(R, L, f, g, K, u, o) {
     const col = aCol(L, "body"), bw = Math.max(2, Math.round(u * 0.14) * 2), bh = Math.max(3, Math.round(u * (o.up ? 0.5 : 0.3))), bl = Math.max(3, Math.round(u * (o.up ? 0.34 : 0.5)));
-    const ll = Math.max(1, Math.round(u * 0.14 * (f.legs === "long" ? 1.6 : f.legs === "stilt" ? 3 : 1) * (o.ll || 1)));
+    const ll = Math.max(1, Math.round(u * 0.14 * (f.legs === "long" ? 1.6 : f.legs === "stilt" ? 2.4 : 1) * (o.ll || 1)));
     const body = part(K + ":body", g, v => {
       rbx(v, -bw / 2, 0, -Math.floor(bl / 2), bw / 2 - 1, bh - 1, Math.ceil(bl / 2) - 1, (x, y, z) => col(x, y, z, o.up ? { front: Math.ceil(bl / 2) - 1 } : { under: 0 }), 2);
       if (/flicky|wocky/.test(L.sp.id)) bx(v, -bw / 2 + 1, 0, Math.ceil(bl / 2) - 1, bw / 2 - 2, bh - 2, Math.ceil(bl / 2) - 1, L.belly);
@@ -1108,6 +1108,10 @@
     const R = { g: new THREE.Group(), kind: "animal", plan: sp.plan, legs: [], arms: [], wings: [], tails: [], L, S: g };
     const inner = new THREE.Group(); R.g.add(inner); R.inner = inner;
     (BUILD[sp.plan] || BUILD.quad)(R, L, f, g, K, u);
+    /* its own way of moving (chao-data's habits: an ape on all fours, a chicken's strut...) */
+    const H = D.habits ? D.habits(sp) : {};
+    if (H.gait) R.gait = H.gait; if (H.slow) R.slow = H.slow; if (H.hover) R.hover = H.hover; if (H.swim) R.swims = true;
+    R.habits = H;
     R.g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     R.shadow = blob(Math.max(0.12, R.r || 0.3)); R.g.add(R.shadow);
     R.g.scale.setScalar((c.genes && c.genes.size) || 1);
@@ -1125,17 +1129,41 @@
     const ph = R.ph, amp = st === "run" ? 0.9 : 0.6, inner = R.inner;
     inner.position.set(0, 0, 0); inner.rotation.set(0, 0, 0);
     if (g === "walk4" || g === "crawl") R.legs.forEach((l, i) => { const o = (i === 0 || i === 3) ? 0 : PI; l.rotation.x = moving ? Math.sin(ph + o) * amp * 0.8 : 0; l.rotation.z = 0; });
-    else if (g === "biped" || g === "chao" || g === "chaofly" || g === "bird") R.legs.forEach((l, i) => { l.rotation.x = moving ? Math.sin(ph + i * PI) * amp : 0; });
+    else if (g === "biped" || g === "chao" || g === "chaofly") R.legs.forEach((l, i) => { l.rotation.x = moving ? Math.sin(ph + i * PI) * amp : 0; });
+    else if (g === "knuckle") {
+      /* on all fours, the arms as forelegs (an ape, a monkey, a meerkat at a run): the body tips
+         forward to go, and stands up straight when it stops */
+      const lean = moving ? 0.42 : 0; inner.rotation.x = lean; inner.position.y = moving ? (R.h || 0.4) * 0.04 : 0;
+      R.legs.forEach((l, i) => { l.rotation.x = (moving ? Math.sin(ph + i * PI) * amp * 0.7 : 0) - lean; });
+    }
+    else if (g === "strut") {
+      /* a ground bird's walk: short steps, and the head bobbing forward a pixel at each */
+      R.legs.forEach((l, i) => { l.rotation.x = moving ? Math.sin(ph + i * PI) * 0.35 : 0; });
+      const hd = R.head; if (hd && hd !== R.body && !R.segs) { if (R.headZ0 == null) R.headZ0 = hd.position.z; hd.position.z = R.headZ0 + (moving && Math.sin(ph * 2) > 0 ? (R.S || 0.05) : 0); }
+    }
+    else if (g === "waddle") {
+      /* short legs, rocking side to side (a duck, a penguin) */
+      R.legs.forEach((l, i) => { l.rotation.x = moving ? Math.sin(ph + i * PI) * 0.3 : 0; });
+      if (moving) inner.rotation.z = Math.sin(ph) * 0.14;
+    }
+    else if (g === "bird") {
+      /* a bird on the ground hops, both feet together; in the air it tucks its legs back */
+      if (st === "fly") R.legs.forEach(l => { l.rotation.x = -1.1; });
+      else if (moving) { const hp = Math.abs(Math.sin(ph * 0.9)); inner.position.y = hp * (R.h || 0.3) * 0.24; inner.rotation.x = (hp - 0.5) * 0.12; R.legs.forEach(l => { l.rotation.x = -Math.cos(ph * 0.9) * 0.4; }); }
+      else R.legs.forEach(l => { l.rotation.x = 0; });
+    }
     else if (g === "hop") { const hop = moving ? Math.abs(Math.sin(ph * 0.5)) : 0; inner.position.y = hop * (R.h || 0.3) * 0.3; R.legs.forEach(l => l.rotation.x = moving ? -Math.cos(ph * 0.5) * 0.6 : 0); }
     else if (g === "float") R.legs.forEach((l, i) => { l.rotation.x = Math.sin(t * 2 + i) * 0.25; l.rotation.z = Math.cos(t * 2 + i * 1.3) * 0.2; });
     R.arms.forEach((a, i) => { a.rotation.x = moving && g !== "hop" ? -Math.sin(ph + i * PI) * amp * 0.8 : 0; a.rotation.z = R.kind === "chao" ? (i ? 1 : -1) * 0.3 : 0; });
+    if (g === "knuckle" && moving) R.arms.forEach((a, i) => { a.rotation.x = -0.42 + Math.sin(ph + (i ? 0 : PI)) * amp * 0.6; });       // (the arms walk too, as forelegs)
+    if (st === "fly" && R.kind === "animal" && R.wings.length && g !== "fly") R.legs.forEach(l => { l.rotation.x = -1.1; });      // (legs tucked back in the air)
     R.wings.forEach(w => { const s = w.userData.s || 1; const flap = st === "fly" || g === "fly" ? Math.sin(t * (R.kind === "chao" ? 14 : 18)) * 0.8 : g === "swim" || st === "swim" ? Math.sin(t * 6) * 0.4 : Math.sin(t * 1.6) * 0.06; w.rotation.z = -s * flap; });
     R.tails.forEach((tl, i) => { tl.rotation.y = Math.sin(t * (st === "happy" ? 12 : g === "swim" ? 7 : 3) + i) * (st === "happy" ? 0.5 : g === "swim" ? 0.45 : 0.18); });
     if (R.segs) {
       const S = R.S, n = R.segs.length, wav = moving ? 1 : 0.35, step = R.segStep || 2;
       for (let i = 0; i < n; i++) { const x = Math.round(Math.sin(ph * 0.7 - i * 0.8) * 1.6 * wav * (i / n + 0.3)); R.segs[i].position.set(x * S, 0, (-i * step + 4) * S); }
       if (R.head) R.head.position.set(Math.round(Math.sin(ph * 0.7 + 0.8) * 1.2 * wav) * S, 1 * S, 5 * S);
-    } else if (moving && g !== "hop") inner.position.y = Math.abs(Math.sin(ph)) * (R.h || 0.4) * (g === "chao" ? 0.05 : 0.03);
+    } else if (moving && g !== "hop" && g !== "bird") inner.position.y = Math.abs(Math.sin(ph)) * (R.h || 0.4) * (g === "chao" ? 0.05 : 0.03);
     if (g === "swim" || R.aquatic) inner.rotation.z = Math.sin(t * 2) * 0.05;
     if (g === "hump" && moving) { inner.position.y = Math.abs(Math.sin(ph * 0.5)) * 0.05; inner.rotation.x = Math.sin(ph * 0.5) * 0.1; }
     if (g === "fly" || R.hover) inner.position.y = (R.hover || 0.6) * (R.h || 0.3) + Math.sin(t * 3) * 0.04;

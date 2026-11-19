@@ -269,10 +269,10 @@
     ["puffin", "Puffin", "penguin", 0.4, [0x1a1a22, 0xf08a2a, 0xf8f8f8], "beak:puffin", M, "agi", 2],
     ["penguin", "Penguin", "penguin", 0.55, [0x2a3a5a, 0xf8f8f8, 0xf8f8f8], "beak:short,flippers", M, "agi", 1],
     ["emperorpenguin", "Emperor Penguin", "penguin", 0.8, [0x1a2a3a, 0xf8c040, 0xf8f8f8], "beak:long,flippers", M, "vit", 3],
-    ["flamingo", "Flamingo", "wader", 0.85, [0xf8a0b0, 0xe8708a, 0xf8b0c0], "beak:bent,legs:stilt,neck:long", T, "agi", 2],
-    ["heron", "Heron", "wader", 0.8, [0x9aa0b0, 0x3a3a3a, 0xf8f8f8], "beak:long,legs:stilt,neck:long", T, "ins", 2],
-    ["crane", "Crane", "wader", 0.9, [0xf8f8f8, 0xd83a3a, 0xf8f8f8], "beak:long,legs:stilt,neck:long,cap", Y, "cha", 3],
-    ["stork", "Stork", "wader", 0.85, [0xf8f8f8, 0x1a1a1a, 0xf8f8f8], "beak:long,legs:stilt", H, "vit", 2],
+    ["flamingo", "Flamingo", "wader", 0.85, [0xf8a0b0, 0xe8708a, 0xf8b0c0], "beak:bent,legs:stilt,neck:long,legc:e8708a", T, "agi", 2],
+    ["heron", "Heron", "wader", 0.8, [0x9aa0b0, 0x3a3a3a, 0xf8f8f8], "beak:long,legs:stilt,neck:long,legc:c8b060", T, "ins", 2],
+    ["crane", "Crane", "wader", 0.9, [0xf8f8f8, 0xd83a3a, 0xf8f8f8], "beak:long,legs:stilt,neck:long,cap,legc:4a4a50", Y, "cha", 3],
+    ["stork", "Stork", "wader", 0.85, [0xf8f8f8, 0x1a1a1a, 0xf8f8f8], "beak:long,legs:stilt,neck:long,legc:d8503a", H, "vit", 2],
     ["swan", "Swan", "waterfowl", 0.8, [0xf8f8f8, 0xf08a2a, 0xf8f8f8], "neck:long", Y, "cha", 2],
     ["duck", "Duck", "waterfowl", 0.45, [0x6a5a3a, 0x2a8a4a, 0xd8c8a8], "bill", H, "vit", 1],
     ["duckling", "Duckling", "waterfowl", 0.3, [0xf8e040, 0xf8a020, 0xf8f0a0], "bill", H, "vit", 1],
@@ -457,6 +457,41 @@
   const BY = {};
   for (const s of CHAO) BY[s.id] = s;
   for (const s of ANIMALS) BY[s.id] = s;
+  /* ---------------------------------------------------------------- how each animal lives
+     Its real habits, by body plan and then by species: gait (how it moves: knuckle = on all
+     fours with the arms as front legs, strut = a ground bird's head-bobbing walk, waddle,
+     hop...), slow, hover; fly (how often it takes to the air: 0 never), night (out at night,
+     asleep by day), herd (keeps near its own kind), graze (stops to crop the grass), likes (the
+     place it goes to: water, shore, trees, flowers, high), swim, wade (stands in the shallows),
+     perch (rests up in a tree), sentinel (stands up straight to keep watch), sideways (a crab). */
+  const HABIT_PLAN = {
+    primate: { gait: "knuckle", likes: "trees" }, ape: { gait: "knuckle" }, upright: { gait: "knuckle", sentinel: 1 }, climber: { gait: "knuckle", slow: 0.35, likes: "trees" },
+    bird: { fly: 1, perch: 1 }, raptor: { fly: 1.8, perch: 1 }, owl: { fly: 1, perch: 1, night: 1 }, wader: { gait: "strut", fly: 0.6, likes: "shore", wade: 1, slow: 0.6 },
+    waterfowl: { gait: "waddle", fly: 0.45, likes: "water", swim: 1 }, penguin: { gait: "waddle", fly: 0, likes: "water", swim: 1 }, ratite: { fly: 0 }, bat: { fly: 1.6, night: 1 },
+    seal: { likes: "water", swim: 1 }, turtle: { likes: "shore" }, frog: { likes: "shore" }, croc: { likes: "water", swim: 1, slow: 0.7 }, lizard: { likes: "sun" },
+    crab: { sideways: 1, likes: "shore" }, butterfly: { likes: "flowers" }, glider: { likes: "trees", night: 1 }, woolly: { herd: 1, graze: 1 }, worm: { likes: "flowers" }, snail: { likes: "shade" },
+  };
+  const GROUND_FOWL = ["cucky", "chicken", "chick", "rooster", "turkey", "pheasant", "quail", "peacock", "roadrunner"];
+  const HERDS = ["deer", "fawn", "reindeer", "moose", "elk", "goat", "ibex", "llama", "camel", "horse", "pony", "zebra", "donkey", "cow", "bull", "buffalo", "elephant", "giraffe", "okapi", "boar", "warthog", "unicorn", "pegasus", "kirin"];
+  const NIGHT = ["raccoon", "hedgehog", "mouse", "hamster", "skunk", "badger", "mole", "porcupine", "armadillo", "firefly", "kiwi", "slowloris", "tarsier", "blackcat", "panther", "lynx", "wolf", "fox", "arcticfox", "fennec", "moth"];
+  const WATERY = { hippo: { likes: "water", swim: 1, slow: 0.7 }, beaver: { likes: "water", swim: 1 }, platypus: { likes: "water", swim: 1 }, polarbear: { likes: "water", swim: 1 }, tapir: { likes: "water", swim: 1 }, moose: { likes: "water" }, elephant: { likes: "water" }, tiger: { likes: "water", swim: 1 }, dragonfly: { likes: "water" }, kingfisher: { likes: "water" }, seagull: { likes: "water", fly: 1.8 }, albatross: { likes: "water", fly: 2.2 }, pelican: { likes: "water", swim: 1, fly: 1.2 }, flamingo: { likes: "water" } };
+  const HABIT_SP = {
+    hummingbird: { gait: "fly", hover: 0.9, likes: "flowers" }, bee: { likes: "flowers" }, roadrunner: { gait: "biped", fly: 0.1 }, tarsier: { gait: "hop", night: 1, likes: "trees" }, slowloris: { gait: "knuckle", slow: 0.3, night: 1, likes: "trees" },
+    lobster: { sideways: 0, likes: "water" }, scorpion: { sideways: 0, night: 1, likes: "sun" }, kiwi: { gait: "waddle", fly: 0 }, dodo: { gait: "waddle", fly: 0 }, cat: { likes: "sun" }, tabby: { likes: "sun" }, cheetah: { likes: "sun" }, lion: { likes: "sun", herd: 1 },
+    meerkat: { herd: 1, likes: "sun" }, prairiedog: { herd: 1 }, goat: { likes: "high" }, ibex: { likes: "high" }, snowleopard: { likes: "high" }, eagle: { likes: "high" }, condor: { likes: "high" }, squirrel: { likes: "trees" }, chipmunk: { likes: "trees" }, koala: { likes: "trees" }, sloth: { likes: "trees", slow: 0.25 },
+  };
+  function habitsOf(sp) {
+    if (!sp || sp.kind !== "animal") return {};
+    const id = sp.id.slice(3), h = Object.assign({}, HABIT_PLAN[sp.plan] || {});
+    if (GROUND_FOWL.includes(id)) Object.assign(h, { gait: "strut", fly: 0.15, perch: 0 });
+    if (HERDS.includes(id)) Object.assign(h, { herd: 1, graze: 1 });
+    if (NIGHT.includes(id)) h.night = 1;
+    if (WATERY[id]) Object.assign(h, WATERY[id]);
+    if (HABIT_SP[id]) Object.assign(h, HABIT_SP[id]);
+    if (sp.feat && sp.feat.flightless) h.fly = 0;
+    return h;
+  }
+
   /* ---------------------------------------------------------------- the keeper's decor
      Things to set out in a garden of your own (Pip sells them; the story gives the last). use:
      what a creature does at it -- sleep in it, sit by it, train on it, splash in it, dance to it
@@ -481,7 +516,7 @@
   ];
 
   root.ChaoData = {
-    DECOR, decor: id => DECOR.find(d => d.id === id),
+    DECOR, decor: id => DECOR.find(d => d.id === id), habits: sp => habitsOf(typeof sp === "string" ? BY[sp] : sp),
     ATTRS, TEMPERS, TEMPER_KEYS, ALIGNS, ALIGN_KEYS, PATHS, PATH_KEYS, CHAO, ANIMALS, TECHS, FOODS, TOYS, REGIONS,
     species: id => BY[id], chao: id => BY[id] && BY[id].kind === "chao" ? BY[id] : null, animal: id => BY[id] && BY[id].kind === "animal" ? BY[id] : null,
     tech: id => TECHS.find(t => t.id === id), food: id => FOODS.find(f => f.id === id), toy: id => TOYS.find(t => t.id === id),
