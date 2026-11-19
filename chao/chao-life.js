@@ -423,11 +423,22 @@
   function record(c) { return { id: c.id, name: c.name, sp: c.sp, gen: c.gen, parents: c.parents, kind: c.kind, line: c.line || c.id }; }
   function fresh() {
     return { v: 1, day: 0.3, chao: [], animals: [], eggs: [], book: {}, seen: {}, owned: {}, inv: { round: 4, triangle: 1, square: 1 }, rings: 300,
-      avatar: null, freed: 0, freedEggs: 0, breedMiss: 0, ach: {}, log: [], habitat: {}, quest: {} };
+      avatar: null, freed: 0, freedEggs: 0, breedMiss: 0, ach: {}, log: [], habitat: {}, quest: {}, ids: 2 };
+  }
+  /* species whose ids changed, once, when the classic animals were put right: the white bird
+     that was called Wocky is Locky (the bald eagle), and "Mocky" the monkey is Wocky */
+  const RENAMED = { 2: { "an-wocky": "an-locky", "an-mocky": "an-wocky" } };
+  function renameIds(o, map) {
+    if (Array.isArray(o)) { for (let i = 0; i < o.length; i++) { if (typeof o[i] === "string" && map[o[i]]) o[i] = map[o[i]]; else if (o[i] && typeof o[i] === "object") renameIds(o[i], map); } return; }
+    for (const k of Object.keys(o)) { const val = o[k]; if (typeof val === "string" && map[val]) o[k] = map[val]; else if (val && typeof val === "object") renameIds(val, map); }
+    const ks = Object.keys(o).filter(k => map[k]), vals = ks.map(k => o[k]);   // (all at once, so the old Wocky and the new don't collide)
+    ks.forEach(k => delete o[k]); ks.forEach((k, i) => { o[map[k]] = vals[i]; });
   }
   function sane(s) {
     const f = fresh();
     if (!s || typeof s !== "object" || s.v !== 1) return f;
+    for (let n = (s.ids || 1) + 1; n <= f.ids; n++) if (RENAMED[n]) renameIds(s, RENAMED[n]);
+    s.ids = f.ids;
     for (const k in f) if (s[k] == null) s[k] = f[k];
     for (const c of [...s.chao, ...s.animals]) if (!c.genes || !c.lv) return f;
     return s;

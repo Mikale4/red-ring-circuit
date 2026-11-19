@@ -286,9 +286,12 @@ Wild (a leaf), the machines and badnik drives Gear (a gear) -- and its **path** 
 most (Tidal fins, Sky wings, Dash legs and swept ears, Brawn arms, Spark antlers and glow; a
 balanced upbringing, the round Bloom), changing again later with a second path blended in.
 5 alignments x those paths and their blends, the children and the rare forms make 206 Chao, every
-one built from its parts; the 233 animals are 35 body plans dressed in each species' own
+one built from its parts; the 238 animals are 36 body plans dressed in each species' own
 features (a fox's snout, ears and brush; a lion's mane and tufted tail; an elephant's trunk,
-fans and tusks). The rare forms wait in the genes and the upbringing: two crystal alleles make a
+fans and tusks; a monkey's bare face, ears at the sides and curling tail). The animals the zones
+free are the twelve of Sonic 1 and 2, as Sonic Retro has them: Flicky the bluebird, Pocky the
+rabbit, Cucky the chicken, Pecky the penguin, Rocky the seal, Picky the pig, Ricky the squirrel,
+Tocky the sea turtle, Wocky the monkey, Becky the bear, Locky the bald eagle and Micky the mouse. The rare forms wait in the genes and the upbringing: two crystal alleles make a
 Crystal Chao, a sweet tooth a Candy Chao, an egg warmed by the volcano vents an Ember Chao, a
 Tidal line three generations long a Tide Chao, and the legendary ones further still. A creature's
 card shows it all: its picture, care, bond and leaning, temperaments, the seven attributes

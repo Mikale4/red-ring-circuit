@@ -587,6 +587,17 @@
       if (f.eyepatch) for (const s of [-1, 1]) bx(v, mx(s, 1), hh - 3, hd - 1, mx(s, 2), hh - 2, hd - 1, L.second);
       if (f.stripe === "face") bx(v, -1, 1, hd - 1, 0, hh - 1, hd - 1, 0xf8f8f8);
       if (f.head === "white") bx(v, -hw, 0, 0, hw - 1, hh - 1, hd - 1, (x, y, z) => v.has(x, y, z) ? 0xf8f8f8 : null);
+      /* a monkey's face: bare and pale round the eyes and down to the chin, the fur coming down
+         to a point between the eyes, and a little muzzle */
+      if (f.face === "monkey") {
+        const fc = (x, y, z) => grain(L.second, x, y, z, 0.03);
+        for (let x = -hw; x < hw; x++) for (let y = 0; y < hh - 1; y++) {
+          if (y === hh - 2 && hw >= 2 && (x === -1 || x === 0)) continue;
+          if (y === 0 && (x === -hw || x === hw - 1)) continue;
+          if (v.has(x, y, hd - 1)) v.set(x, y, hd - 1, fc(x, y, hd - 1));
+        }
+        bx(v, -1, 0, hd, 0, Math.min(1, hh - 3), hd, fc);
+      }
       /* the snout, or the beak, or the bill, in front of the face */
       const sn = f.snout, bk = f.beak, z0 = hd, low = 0;
       const snoutCol = sn === "bear" ? L.belly : sn === "pig" || sn === "wide" ? mixC(main, 0xe8a0a8, 0.3) : null;
@@ -614,12 +625,23 @@
         else bx(v, -1, y, z0, 0, y, z0, bc);
       }
       /* ears, on top */
-      const ear = f.ears, top = hh;
+      const ear = f.ears, top = hh, sideEars = /^(primate|ape)$/.test(L.sp.plan);   // (a monkey's ears are on the sides of its head, not on top)
       if (ear) for (const s of [-1, 1]) {
-        const x = mx(s, hw - 1), xi = mx(s, hw - 2), ez = Math.max(0, Math.floor(hd / 2) - 1), inner = mixC(main, 0xf0a0a8, 0.5);
-        if (ear === "point" || ear === "tuft") { v.set(x, top, ez, main); v.set(xi, top, ez, main); v.set(x, top + 1, ez, ear === "tuft" ? 0x2a2a2a : main); if (ear === "tuft") v.set(x, top + 2, ez, 0x2a2a2a); v.set(xi, top, ez + 1, inner); }
+        const x = mx(s, hw - 1), xi = mx(s, hw - 2), ez = Math.max(0, Math.floor(hd / 2) - 1), inner = f.face === "monkey" ? L.second : mixC(main, 0xf0a0a8, 0.5);
+        if (sideEars && (ear === "round" || ear === "big")) {
+          const ox = mx(s, hw), y0 = Math.max(1, hh - 3), n = ear === "big" ? 2 : 1;
+          bx(v, ox, y0, ez, ox, y0 + n, ez + 1, (xx, y, z) => z === ez + 1 ? inner : main);
+          if (ear === "big") v.set(mx(s, hw + 1), y0 + 1, ez, main);
+        }
+        else if (ear === "point" || ear === "tuft") { v.set(x, top, ez, main); v.set(xi, top, ez, main); v.set(x, top + 1, ez, ear === "tuft" ? 0x2a2a2a : main); if (ear === "tuft") v.set(x, top + 2, ez, 0x2a2a2a); v.set(xi, top, ez + 1, inner); }
+        else if (ear === "round" && f.snout === "bear") { bx(v, x, top, ez, xi, top, ez, f.eyepatch ? L.second : main); v.set(xi, top, ez + 1, f.eyepatch ? L.second : inner); }   // (a bear's: small and round, low on the head)
         else if (ear === "round") bx(v, x, top, ez, mx(s, hw - 2), top + 1, ez, (xx, y) => y === top + 1 && xx === mx(s, hw - 2) ? null : main);
-        else if (ear === "big" || ear === "huge") { const n = ear === "huge" ? 4 : 2; bx(v, x, top, ez, mx(s, hw - 2), top + n, ez, (xx, y) => xx === xi && y < top + n ? inner : main); }
+        else if (ear === "big" || ear === "huge") {
+          /* (on a narrow head the two ears would meet in the middle and make one wall: set them out at the sides instead) */
+          const n = ear === "huge" ? 4 : 2, eo = hw >= 3 ? x : mx(s, hw), ei = hw >= 3 ? xi : hw >= 2 ? mx(s, hw - 1) : eo;
+          bx(v, eo, top, ez, ei, top + n, ez, (xx, y) => xx === ei && ei !== eo && y < top + n ? inner : main);
+          if (ei === eo) v.set(eo, top + 1, ez + 1, inner);
+        }
         else if (ear === "long") { bx(v, x, top, ez, x, top + Math.max(3, hh), ez, main); bx(v, x, top, ez + 1, x, top + Math.max(3, hh) - 1, ez + 1, inner); }
         else if (ear === "lop") bx(v, mx(s, hw), hh - 1, ez, mx(s, hw), 0, ez + 1, sec);
         else if (ear === "flop") bx(v, mx(s, hw), hh - 1, ez, mx(s, hw), hh - 3, ez, sec);
@@ -716,6 +738,7 @@
       else if (t === "sting") { line(v, 0, 0, -1, 0, 3, -2, L.main); v.set(0, 3, -1, L.main); v.set(0, 3, 0, 0x1a1a1a); }
       else if (t === "fin") bx(v, 0, 0, -1, 0, 2, -2, mixC(L.main, 0xffffff, 0.3));
       else if (t === "thin") line(v, 0, 0, -1, 0, -1, -4, mixC(L.main, 0xe8a0a8, 0.4));
+      else if (t === "long" && L.sp.plan === "primate") { const c = (x, y, z) => col(x, y, z); line(v, 0, 0, -1, 0, -1, -3, c); line(v, 0, -1, -3, 0, 3, -5, c); v.set(0, 4, -5, c(0, 4, -5)); v.set(0, 5, -4, c(0, 5, -4)); v.set(0, 4, -3, c(0, 4, -3)); }   // (a monkey's, curling up at the end)
       else line(v, 0, 0, -1, 0, -1, -4, (x, y, z) => col(x, y, z));                    // long
     });
     at(tl, pos[0], pos[1], pos[2], g); R.inner.add(tl); R.tails.push(tl);
@@ -723,8 +746,9 @@
   }
   /* -- a wing: feathered, leathery, clear, a butterfly's, or a flipper */
   function aWing(R, L, g, K, s, n, kind, pos) {
+    const ws = L.f && L.f.head === "white" ? mulC(L.main, 0.75) : L.second;   // (an eagle's white is its head and tail; its wings are dark to the tips)
     const w = part(`${K}:wing${s}:${kind}:${n}`, g, v => {
-      if (kind === "feather") for (let x = 0; x < n; x++) for (let z = 0; z >= -Math.max(1, Math.ceil((n - x) * 0.7)); z--) v.set(mx(s, x), 0, z, x >= n - 1 || z === -Math.ceil((n - x) * 0.7) ? L.second : mixC(L.main, L.second, x / n * 0.6));
+      if (kind === "feather") for (let x = 0; x < n; x++) for (let z = 0; z >= -Math.max(1, Math.ceil((n - x) * 0.7)); z--) v.set(mx(s, x), 0, z, x >= n - 1 || z === -Math.ceil((n - x) * 0.7) ? ws : mixC(L.main, ws, x / n * 0.6));
       else if (kind === "leather") { for (let x = 0; x < n; x++) for (let y = -Math.floor((n - x) * 0.6); y <= 0; y++) v.set(mx(s, x), y + 1, 0, (x % 3 === 2) ? mulC(L.second, 0.7) : mixC(L.second, L.main, 0.3)); }
       else if (kind === "clear") for (let x = 0; x < n; x++) v.set(mx(s, x), 0, 0, 0xd8f0f8), v.set(mx(s, x), 0, -1, 0xc8e4f0);
       else if (kind === "butterfly" || kind === "moth") { for (let x = 0; x < n; x++) for (let y = -n + 1 + Math.floor(x / 2); y < n - Math.floor(x / 2); y++) v.set(mx(s, x), y, 0, (x === n - 1 || Math.abs(y) === n - 1 - Math.floor(x / 2)) ? L.second : (kind === "butterfly" && x === Math.floor(n / 2) && y === 1 ? 0xf8f8f8 : L.main)); }
@@ -743,7 +767,7 @@
       if (foot === "hoof") bx(v, x0, -len, x0, w > 1 ? 0 : 0, -len, w > 1 ? 0 : 0, mulC(L.second, 0.55));
       else if (foot === "talon") { v.set(0, -len, 1, 0xd8a040); v.set(0, -len, -1, 0xd8a040); }
       else if (foot === "web") bx(v, -1, -len, 0, 0, -len, 1, 0xf08a2a);
-      else if (foot === "paw") v.set(0, -len, 1, (x => col(0, -len, 1, { low: -len + 1 }))());
+      else if (foot === "paw") v.set(0, -len, 1, L.f && L.f.face === "monkey" ? L.second : col(0, -len, 1, { low: -len + 1 }));   // (a monkey's bare feet)
     });
     at(l, pos[0], pos[1], pos[2], g); R.inner.add(l); R.legs.push(l);
     return l;
@@ -755,7 +779,7 @@
     const sid = L.sp.id;
     let bl = Math.max(4, Math.round(u * 0.55)), bw = Math.max(2, Math.round(u * 0.15) * 2), bh = Math.max(3, Math.round(u * 0.3)), ll = Math.max(2, Math.round(u * 0.24)), hd = Math.max(3, Math.round(u * 0.26));
     if (f.legs === "long") ll = Math.round(ll * 1.6);
-    if (/elephant|rhino|hippo|bear|buffalo|bull|moose|camel|giraffe|polarbear|panda/.test(sid)) { bh += 1; bw += 2; }
+    if (/elephant|rhino|hippo|bear|becky|buffalo|bull|moose|camel|giraffe|polarbear|panda/.test(sid)) { bh += 1; bw += 2; }
     if (/hippo|pig|boar|warthog|badger|wolverine|armadillo|pangolin|mole|shrew|guineapig|hamster|mouse|skunk|ferret|weasel|stoat|mongoose|hedgehog|porcupine|tapir/.test(sid)) ll = Math.max(1, Math.round(ll * 0.55));
     if (/ferret|weasel|stoat|mongoose|otter|cheetah/.test(sid)) { bl += 2; bh = Math.max(2, bh - 1); }
     const hw = Math.max(2, Math.floor(bw / 2) + (/lion|bear|tiger|panda|hippo/.test(sid) ? 1 : 0)), hh = Math.max(3, hd), col = aCol(L, "body");
@@ -770,6 +794,7 @@
       if (f.spines) for (let z = bz0; z <= bz1; z += 2) v.set(-1, top + 1, z, L.second), v.set(0, top + 1, z, L.second);
       if (f.scutes) for (let z = bz0; z <= bz1; z += 2) for (const x of [-1, 0]) v.set(x, top + 1, z, mulC(L.main, 0.75));
       if (f.pouch) bx(v, -1, 1, bz1 + 1, 0, 2, bz1 + 1, L.belly);
+      if (f.chest) bx(v, -bw / 2 + 1, 1, bz1, bw / 2 - 2, Math.max(1, bh - Math.max(1, Math.floor(hh / 2)) - 1), bz1, (x, y, z) => y === 1 && (x === -bw / 2 + 1 || x === bw / 2 - 2) ? null : grain(0xf0e2c4, x, y, z, 0.03));   // (Becky's pale crescent)
       if (f.rivets) for (let z = bz0 + 1; z < bz1; z += 2) for (const x of [-bw / 2, bw / 2 - 1]) v.set(x, Math.floor(top / 2), z, 0x5a606a);
       if (f.wheel) for (const x of [-bw / 2 - 1, bw / 2]) rbx(v, x, -2, -1, x, 0, 1, 0x2a2a2a, 2);
       if (f.bones) for (let z = bz0 + 1; z < bz1; z += 2) bx(v, -bw / 2, top, z, bw / 2 - 1, top, z, 0xd8d8d0);
@@ -819,13 +844,14 @@
   /* the upright: primates, apes, meerkats, koalas */
   function biped(R, L, f, g, K, u, o) {
     const col = aCol(L, "body"), bw = Math.max(2, Math.round(u * o.w) * 2), bh = Math.max(3, Math.round(u * o.h)), bd = Math.max(2, Math.round(u * o.d)), ll = Math.max(2, Math.round(u * o.l));
-    const body = part(K + ":body", g, v => rbx(v, -bw / 2, 0, -Math.floor(bd / 2), bw / 2 - 1, bh - 1, Math.ceil(bd / 2) - 1, (x, y, z) => col(x, y, z, { front: Math.ceil(bd / 2) - 1, top: bh - 1 }), 3));
+    const monkey = f.face === "monkey";   // (a monkey's pale belly stops short of its chin, so the face stands apart)
+    const body = part(K + ":body", g, v => rbx(v, -bw / 2, 0, -Math.floor(bd / 2), bw / 2 - 1, bh - 1, Math.ceil(bd / 2) - 1, (x, y, z) => col(x, y, z, { front: monkey && y >= bh - 1 ? 99 : Math.ceil(bd / 2) - 1, top: bh - 1 }), 3));
     at(body, 0, ll, 0, g); R.inner.add(body); R.body = body;
     const hw = Math.max(2, Math.round(u * o.hw)), hh = Math.max(3, Math.round(u * o.hh)), hd = Math.max(3, hh);
     const head = aHead(R, L, f, g, K, hw, hh, hd, {}); at(head, 0, ll + bh, -Math.floor(hd / 2), g); R.inner.add(head); R.head = head;
     const al = Math.max(2, Math.round(u * o.a)), aw = o.thick ? 2 : 1;
     for (const s of [-1, 1]) {
-      const arm = part(`${K}:arm${s}`, g, v => { bx(v, mx(s, 0), -al, aw > 1 ? -1 : 0, mx(s, aw - 1), 0, 0, (x, y, z) => col(x, y, z)); if (f.claws) v.set(mx(s, 0), -al - 1, 0, 0xe8e0d0); });
+      const arm = part(`${K}:arm${s}`, g, v => { bx(v, mx(s, 0), -al, aw > 1 ? -1 : 0, mx(s, aw - 1), 0, 0, (x, y, z) => f.face === "monkey" && y === -al ? grain(L.second, x, y, z, 0.03) : col(x, y, z)); if (f.claws) v.set(mx(s, 0), -al - 1, 0, 0xe8e0d0); });
       at(arm, s * bw / 2, ll + bh - 1, 0, g); R.inner.add(arm); R.arms.push(arm);
       aLeg(R, L, g, K, "l" + s, [s * (bw / 2 - 1) + (s > 0 ? 0 : 0.5) - 0.5 + (s > 0 ? 0.5 : 0), ll, 0], ll, aw, "paw");
     }
@@ -869,7 +895,7 @@
     const ll = Math.max(1, Math.round(u * 0.14 * (f.legs === "long" ? 1.6 : f.legs === "stilt" ? 2.4 : 1) * (o.ll || 1)));
     const body = part(K + ":body", g, v => {
       rbx(v, -bw / 2, 0, -Math.floor(bl / 2), bw / 2 - 1, bh - 1, Math.ceil(bl / 2) - 1, (x, y, z) => col(x, y, z, o.up ? { front: Math.ceil(bl / 2) - 1 } : { under: 0 }), 2);
-      if (/flicky|wocky/.test(L.sp.id)) bx(v, -bw / 2 + 1, 0, Math.ceil(bl / 2) - 1, bw / 2 - 2, bh - 2, Math.ceil(bl / 2) - 1, L.belly);
+      if (/flicky/.test(L.sp.id)) bx(v, -bw / 2 + 1, 0, Math.ceil(bl / 2) - 1, bw / 2 - 2, bh - 2, Math.ceil(bl / 2) - 1, L.belly);
     });
     at(body, 0, ll, 0, g); R.inner.add(body); R.body = body;
     let hy = ll + bh - (o.up ? 1 : 2), hz = o.up ? -1 : Math.ceil(bl / 2) - 2;
@@ -918,7 +944,7 @@
   };
   /* turtles: a stepped shell, a head, stubby legs */
   BUILD.turtle = (R, L, f, g, K, u) => {
-    const sea = /seaturtle/.test(L.sp.id), dome = f.shell === "dome", w = Math.max(4, Math.round(u * 0.25) * 2), l = Math.max(5, Math.round(u * 0.6));
+    const sea = !!f.flippers || /seaturtle/.test(L.sp.id), dome = f.shell === "dome", w = Math.max(4, Math.round(u * 0.25) * 2), l = Math.max(5, Math.round(u * 0.6));
     const shell = part(K + ":shell", g, v => {
       const z0 = -Math.floor(l / 2), z1 = z0 + l - 1;
       bx(v, -w / 2, 0, z0, w / 2 - 1, 0, z1, L.belly);

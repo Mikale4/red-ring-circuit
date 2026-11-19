@@ -119,18 +119,21 @@
   const H = "central", T = "tropical", M = "mountain", F = "forest", Y = "mystic", C = "mech", S = "sky";
   /* [id, name, plan, size, [main, second, belly], features, region, lean, rarity, classic] */
   const A = [
-    // the classic animals: what the badniks hold (the main game frees them)
+    // the classic animals: what the badniks hold (the main game frees them). The twelve of
+    // Sonic 1 and 2, as Sonic Retro has them: a bluebird, a rabbit, a chicken, a penguin, a seal,
+    // a pig, a squirrel, a sea turtle, a monkey, a bear, a bald eagle and a mouse.
     ["flicky", "Flicky", "bird", 0.42, [0x3a7af0, 0xf8f8f8, 0xf8f8f8], "beak:short,crest", H, "agi", 1, 1],
-    ["pocky", "Pocky", "hopper", 0.5, [0xf0f0f0, 0xf8b0c0, 0xf8f8f8], "ears:long,tail:puff", H, "vel", 1, 1],
+    ["pocky", "Pocky", "hopper", 0.5, [0xc8d8f4, 0xe8b080, 0xf8f8f8], "ears:long,tail:puff", H, "vel", 1, 1],
     ["cucky", "Cucky", "bird", 0.48, [0xf8f8f0, 0xe83a3a, 0xf8f8f0], "beak:short,comb,flightless", H, "res", 1, 1],
     ["pecky", "Pecky", "penguin", 0.5, [0x2a3a5a, 0xf8f8f8, 0xf8f8f8], "beak:short,flippers", M, "agi", 1, 1],
     ["rocky", "Rocky", "seal", 0.6, [0xa8b0c0, 0x8a909a, 0xd8dce4], "whiskers,flippers", T, "vit", 1, 1],
     ["picky", "Picky", "quad", 0.5, [0xf8b8c8, 0xe89aa8, 0xf8c8d4], "snout:pig,ears:flop,tail:curl", H, "res", 1, 1],
     ["ricky", "Ricky", "hopper", 0.45, [0xb87a4a, 0x8a5a3a, 0xf0d8b8], "ears:round,tail:bushy", F, "agi", 1, 1],
-    ["tocky", "Tocky", "turtle", 0.5, [0x6aa84a, 0x8a6a3a, 0xd8c878], "shell", T, "res", 1, 1],
-    ["mocky", "Mocky", "primate", 0.55, [0x9a6a3a, 0xe8c8a0, 0xe8c8a0], "ears:round,tail:long", F, "agi", 1, 1],
-    ["becky", "Becky", "bird", 0.45, [0xf8e040, 0xf08a2a, 0xf8f0b0], "beak:short", T, "vel", 1, 1],
-    ["wocky", "Wocky", "bird", 0.5, [0xf8f8f8, 0x3a3a3a, 0xf8f8f8], "beak:long,legs:long", T, "ins", 2, 1],
+    ["tocky", "Tocky", "turtle", 0.5, [0xe8c890, 0x4a9a3a, 0xe8843a], "shell,flippers", T, "res", 1, 1],
+    ["wocky", "Wocky", "primate", 0.55, [0x9a5a2a, 0xecc898, 0xecc898], "ears:round,tail:long,face:monkey", F, "agi", 1, 1],
+    ["becky", "Becky", "quad", 0.6, [0x7a4a2a, 0x5a3a22, 0xd8b088], "ears:round,snout:bear,chest", F, "pow", 1, 1],
+    ["locky", "Locky", "raptor", 0.5, [0x3a3a3e, 0xf8f8f8, 0x3a3a3e], "beak:hook,talons,head:white,legc:f0b030", S, "ins", 2, 1],
+    ["micky", "Micky", "quad", 0.32, [0xa8b8cc, 0xf0a878, 0xe8eef4], "ears:big,tail:thin,whiskers", Y, "agi", 1, 1],
     ["rabbit", "Rabbit", "hopper", 0.5, [0xd8c0a0, 0xc0a080, 0xf8f0e0], "ears:long,tail:puff", H, "vel", 1],
     // the garden's mammals
     ["hare", "Snow Hare", "hopper", 0.55, [0xf8f8f8, 0xd8dce4, 0xf8f8f8], "ears:long,tail:puff", M, "vel", 2],
@@ -219,10 +222,10 @@
     ["orca", "Orca", "fish", 1.3, [0x1a1a22, 0xf8f8f8, 0xf8f8f8], "fin:tall,patch", T, "pow", 4],
     ["narwhal", "Narwhal", "fish", 1.1, [0xa8b0b8, 0x6a7a8a, 0xd8dce4], "tusk:spiral,spots", M, "ins", 4],
     ["manatee", "Manatee", "fish", 1.1, [0x9a9aa0, 0x7a7a80, 0xb0b0b4], "flippers,snout:wide", T, "vit", 3],
-    ["monkey", "Monkey", "primate", 0.6, [0x9a6a3a, 0xe8c8a0, 0xe8c8a0], "ears:round,tail:long", F, "agi", 1],
+    ["monkey", "Monkey", "primate", 0.6, [0x8a6a4a, 0xe8c8a0, 0xd8b890], "ears:round,tail:long,face:monkey", F, "agi", 1],
     ["baboon", "Baboon", "primate", 0.8, [0x8a7a5a, 0xd83a5a, 0xa89a7a], "snout:dog,mane:short", T, "pow", 2],
     ["gorilla", "Gorilla", "ape", 1.2, [0x2a2a2a, 0x5a5a5a, 0x3a3a3a], "brow,arms:big", F, "pow", 3],
-    ["chimp", "Chimpanzee", "ape", 0.85, [0x3a2a22, 0xe8c8a0, 0x5a4a3a], "ears:big", F, "ins", 2],
+    ["chimp", "Chimpanzee", "ape", 0.85, [0x3a2a22, 0xe8c8a0, 0x5a4a3a], "ears:big,face:monkey", F, "ins", 2],
     ["orangutan", "Orangutan", "ape", 1.0, [0xc8602a, 0xa8481a, 0xd8784a], "arms:long,cheekpads", F, "vit", 3],
     ["lemur", "Lemur", "primate", 0.5, [0xb0b0b8, 0x2a2a2a, 0xf8f8f8], "tail:ringed,eyes:big", Y, "agi", 2],
     ["slowloris", "Slow Loris", "primate", 0.38, [0xc8a07a, 0x6a4a32, 0xf0e0c8], "eyes:big,mask", Y, "ins", 3],
@@ -473,12 +476,12 @@
   };
   const GROUND_FOWL = ["cucky", "chicken", "chick", "rooster", "turkey", "pheasant", "quail", "peacock", "roadrunner"];
   const HERDS = ["deer", "fawn", "reindeer", "moose", "elk", "goat", "ibex", "llama", "camel", "horse", "pony", "zebra", "donkey", "cow", "bull", "buffalo", "elephant", "giraffe", "okapi", "boar", "warthog", "unicorn", "pegasus", "kirin"];
-  const NIGHT = ["raccoon", "hedgehog", "mouse", "hamster", "skunk", "badger", "mole", "porcupine", "armadillo", "firefly", "kiwi", "slowloris", "tarsier", "blackcat", "panther", "lynx", "wolf", "fox", "arcticfox", "fennec", "moth"];
+  const NIGHT = ["raccoon", "hedgehog", "mouse", "micky","hamster", "skunk", "badger", "mole", "porcupine", "armadillo", "firefly", "kiwi", "slowloris", "tarsier", "blackcat", "panther", "lynx", "wolf", "fox", "arcticfox", "fennec", "moth"];
   const WATERY = { hippo: { likes: "water", swim: 1, slow: 0.7 }, beaver: { likes: "water", swim: 1 }, platypus: { likes: "water", swim: 1 }, polarbear: { likes: "water", swim: 1 }, tapir: { likes: "water", swim: 1 }, moose: { likes: "water" }, elephant: { likes: "water" }, tiger: { likes: "water", swim: 1 }, dragonfly: { likes: "water" }, kingfisher: { likes: "water" }, seagull: { likes: "water", fly: 1.8 }, albatross: { likes: "water", fly: 2.2 }, pelican: { likes: "water", swim: 1, fly: 1.2 }, flamingo: { likes: "water" } };
   const HABIT_SP = {
     hummingbird: { gait: "fly", hover: 0.9, likes: "flowers" }, bee: { likes: "flowers" }, roadrunner: { gait: "biped", fly: 0.1 }, tarsier: { gait: "hop", night: 1, likes: "trees" }, slowloris: { gait: "knuckle", slow: 0.3, night: 1, likes: "trees" },
     lobster: { sideways: 0, likes: "water" }, scorpion: { sideways: 0, night: 1, likes: "sun" }, kiwi: { gait: "waddle", fly: 0 }, dodo: { gait: "waddle", fly: 0 }, cat: { likes: "sun" }, tabby: { likes: "sun" }, cheetah: { likes: "sun" }, lion: { likes: "sun", herd: 1 },
-    meerkat: { herd: 1, likes: "sun" }, prairiedog: { herd: 1 }, goat: { likes: "high" }, ibex: { likes: "high" }, snowleopard: { likes: "high" }, eagle: { likes: "high" }, condor: { likes: "high" }, squirrel: { likes: "trees" }, chipmunk: { likes: "trees" }, koala: { likes: "trees" }, sloth: { likes: "trees", slow: 0.25 },
+    meerkat: { herd: 1, likes: "sun" }, prairiedog: { herd: 1 }, goat: { likes: "high" }, ibex: { likes: "high" }, snowleopard: { likes: "high" }, eagle: { likes: "high" }, locky: { likes: "high" }, condor: { likes: "high" }, squirrel: { likes: "trees" }, chipmunk: { likes: "trees" }, koala: { likes: "trees" }, sloth: { likes: "trees", slow: 0.25 },
   };
   function habitsOf(sp) {
     if (!sp || sp.kind !== "animal") return {};
