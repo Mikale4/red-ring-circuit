@@ -78,7 +78,7 @@
       S.eggs = S.eggs.filter(e => !rg(e)).concat(G.items.filter(i => i.kind === "egg").map(i => Object.assign(i.data, { region: here, pos: [+i.x.toFixed(2), +i.z.toFixed(2)] })));
       S.items = (S.items || []).filter(i => !rg(i)).concat(G.items.filter(i => i.kind !== "egg" && !i.temp).map(i => ({ kind: i.kind, id: i.id, region: here, pos: [+i.x.toFixed(2), +i.z.toFixed(2)] })));
       if (G.keeper) S.keeper = [+G.keeper.x.toFixed(2), +G.keeper.z.toFixed(2), +G.keeper.a.toFixed(2)];
-      if (G.held) { const h = G.held; if (h.kind === "egg") S.eggs.push(Object.assign(h.data, { region: here, pos: [G.keeper.x, G.keeper.z] })); else if (h.kind !== "creature") S.items.push({ kind: h.kind, id: h.id, region: here, pos: [G.keeper.x, G.keeper.z] }); }
+      /* (what's held is still among the items, saved above where the keeper holds it) */
     }
     for (const c of [...S.chao, ...S.animals]) { if (c.log.length > 40) c.log.splice(1, c.log.length - 40); for (const k in c.rel) if (Math.abs(c.rel[k]) < 0.5) delete c.rel[k]; }
     try { localStorage.setItem(G.opts.key || "redringcircuit.chao", JSON.stringify(S)); } catch (e) {}
@@ -185,7 +185,7 @@
     forest:   { ok: S => S.chao.length + S.animals.length >= 4, why: "Fallen trees lie across the path. (The garden's folk will clear them once four creatures live with you.)", done: "The fallen trees are cleared: the Forest Garden is open!" },
     mountain: { ok: S => (S.ach.duelWins || 0) >= 1, why: "Rocks have fallen across the pass. (The climbers will move them for a keeper who has won a duel at the hall.)", done: "The pass is clear: the Mountain Garden is open!" },
     mystic:   { ok: S => (S.ach.eggs || 0) >= 1, why: "The old stone door is sealed. (It opens, they say, for a keeper whose creatures have had an egg of their own.)", done: "The stone door has opened: the Mystic Garden!" },
-    mech:     { ok: S => S.chao.length + S.animals.length >= 8 || (S.freedEggs || 0) >= 3, why: "The lift has no power. (The engineers want eight creatures in your care -- or three eggs from animals freed in the zones.)", done: "The lift has power: the Mechanical Garden is open!" },
+    mech:     { ok: S => S.chao.length + S.animals.length >= 8 || (S.freedEggs || 0) >= 1, why: "The lift has no power. (The engineers want eight creatures in your care -- or an egg from the animals you've freed in the zones, a hundred of them.)", done: "The lift has power: the Mechanical Garden is open!" },
     sky:      { ok: S => ["tropical", "forest", "mountain", "mystic", "mech"].every(k => (S.open || {})[k]), why: "The balloon needs mending. (Open the other five gardens and it'll fly.)", done: "The balloon is mended: the Sky Garden is above!" },
   };
   /* see which gates have opened (and tell, the first time) */
@@ -251,6 +251,7 @@
       persist();
       fade.classList.remove("on"); setTimeout(() => fade.remove(), 500);
       G.traveling = false;
+      if (src === "world" && to !== "world") tut("world");
       setTimeout(() => { if (G) storyCheck(); }, 1400);
     }, 480);
   }
@@ -268,23 +269,66 @@
   /* what each garden is good for, a little, just by living there */
   const REGION_TRAIN = { tropical: "res", forest: "ins", mountain: "pow", mystic: "cha", mech: "ins", sky: "agi" };
   function shadowsOn(o) { o.traverse(m => { if (m.isMesh && m.material && !m.material.transparent && m.geometry.type !== "PlaneGeometry") { m.castShadow = true; m.receiveShadow = true; } }); }
-  /* the animals Sonic and the others free from the badniks: every eight, an egg in the mailbox */
+  /* ---------------------------------------------------------------- mail
+     Letters at the Central Garden's mailbox, each with what it brings -- eggs, rings, things for
+     the bag, decor for the habitat bag -- taken when it's opened. They come from the zones (the
+     cabinet's post: an animal's egg from a boss's capsule, a Chao's egg for beating a boss, a
+     tenth of the rings from cleared stages; and an egg for every hundred animals freed), the
+     Garden Society, Wren, Hazel. The HUD keeps count of the unread. */
+  const LETTERS_MAX = 40;
+  function letter(o) {
+    const S = G.save; S.letters = S.letters || [];
+    S.letters.unshift(Object.assign({ id: G.L.uid("m"), day: S.day, read: false }, o));
+    if (S.letters.length > LETTERS_MAX) S.letters.length = LETTERS_MAX;
+  }
+  const classicSp = () => { const pool = G.D.ANIMALS.filter(a => a.classic && (a.rarity <= 1 || Math.random() < 0.3)); return pool[Math.floor(Math.random() * pool.length)].id; };
   function mail() {
-    const S = G.save, L = G.L, D = G.D;
-    const freed = G.opts.prog ? (G.opts.prog().animals || 0) : 0;
-    S.mail = S.mail || [];
-    const due = Math.floor(freed / 8);
+    const S = G.save, L = G.L;
+    S.letters = S.letters || [];
+    /* (an old save's mailbox eggs become letters) */
+    if (S.mail && S.mail.length) { for (const e of S.mail) letter({ from: "The mailbox", title: "An egg", text: `An egg, ${e.from || "left in the mailbox"}.`, eggs: [e] }); S.mail = []; }
+    /* every hundred animals freed from the badniks in the zones: an egg */
+    const freed = G.opts.prog ? (G.opts.prog().animals || 0) : 0, due = Math.floor(freed / 100);
     if (S.freedEggs == null || S.freedEggs > due) S.freedEggs = Math.min(due, S.freedEggs || 0);
-    let n = 0;
-    while (S.freedEggs < due && S.mail.length < 8) {
-      S.freedEggs++; n++;
-      const pool = D.ANIMALS.filter(a => a.classic && (a.rarity <= 1 || Math.random() < 0.3));
-      const sp = pool[Math.floor(Math.random() * pool.length)];
-      S.mail.push(L.egg(sp.id, { from: "from an animal freed from a badnik, out in the zones" }));
+    while (S.freedEggs < due) { S.freedEggs++; letter({ from: "The zones", title: "An egg from the animals you've freed", text: `You've freed ${S.freedEggs * 100} animals from Eggman's badniks. One of them left you an egg.`, eggs: [L.egg(classicSp(), { from: "from an animal freed from a badnik, out in the zones" })] }); }
+    /* the cabinet's post: what the zones sent while you were out there */
+    const post = G.opts.post ? G.opts.post() : [];
+    for (const p of post) {
+      if (p.k === "egg" && p.kind === "animal") letter({ from: "The zones", title: "An animal egg", text: `From ${p.from}: one of the animals you freed left an egg for your garden.`, eggs: [L.egg(classicSp(), { from: "from " + p.from })] });
+      else if (p.k === "egg") letter({ from: "The zones", title: "A Chao egg", text: `A Chao egg, ${p.from}.`, eggs: [L.egg("chao-neutral-child", { from: "sent " + p.from })] });
+      else if (p.k === "rings" && p.n > 0) letter({ from: "The zones", title: `${p.n} rings`, text: `A tenth of the rings you collected in ${p.stages > 1 ? `${p.stages} stages (the last, ${p.from})` : p.from}.`, rings: p.n });
     }
-    if (S.freedEggs < due) S.freedEggs = due;          // (a full mailbox: the rest are lost to the wind, as letters are)
-    if (n) setTimeout(() => toast(`${n} egg${n > 1 ? "s" : ""} in the mailbox: animals freed from the badniks`, "mail"), 1800);
-    G.mailN = S.mail.length;
+    if (post.length || S.letters.some(m => !m.read)) { const n = S.letters.filter(m => !m.read).length; if (n) setTimeout(() => G && toast(`You've got mail: ${n} letter${n > 1 ? "s" : ""} at the mailbox`, "mail"), 1800); }
+    persist();
+  }
+  /* the mail, read: at the mailbox (eggs set down beside it), or from the menu (eggs at your feet) */
+  function mailMenu(sel) {
+    const S = G.save, L = S.letters || [];
+    tut("mailbox");
+    const gifts = m => [m.eggs && m.eggs.length ? `${m.eggs.length} egg${m.eggs.length > 1 ? "s" : ""}` : "", m.rings ? `${m.rings} rings` : "", m.items ? Object.entries(m.items).map(([id, n]) => `${n} ${G.D.food(id) ? G.D.food(id).name : id}`).join(", ") : "", m.decor ? Object.entries(m.decor).map(([id, n]) => `${n} ${G.D.decor(id).name}`).join(", ") : ""].filter(Boolean).join(", ");
+    const el = menuOpen(sec("Mail", "mail", `
+      <p class="cg-text">${L.length ? "Open a letter to take what's in it." : "No letters yet. Eggs and rings from the zones, and gifts from the garden's folk, come here."}</p>
+      <div class="cg-list">${L.map((m, i) => `<button class="cg-irow cg-letter ${m.read ? "" : "new"}" data-f ${(sel ? sel === m.id : i === 0) ? "data-focus" : ""} data-m="${m.id}"><span class="cg-dot" style="background:${m.read ? "#5a6a9a" : "#ffd21a"}"></span><b>${esc(m.title)}</b><i>${esc(m.from)}: ${esc(m.text)}</i><em>${m.taken ? "" : esc(gifts(m))}</em></button>`).join("")}</div>
+      <div class="cg-foot">${L.some(m => !m.taken && gifts(m)) ? `<button class="btn" data-f data-all>${ico("check")}Take everything</button>` : ""}${L.some(m => m.read) ? `<button class="btn ghost" data-f data-clear>${ico("close")}Throw away the read ones</button>` : ""}<button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`), menuClose, "cg-small");
+    el.querySelector("[data-back]").onclick = menuClose;
+    const cl = el.querySelector("[data-clear]"); if (cl) cl.onclick = () => { S.letters = L.filter(m => !m.read || (!m.taken && gifts(m))); persist(); mailMenu(); };
+    const all = el.querySelector("[data-all]"); if (all) all.onclick = () => { for (const m of L.slice()) openLetter(m, true); persist(); mailMenu(); };
+    el.querySelectorAll("[data-m]").forEach(b => b.onclick = () => { const m = L.find(x => x.id === b.dataset.m); if (!m) return; openLetter(m); persist(); mailMenu(m.id); });
+  }
+  function openLetter(m, quiet) {
+    const S = G.save; m.read = true;
+    if (m.taken) return;
+    if (m.eggs && m.eggs.length && G.onMap) { toast("Open it in a garden: the eggs need somewhere to go", "info"); return; }
+    if (m.eggs && m.eggs.length) {
+      const free = CAP() - (S.chao.length + S.animals.length + G.items.filter(i => i.kind === "egg").length);
+      if (free < m.eggs.length) { toast("The garden's full: make room before you take the eggs", "info"); return; }
+      const mb = G.W.spots.mailbox, k = G.keeper, at = mb && Math.hypot(k.x - mb.x, k.z - mb.z) < 4 ? mb : k;
+      m.eggs.forEach((e, i) => addItem("egg", null, at.x + Math.cos(i * 1.7) * 1.1, at.z - 1 + Math.sin(i * 1.7) * 0.7, e));
+    }
+    if (m.rings) S.rings += m.rings;
+    if (m.items) for (const id in m.items) S.inv[id] = (S.inv[id] || 0) + m.items[id];
+    if (m.decor) { S.decorBag = S.decorBag || {}; for (const id in m.decor) S.decorBag[id] = (S.decorBag[id] || 0) + m.decor[id]; }
+    if (m.eggs || m.rings || m.items || m.decor) { m.taken = true; sfx("coin"); if (!quiet) toast(m.eggs && m.eggs.length ? `${m.eggs.length} egg${m.eggs.length > 1 ? "s" : ""} set down ${G.W.spots.mailbox && Math.hypot(G.keeper.x - G.W.spots.mailbox.x, G.keeper.z - G.W.spots.mailbox.z) < 4 ? "by the mailbox" : "at your feet"}` : "Taken", "check"); }
   }
   function intro() {
     talk([
@@ -306,6 +350,7 @@
       for (const f of ["round", "round", "triangle"]) addItem("fruit", f, rnd(-3, 3), rnd(26, 28));
       persist();
       toast("Three eggs by the incubator", "heart");
+      setTimeout(() => { if (G && !G.menu && !G.talking) lessonOffer(); }, 900);
     });
   }
 
@@ -795,6 +840,7 @@
     let mx = fx * I.y + rx * I.x, mz = fz * I.y + rz * I.x;
     const mag = Math.min(1, Math.hypot(mx, mz));
     const run = (G.keys.Shift || I.run || mag > 0.92 && I.pad) && mag > 0.1;
+    if (run && mag > 0.3) tut("run");
     const wade = W.depth(k.x, k.z) > 0.15 && W.standAt(k.x, k.z) == null;
     const spd = (run ? 6.2 : 3.3) * (wade ? 0.55 : 1) * (G.held && G.held.kind === "creature" ? 0.9 : 1) * (G.onMap ? 0.72 : 1);
     if (mag > 0.05) { const n = Math.hypot(mx, mz); mx /= n; mz /= n; }
@@ -810,7 +856,7 @@
     if (k.air) { k.vy -= 22 * dt; k.y += k.vy * dt; if (k.y <= g) { k.y = g; k.air = false; } }
     else if (g < k.y - 0.6) { k.air = true; k.vy = 0; }
     else k.y = lerp(k.y, g, Math.min(1, dt * 16));
-    if (G.jump && !k.air) { k.air = true; k.vy = 7; sfx("jump"); }
+    if (G.jump && !k.air) { k.air = true; k.vy = 7; sfx("jump"); tut("jump"); }
     G.jump = false;
     k.rig.g.position.set(k.x, k.y, k.z); k.rig.g.rotation.y = k.a;
     const state = k.air ? "walk" : sp > 4.5 ? "run" : sp > 0.4 ? "walk" : "idle";
@@ -827,7 +873,7 @@
   function camTick(dt) {
     const k = G.keeper, U = G.cam.userData, W = G.W;
     const rot = (G.keys.q ? 1 : 0) - (G.keys.e ? 1 : 0) + (G.pad.rx || 0) * -1;
-    U.yaw += rot * dt * 2.2;
+    U.yaw += rot * dt * 2.2; if (Math.abs(rot) > 0.01 || G.dragging) tut("cam");
     if (G.pad.ry) U.pitch = clamp(U.pitch + G.pad.ry * dt * 1.2, 0.08, 1.2);
     /* drift behind the keeper as they walk, gently */
     const sp = Math.hypot(k.vx, k.vz);
@@ -884,7 +930,7 @@
     } else if (r) {
       if (r.kind === "creature") { P.push(["Z", `Pick up ${r.e.c.name}`], ["C", "Pet"], ["V", "Look"]); }
       else if (r.kind === "tree") P.push(["Z", "Shake the tree"]);
-      else if (r.kind === "spot") { const n = r.n; P.push(["Z", n === "incubator" ? "The incubator" : n === "mailbox" ? (G.save.mail && G.save.mail.length ? `Mailbox (${G.save.mail.length})` : "Mailbox") : n === "book" ? "The encyclopedias" : n === "hall" ? "The Garden Hall" : n === "yard" ? "The training ground" : n.startsWith("gate") ? (r.s.gate.open ? `Out on the road to the ${r.s.gate.name}` : `The way to the ${r.s.gate.name}`) : n === "exit" ? "Out to the world map" : r.s.lm ? (lmOpen(r.s.lm) ? `Into the ${r.s.name}` : `The ${r.s.name}: the way's shut`) : r.s.raid ? "The badniks' cage" : r.s.shard ? "The glint of light" : r.s.dojo ? "The dojo" : r.s.arena ? "The Garden League's arena" : n === "pier" ? "The pier" : n === "lake" ? "The frozen lake" : n === "altar" ? "The altar" : n === "observatory" ? "The observatory" : ""]); }
+      else if (r.kind === "spot") { const n = r.n; P.push(["Z", n === "incubator" ? "The incubator" : n === "mailbox" ? ((G.save.letters || []).some(m => !m.read) ? `Mailbox (${G.save.letters.filter(m => !m.read).length} new)` : "Mailbox") : n === "book" ? "The encyclopedias" : n === "hall" ? "The Garden Hall" : n === "yard" ? "The training ground" : n.startsWith("gate") ? (r.s.gate.open ? `Out on the road to the ${r.s.gate.name}` : `The way to the ${r.s.gate.name}`) : n === "exit" ? "Out to the world map" : r.s.lm ? (lmOpen(r.s.lm) ? `Into the ${r.s.name}` : `The ${r.s.name}: the way's shut`) : r.s.raid ? "The badniks' cage" : r.s.shard ? "The glint of light" : r.s.dojo ? "The dojo" : r.s.arena ? "The Garden League's arena" : n === "pier" ? "The pier" : n === "lake" ? "The frozen lake" : n === "altar" ? "The altar" : n === "observatory" ? "The observatory" : ""]); }
       else if (r.kind === "npc") P.push(["Z", `Talk to ${r.n.name}`]);
       else if (r.kind === "decor") P.push(["Z", `The ${r.o.D.name.toLowerCase()}`]);
       else { P.push(["Z", `Pick up ${name(r)}`]); if (r.kind === "egg") P.push(["V", "Look"]); }
@@ -904,23 +950,23 @@
       if (r && r.kind === "spot" && r.s.lm) { enterLm(r.s.lm); return; }
       if (h.kind === "creature" && r && r.kind === "spot" && r.s.shard) { shardTry(h.e); return; }
       if (h.kind === "creature" && r && r.kind === "spot" && r.n === "altar" && heart().done) { altarGo(h.e); return; }
-      if (h.kind === "egg" && r && r.kind === "decor" && r.o.d.id === "warmer") { const it = h.it, o = r.o; drop(); it.x = o.d.x + rnd(-0.2, 0.2); it.z = o.d.z + rnd(-0.2, 0.2); it.y = G.W.ground(o.d.x, o.d.z) + 0.5; it.m.position.set(it.x, it.y, it.z); it.warmer = true; toast("The egg is warm on the egg warmer", "flame"); return; }
-      if (h.kind === "fruit" && r && r.kind === "creature") { const e = r.e, it = h.it; G.held = null; it.held = false; eatItem(e, it); e.c.bond = clamp(e.c.bond + 1.5, 0, 100); G.L.raise(e.c, "hero", 2); sfx("grab"); return; }
-      if (h.kind === "toy" && r && r.kind === "creature") { const e = r.e, it = h.it; drop(); it.x = e.x + Math.sin(e.a) * 0.4; it.z = e.z + Math.cos(e.a) * 0.4; e.task = null; task(e, "play", { toy: it }); e.c.bond = clamp(e.c.bond + 1, 0, 100); if (e.c.genes.likes.toy === it.id) { G.M.emote(e.rig, "heart"); e.bub = 1.6; floatText(e, "Favourite!", 0xf07ab0); e.c.care.mood = clamp(e.c.care.mood + 12, 0, 100); } return; }
-      if (h.kind === "egg" && r && r.kind === "spot" && r.n === "incubator") { const it = h.it; drop(); const s = G.W.spots.incubator; it.x = s.x + rnd(-0.3, 0.3); it.z = s.z + rnd(-0.3, 0.3); it.y = s.y; it.m.position.set(it.x, it.y, it.z); toast("The egg is warm on the incubator", "flame"); return; }
+      if (h.kind === "egg" && r && r.kind === "decor" && r.o.d.id === "warmer") { const it = h.it, o = r.o; drop(); it.x = o.d.x + rnd(-0.2, 0.2); it.z = o.d.z + rnd(-0.2, 0.2); it.y = G.W.ground(o.d.x, o.d.z) + 0.5; it.m.position.set(it.x, it.y, it.z); it.warmer = true; toast("The egg is warm on the egg warmer", "flame"); tut("incubate"); return; }
+      if (h.kind === "fruit" && r && r.kind === "creature") { const e = r.e, it = h.it; G.held = null; it.held = false; eatItem(e, it); e.c.bond = clamp(e.c.bond + 1.5, 0, 100); G.L.raise(e.c, "hero", 2); sfx("grab"); tut("feed"); return; }
+      if (h.kind === "toy" && r && r.kind === "creature") { const e = r.e, it = h.it; drop(); it.x = e.x + Math.sin(e.a) * 0.4; it.z = e.z + Math.cos(e.a) * 0.4; e.task = null; task(e, "play", { toy: it }); e.c.bond = clamp(e.c.bond + 1, 0, 100); tut("toy"); if (e.c.genes.likes.toy === it.id) { G.M.emote(e.rig, "heart"); e.bub = 1.6; floatText(e, "Favourite!", 0xf07ab0); e.c.care.mood = clamp(e.c.care.mood + 12, 0, 100); } return; }
+      if (h.kind === "egg" && r && r.kind === "spot" && r.n === "incubator") { const it = h.it; drop(); const s = G.W.spots.incubator; it.x = s.x + rnd(-0.3, 0.3); it.z = s.z + rnd(-0.3, 0.3); it.y = s.y; it.m.position.set(it.x, it.y, it.z); toast("The egg is warm on the incubator", "flame"); tut("incubate"); return; }
       drop(); return;
     }
     if (!r) return;
     if (r.kind === "creature") { pickUp({ kind: "creature", e: r.e }); return; }
     if (r.kind === "fruit" || r.kind === "toy" || r.kind === "egg") { pickUp({ kind: r.kind, it: r.it, id: r.it.id }); return; }
-    if (r.kind === "tree") { const f = G.W.shake(r.t); sfx("stumble"); r.t.m.rotation.z = 0.06; setTimeout(() => { if (r.t.m) { r.t.m.rotation.z = 0; r.t.m.updateMatrix(); } }, 160); r.t.m.updateMatrix(); if (f) dropFruit(f); else toast("No fruit on it yet: it'll grow more", "clover"); return; }
+    if (r.kind === "tree") { tut("shake"); const f = G.W.shake(r.t); sfx("stumble"); r.t.m.rotation.z = 0.06; setTimeout(() => { if (r.t.m) { r.t.m.rotation.z = 0; r.t.m.updateMatrix(); } }, 160); r.t.m.updateMatrix(); if (f) dropFruit(f); else toast("No fruit on it yet: it'll grow more", "clover"); return; }
     if (r.kind === "npc") { r.n.f.talk(); return; }
     if (r.kind === "decor") { decorMenu(r.o); return; }
     if (r.kind === "spot") {
       const n = r.n;
-      if (n === "mailbox") { const S = G.save; if (!S.mail || !S.mail.length) { toast("The mailbox is empty", "mail"); return; } let i = 0; for (const e of S.mail) { addItem("egg", null, r.s.x + Math.cos(i) * 1.2 - 0.6, r.s.z - 1 + Math.sin(i) * 0.6, e); i++; } toast(`${S.mail.length} egg${S.mail.length > 1 ? "s" : ""} from the mailbox`, "mail"); S.mail = []; persist(); sfx("grab"); return; }
-      if (n === "book") { encyclopedia(); return; }
-      if (n === "hall") { hallMenu(); return; }
+      if (n === "mailbox") { mailMenu(); return; }
+      if (n === "book") { tut("book"); encyclopedia(); return; }
+      if (n === "hall") { tut("hall"); hallMenu(); return; }
       if (n === "yard") { yardMenu(); return; }
       if (n === "incubator") { toast("Eggs set here hatch twice as fast", "flame"); return; }
       if (n.startsWith("gate")) { const g = r.s.gate; if (g.open) travel("world", g.id); else talk([["Sign", `To the ${g.name}. ${(GATE_RULES[g.id] || {}).why || g.need}`]]); return; }
@@ -941,8 +987,8 @@
       const e = h.e; e.held = true; e.task = null; e.st = "held"; G.held = { kind: "creature", e };
       const shy = e.c.genes.temper[0] === "shy" && e.c.bond < 30;
       if (shy) { G.M.emote(e.rig, "exclaim"); e.bub = 1.4; } else if (e.c.genes.traits.includes("cuddly")) { G.M.emote(e.rig, "heart"); e.bub = 1.4; }
-      G.save.seen[e.c.sp] = true; sfx("grab");
-    } else { h.it.held = true; G.held = h; sfx("grab"); }
+      G.save.seen[e.c.sp] = true; sfx("grab"); tut("pick");
+    } else { h.it.held = true; G.held = h; sfx("grab"); tut("pick-" + h.kind); }
   }
   function drop(toss) {
     if (G.onMap && G.held) { toast("Not out here: carry it into a garden first", "info"); return; }
@@ -963,15 +1009,15 @@
   function actC() {
     if (G.placing) { placeKey("C"); return; }
     const r = G.reach, h = G.held, L = G.L;
-    if (h && h.kind === "creature") { const e = h.e; L.pet(e.c); L.pet(e.c); G.M.emote(e.rig, "heart"); e.bub = 1.5; e.face = "happy"; setTimeout(() => e.face = null, 900); chirp(1100); return; }
-    if (h && h.kind === "egg") { h.it.data.warm += 3; floatAt(h.it.x, h.it.y + 0.5, h.it.z, "Warm", 0xff8a10); return; }
+    if (h && h.kind === "creature") { const e = h.e; L.pet(e.c); L.pet(e.c); G.M.emote(e.rig, "heart"); e.bub = 1.5; e.face = "happy"; setTimeout(() => e.face = null, 900); chirp(1100); tut("cuddle"); return; }
+    if (h && h.kind === "egg") { h.it.data.warm += 3; floatAt(h.it.x, h.it.y + 0.5, h.it.z, "Warm", 0xff8a10); tut("rub"); return; }
     if (r && r.kind === "creature") {
       const e = r.e; L.pet(e.c);
       const shy = e.c.genes.temper[0] === "shy" && e.c.bond < 25;
       e.task = { k: "petted", t: 0, until: 1.6 }; e.st = "happy";
       G.M.emote(e.rig, shy ? "exclaim" : "heart"); e.bub = 1.4; chirp(shy ? 700 : 1100);
       if (e.c.care.mood > 80 && Math.random() < 0.25) floatText(e, "♥", 0xf07ab0);
-      G.save.ach.pets = (G.save.ach.pets || 0) + 1;
+      G.save.ach.pets = (G.save.ach.pets || 0) + 1; tut("pet");
     }
   }
   function actX() {
@@ -980,13 +1026,13 @@
     /* a whistle: those who are fond of the keeper come; the rest look round */
     sfx("check");
     for (const e of G.ents) { const d = Math.hypot(e.x - G.keeper.x, e.z - G.keeper.z); if (d > 18 || e.held || e.cocoon || (e.task && (e.task.k === "sleep" && e.task.down))) continue; if (e.c.bond > 25 || e.c.genes.temper.includes("affectionate")) { task(e, "follow", { until: 12 }); G.M.emote(e.rig, "exclaim"); } else { G.M.emote(e.rig, "question"); } e.bub = 1.4; }
-    floatAt(G.keeper.x, G.keeper.y + 2.1, G.keeper.z, "♪", 0xffd21a);
+    floatAt(G.keeper.x, G.keeper.y + 2.1, G.keeper.z, "♪", 0xffd21a); tut("whistle");
   }
   function actV() {
     if (G.placing) { placeKey("V"); return; }
     const r = G.reach, h = G.held;
     const e = h && h.kind === "creature" ? h.e : r && r.kind === "creature" ? r.e : null;
-    if (e) { card(e.c); return; }
+    if (e) { tut("look"); card(e.c); return; }
     const it = h && h.kind === "egg" ? h.it : r && r.kind === "egg" ? r.it : null;
     if (it) { const d = it.data, k = d.warm / d.need; talk([["Egg", `${d.from ? esc(d.from[0].toUpperCase() + d.from.slice(1)) + ". " : ""}${k < 0.3 ? "Cool still: it needs a while yet." : k < 0.7 ? "Warm, and something stirs inside." : "It's wobbling! It'll hatch any moment."}`]]); }
   }
@@ -1041,7 +1087,10 @@
     toast(`Day ${n + 1}`, "sun");
     const S = G.save;
     dawnDecor();
-    if (Math.random() < 0.35 && (S.mail || []).length < 8) { S.mail = S.mail || []; const pool = G.D.ANIMALS.filter(a => a.region === "central" && a.rarity <= 2); const sp = pool[Math.floor(Math.random() * pool.length)]; S.mail.push(G.L.egg(Math.random() < 0.5 ? "chao-neutral-child" : sp.id, { from: "sent by the Garden Society, with its compliments" })); toast("Something arrived in the mailbox", "mail"); }
+    /* the Garden Society writes now and then: mostly fruit; an egg only rarely (eggs are earned) */
+    const r = Math.random();
+    if (r < 0.06) { const pool = G.D.ANIMALS.filter(a => a.region === "central" && a.rarity <= 2); const sp = pool[Math.floor(Math.random() * pool.length)]; letter({ from: "The Garden Society", title: "With the Society's compliments", text: "For a garden well kept, an egg from the Society's own.", eggs: [G.L.egg(Math.random() < 0.5 ? "chao-neutral-child" : sp.id, { from: "sent by the Garden Society, with its compliments" })] }); toast("A letter in the mailbox", "mail"); }
+    else if (r < 0.3) { letter({ from: "The Garden Society", title: "A basket of fruit", text: "The Society's orchards had more than they could eat.", items: { round: 2, triangle: 1, square: 1 } }); toast("A letter in the mailbox", "mail"); }
     persist();
   }
   /* a creature's rig: placed, turned, animated, its ball and its tag */
@@ -1089,12 +1138,15 @@
     G.hud.innerHTML = `
       <div class="cg-clock"><span class="cg-sun"></span><b></b><i></i></div>
       <div class="cg-rings"><span class="cg-ring"></span><b></b></div>
+      <button class="cg-mailc" style="display:none">${ico("mail")}<b></b></button>
+      <div class="cg-lesson" style="display:none"></div>
       <div class="cg-mini" style="display:none"><canvas width="132" height="132"></canvas></div>
       <div class="cg-mapname" style="display:none"></div>
       <div class="cg-toasts"></div>
       <div class="cg-prompt"></div>
       <button class="cg-menu-btn" data-cgmenu>${ico("chevrons")}<span>Menu</span></button>`;
     G.hud.querySelector("[data-cgmenu]").onclick = () => mainMenu();
+    G.hud.querySelector(".cg-mailc").onclick = () => { if (!G.menu && !G.talking && !G.battle) mailMenu(); };
     if (matchMedia("(pointer: coarse)").matches || "ontouchstart" in root) touchPad();
   }
   function hudTick() {
@@ -1102,7 +1154,9 @@
     const s = `${h % 12 || 12}:${String(m).padStart(2, "0")}<small>${h < 12 ? "AM" : "PM"}</small>`, d = `Day ${Math.floor(G.save.day) + 1}`;
     if (s !== G.hudS) { G.hudS = s; const c = G.hud.querySelector(".cg-clock"); c.querySelector("b").innerHTML = s; c.querySelector("i").textContent = d; c.querySelector(".cg-sun").innerHTML = ico(isNight() ? "moon" : "sun"); }
     const rings = G.save.rings; if (rings !== G.hudR) { G.hudR = rings; G.hud.querySelector(".cg-rings b").textContent = rings; }
-    mapHud();
+    const un = (G.save.letters || []).filter(m => !m.read).length;
+    if (un !== G.hudM) { G.hudM = un; const mc = G.hud.querySelector(".cg-mailc"); mc.style.display = un ? "" : "none"; mc.querySelector("b").textContent = un; }
+    mapHud(); lessonHud();
   }
   const V3 = new THREE.Vector3();
   function project(x, y, z) { V3.set(x, y, z).project(G.cam); if (V3.z > 1) return null; return [(V3.x + 1) / 2 * G.w, (1 - V3.y) / 2 * G.h]; }
@@ -1202,6 +1256,8 @@
         <button class="cg-mi" data-f data-focus data-go="creatures">${ico("heart")}<b>Garden</b><i>${nC} Chao, ${nA} animal${nA === 1 ? "" : "s"}${G.items.filter(i => i.kind === "egg").length ? `, ${G.items.filter(i => i.kind === "egg").length} egg${G.items.filter(i => i.kind === "egg").length === 1 ? "" : "s"}` : ""}</i></button>
         <button class="cg-mi" data-f data-go="book">${ico("book")}<b>Encyclopedias</b><i>${Object.keys(S.seen).filter(k => k.startsWith("chao")).length}/${G.D.CHAO.length} Chao, ${Object.keys(S.seen).filter(k => k.startsWith("an-")).length}/${G.D.ANIMALS.length} animals</i></button>
         <button class="cg-mi" data-f data-go="bag">${ico("clipboard")}<b>Bag</b><i>Fruit and things to take out</i></button>
+        <button class="cg-mi" data-f data-go="mail">${ico("mail")}<b>Mail</b><i>${(() => { const n = (S.letters || []).filter(m => !m.read).length; return n ? `${n} new letter${n > 1 ? "s" : ""}` : "Letters from the zones and the garden's folk"; })()}</i></button>
+        <button class="cg-mi" data-f data-go="lessons">${ico("book")}<b>Hazel's lessons</b><i>${lessonsLine()}</i></button>
         <button class="cg-mi" data-f data-go="habitat">${ico("clover")}<b>Habitat</b><i>${decorList().length}/${decorCap()} decor set out here${Object.values(S.decorBag || {}).reduce((a, b) => a + b, 0) ? `, ${Object.values(S.decorBag).reduce((a, b) => a + b, 0)} in the bag` : ""}</i></button>
         <button class="cg-mi" data-f data-go="keeper">${ico("person")}<b>Keeper</b><i>${esc(S.avatar.name || "You")}: change how you look</i></button>
         <button class="cg-mi" data-f data-go="leave">${ico("door")}<b>Save and leave</b><i>Back to the cabinet's menu</i></button>
@@ -1209,10 +1265,11 @@
       <p class="cg-keys"><b>Arrows</b> move &nbsp; <b>Shift</b> run &nbsp; <b>Space</b> jump &nbsp; <b>Z</b> pick up / use &nbsp; <b>C</b> pet &nbsp; <b>X</b> throw / whistle &nbsp; <b>V</b> look &nbsp; <b>Q E</b> or drag: camera</p>`, "cg-small"));
     G.menu.el.querySelectorAll("[data-go]").forEach(b => b.onclick = () => {
       const k = b.dataset.go;
-      if (k === "creatures") creaturesList(); else if (k === "book") encyclopedia(); else if (k === "bag") bag(); else if (k === "habitat") habitatMenu(); else if (k === "keeper") creator(false); else if (k === "leave") { menuClose(); persist(); close(); }
+      if (k === "creatures") creaturesList(); else if (k === "book") encyclopedia(); else if (k === "bag") bag(); else if (k === "habitat") habitatMenu(); else if (k === "mail") mailMenu(); else if (k === "lessons") lessonsMenu(); else if (k === "keeper") creator(false); else if (k === "leave") { menuClose(); persist(); close(); }
     });
   }
   function creaturesList() {
+    tut("list");
     const S = G.save, all = [...S.chao, ...S.animals];
     const row = c => { const sp = G.D.species(c.sp); return `<button class="cg-crow" data-f data-c="${c.id}"><canvas width="96" height="96" data-thumb="${c.id}"></canvas><span><b>${esc(c.name)}</b><i>${esc(sp.name)}</i><em>${ico("heart")} ${Math.round(c.bond)} &nbsp; Lv ${G.L.lvSum(c)}</em></span></button>`; };
     const el = menuOpen(sec("The garden's own", "heart", `
@@ -1271,7 +1328,7 @@
     const el = menuOpen(`<div class="panel cg-panel cg-hatch"><div class="panel-hd gold">${ico("star")}It hatched!</div>
       <div class="cg-hatch-body"><canvas class="cg-prev" width="260" height="260"></canvas>
         <div><p>A <b>${esc(sp.name)}</b>${c.parents ? `, child of ${esc((G.save.book[c.parents[0]] || {}).name || "?")} and ${esc((G.save.book[c.parents[1]] || {}).name || "?")}` : ""}.</p>
-        <p class="cg-meta">${esc(G.D.TEMPERS[c.genes.temper[0]].name)}, with a ${esc(G.D.TEMPERS[c.genes.temper[1]].name.toLowerCase())} streak. ${esc(G.L.traitsOf(c).map(t => t.name).join(", "))}.</p>
+        <p class="cg-meta">${esc(G.D.TEMPERS[c.genes.temper[0]].name)}, with ${(t2 => /^[aeiou]/.test(t2) ? "an " : "a ")(G.D.TEMPERS[c.genes.temper[1]].name.toLowerCase())}${esc(G.D.TEMPERS[c.genes.temper[1]].name.toLowerCase())} streak. ${esc(G.L.traitsOf(c).map(t => t.name).join(", "))}.</p>
         <label class="cg-lab">Its name</label><input maxlength="14" value="${esc(c.name)}" spellcheck="false"></div></div>
       <div class="cg-foot"><button class="btn ghost" data-f data-rand>${ico("swap")}Another name</button><button class="btn" data-f data-focus data-ok>${ico("check")}Welcome</button></div></div>`, null, "cg-cardwrap");
     const inp = el.querySelector("input");
@@ -1534,12 +1591,13 @@
   const SHOP = {
     food: [["round", 20], ["triangle", 40], ["square", 40], ["berry", 15], ["nut", 15], ["candy", 30], ["mushroom", 30], ["heart", 120], ["chaosdrive-g", 80], ["chaosdrive-p", 80], ["chaosdrive-r", 80], ["chaosdrive-y", 80]],
     toys: [["ball", 60], ["duck", 60], ["trumpet", 80], ["box", 100], ["car", 100], ["kite", 120]],
-    eggs: [["chao-neutral-child", 300, "A Chao egg", "A plain egg: what hatches is up to how you raise it."],
-           ["chao-hero-child", 650, "A Halo Chao egg", "From a Halo line: it hatches already leaning kind and bright."],
-           ["chao-dark-child", 650, "A Shade Chao egg", "From a Shade line: it hatches already leaning sly and bold."],
-           ["chao-wild-child", 650, "A Grove Chao egg", "From a Grove line: half wild from the start, at home with the animals."],
-           ["chao-mech-child", 650, "A Gear Chao egg", "From a Gear line: it hatches with a gear for a ball, and a knack for machines."],
-           ["animal", 250, "An animal's egg", "From the gardens round about. Who knows what's in it?"]],
+    /* (eggs are earned: dear, and only one a day -- Pip gets one in each morning) */
+    eggs: [["chao-neutral-child", 2500, "A Chao egg", "A plain egg: what hatches is up to how you raise it."],
+           ["chao-hero-child", 4000, "A Halo Chao egg", "From a Halo line: it hatches already leaning kind and bright."],
+           ["chao-dark-child", 4000, "A Shade Chao egg", "From a Shade line: it hatches already leaning sly and bold."],
+           ["chao-wild-child", 4000, "A Grove Chao egg", "From a Grove line: half wild from the start, at home with the animals."],
+           ["chao-mech-child", 4000, "A Gear Chao egg", "From a Gear line: it hatches with a gear for a ball, and a knack for machines."],
+           ["animal", 1800, "An animal's egg", "From the gardens round about. Who knows what's in it?"]],
     room: [[10, 1000], [20, 2500], [30, 5000]],
   };
   function shopMenu(tab) {
@@ -1550,7 +1608,9 @@
     let rows = "";
     if (tab === "food") rows = SHOP.food.map(([id, p]) => { const f = G.D.food(id); return row("food:" + id, f.name, f.text + ((S.inv[id] || 0) ? ` (${S.inv[id]} in the bag)` : ""), p, f.c); }).join("");
     if (tab === "toys") rows = SHOP.toys.map(([id, p]) => { const t = G.D.toy(id); return row("toy:" + id, t.name, t.text, p, t.c); }).join("");
-    if (tab === "eggs") rows = SHOP.eggs.map(([id, p, name, text]) => row("egg:" + id, name, text, p, id === "animal" ? 0xd8c8a0 : (G.D.ALIGNS[G.D.species(id).align] || {}).c ? G.D.ALIGNS[G.D.species(id).align].c[0] : 0xf4f0e4)).join("");
+    const eggToday = S.shopEggDay === Math.floor(S.day);
+    if (tab === "eggs") rows = (eggToday ? `<p class="cg-empty">Pip: "That was today's egg, I'm afraid. Another comes in tomorrow morning."</p>` : `<p class="cg-text">Pip gets one egg in each morning. Choose well.</p>`)
+      + SHOP.eggs.map(([id, p, name, text]) => row("egg:" + id, name, text, p, id === "animal" ? 0xd8c8a0 : (G.D.ALIGNS[G.D.species(id).align] || {}).c ? G.D.ALIGNS[G.D.species(id).align].c[0] : 0xf4f0e4).replace("<button", eggToday ? "<button disabled" : "<button")).join("");
     if (tab === "decor") rows = G.D.DECOR.filter(d => !d.story).map(d => row("decor:" + d.id, d.name, d.text + ((S.decorBag || {})[d.id] ? ` (${S.decorBag[d.id]} in the bag)` : ""), d.price, G.Wd.PAINT[S.paint || 0])).join("");
     if (tab === "room") { const cur = (S.habitat && S.habitat.room) || 0, nx = SHOP.room.find(([r]) => r > cur); rows = nx ? row("room:" + nx[0], `A bigger garden (room for ${30 + nx[0]})`, "The Society's carpenters widen your plots and build more nests.", nx[1], 0x6ad050) : `<p class="cg-empty">The garden's as big as it gets: room for ${30 + cur}.</p>`; }
     const el = menuOpen(`<div class="panel cg-panel"><div class="panel-hd">${ico("ticket")}Pip's garden shop<small>${S.rings} rings</small></div>
@@ -1563,6 +1623,8 @@
       const [kind, id] = b.dataset.buy.split(":"), list = kind === "food" ? SHOP.food : kind === "toy" ? SHOP.toys : kind === "egg" ? SHOP.eggs : kind === "decor" ? G.D.DECOR.filter(d => !d.story).map(d => [d.id, d.price]) : SHOP.room;
       const it = list.find(x => String(x[0]) === id); if (!it || S.rings < it[1]) return;
       if (kind === "egg" && !room()) { toast("The garden's full: buy more room first", "info"); return; }
+      if (kind === "egg" && S.shopEggDay === Math.floor(S.day)) { toast("That was today's egg: another comes in tomorrow", "info"); return; }
+      if (kind === "egg") S.shopEggDay = Math.floor(S.day);
       S.rings -= it[1]; sfx("coin");
       const k = G.keeper, fx = k.x + Math.sin(k.a) * 0.8, fz = k.z + Math.cos(k.a) * 0.8;
       if (kind === "food") { S.inv[id] = (S.inv[id] || 0) + 1; toast(`${G.D.food(id).name}: into the bag`, "check"); }
@@ -1585,6 +1647,7 @@
   const TRAIN_PER_DAY = 3;
   function trainsLeft(c) { const d = Math.floor(G.save.day); return c.trainDay === d ? Math.max(0, TRAIN_PER_DAY - (c.trainN || 0)) : TRAIN_PER_DAY; }
   function yardMenu(sel) {
+    tut("yard");
     const S = G.save, T = root.ChaoTrain; if (!T || !T.ok) { toast("The training ground isn't ready", "info"); return; }
     S.trainBest = S.trainBest || {};
     const el = menuOpen(sec("The training ground", "dumbbell", `
@@ -1638,6 +1701,93 @@
     el.querySelector("[data-back]").onclick = menuClose;
     el.querySelector("[data-other]").onclick = () => yardMenu(g.id);
     el.querySelector("[data-again]").onclick = () => trainGo(c, g.id);
+  }
+
+  /* ---------------------------------------------------------------- Hazel's lessons
+     Hands-on and optional: six short lessons, each a few things to do with your own hands (the
+     panel under the clock ticks them off as you do them, in any order). Offered at the first
+     visit, and in the menu any time. All six done, Hazel posts a gift to the mailbox: a Chao egg,
+     an animal egg, and supplies for the creatures. */
+  const LESSONS = [
+    { id: "about", name: "Getting about", hi: "First, your own two feet. Have a wander.", steps: [
+      ["fountain", "Walk to the fountain in the plaza (the arrow keys)"], ["run", "Hold Shift as you walk, to run"], ["jump", "Press Space to jump"], ["cam", "Turn the camera: Q and E, or drag"]],
+      bye: "There. You'll be all over the garden in no time." },
+    { id: "eggs", name: "Eggs", hi: "Eggs want warmth. Let's see to one.", steps: [
+      ["pick-egg", "Pick up an egg (walk up to it, Z)"], ["rub", "Rub it warm while you hold it (C)"], ["incubate", "Set it on the incubator by the hall (Z there)"]],
+      bye: "On the incubator an egg hatches twice as fast; carrying it and rubbing it help too." },
+    { id: "food", name: "Feeding", hi: "Hungry mouths. The orchard's east of the plaza.", steps: [
+      ["shake", "Shake a fruit tree (Z by its trunk)"], ["pick-fruit", "Pick up a fruit (Z)"], ["feed", "Give it to a creature (walk up to one holding it, Z)"]],
+      bye: "Fruit feeds them and grows them a little, too. When they're hungry they'll shake the trees themselves." },
+    { id: "care", name: "Care and play", hi: "A little fuss goes a long way.", steps: [
+      ["pet", "Pet a creature (C)"], ["cuddle", "Pick one up (Z) and cuddle it (C)"], ["toy", "Give a creature a toy: pick one up, then Z on the creature"], ["whistle", "Whistle (X) to call your friends over"]],
+      bye: "Petting and play make friends of them. Rough handling does the opposite, mind." },
+    { id: "know", name: "Knowing them", hi: "Every one is its own. Have a proper look.", steps: [
+      ["look", "Look closer at a creature (V)"], ["list", "Open the menu (Enter), then the Garden list"], ["book", "Open the encyclopedias at the lectern by the hall (Z)"]],
+      bye: "Their cards tell you everything: what they're good at, who they like, what they've been up to." },
+    { id: "places", name: "The garden's places", hi: "Last of all: where everything is.", steps: [
+      ["mailbox", "Check the mailbox by the hall (Z)"], ["hall", "Step into the Garden Hall (Z at its door)"], ["yard", "Visit the training ground east of the plaza (Z at its gate)"], ["world", "Go out through any gate to the world map, and walk back in"]],
+      bye: "Duels and races at the hall, training in the yard, the other gardens out on the map. That's the lot!" },
+  ];
+  const AWARD = "a Chao egg, an animal egg, and supplies for your creatures";
+  const lessonState = () => { const S = G.save; return S.lessons = S.lessons || { done: {}, cur: null, got: {} }; };
+  const lessonsLine = () => { const T = lessonState(), n = Object.keys(T.done).length; return n >= LESSONS.length ? "All done. Hazel's gift was posted" : `${n}/${LESSONS.length} done. All six: ${AWARD}`; };
+  function lessonsMenu() {
+    const T = lessonState(), all = Object.keys(T.done).length >= LESSONS.length;
+    const el = menuOpen(sec("Hazel's lessons", "book", `
+      <p class="cg-text">Short and hands-on: do each thing yourself, in any order, and the list under the clock ticks it off. ${all ? "You've done them all: Hazel's gift went to the mailbox." : `Finish all six and Hazel posts you a gift: ${AWARD}.`}</p>
+      <div class="cg-list">${LESSONS.map((l, i) => `<button class="cg-irow" data-f ${i === 0 ? "data-focus" : ""} data-l="${l.id}"><span class="cg-dot" style="background:${T.done[l.id] ? "#3ad86a" : T.cur === l.id ? "#ffd21a" : "#5a6a9a"}"></span><b>${esc(l.name)}</b><i>${T.done[l.id] ? "Done" : T.cur === l.id ? "Going on now" : `${l.steps.length} things to do`}</i><em>${i + 1}</em></button>`).join("")}</div>
+      <div class="cg-foot">${T.cur ? `<button class="btn ghost" data-f data-stop>${ico("close")}Stop this lesson</button>` : ""}<button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`), menuClose, "cg-small");
+    el.querySelector("[data-back]").onclick = menuClose;
+    const st = el.querySelector("[data-stop]"); if (st) st.onclick = () => { T.cur = null; T.got = {}; persist(); menuClose(); toast("Lesson stopped: pick it up again any time", "info"); };
+    el.querySelectorAll("[data-l]").forEach(b => b.onclick = () => lessonStart(b.dataset.l));
+  }
+  function lessonStart(id) {
+    const T = lessonState(), L = LESSONS.find(l => l.id === id); if (!L) return;
+    menuClose(); T.cur = id; T.got = {}; persist();
+    talk([["Hazel", L.hi], ["Hazel", "The list under the clock shows what to do. Take your time."]]);
+  }
+  /* something done: a lesson's step ticked off, the lesson finished, the gift at the end */
+  function tut(ev) {
+    if (!G || !G.save) return;
+    const T = lessonState(); if (!T.cur) return;
+    const L = LESSONS.find(l => l.id === T.cur); if (!L || T.got[ev] || !L.steps.some(s => s[0] === ev)) return;
+    T.got[ev] = true; sfx("check"); G.hudL = null;
+    if (L.steps.every(s => T.got[s[0]])) {
+      T.done[L.id] = true; T.cur = null; T.got = {}; persist();
+      const all = Object.keys(T.done).length >= LESSONS.length, next = LESSONS.find(l => !T.done[l.id]);
+      setTimeout(() => {
+        if (!G) return;
+        const lines = [["Hazel", `${L.bye}`]];
+        if (all && !T.awarded) {
+          T.awarded = true;
+          const anim = G.D.ANIMALS.filter(a => a.classic && a.rarity <= 1);
+          letter({ from: "Hazel", title: "For finishing your lessons", text: "Every lesson done! A Chao egg, an animal egg, fruit, Chaos Drives and two things for the garden. Look after them.",
+            eggs: [G.L.egg("chao-neutral-child", { from: "a gift from Hazel, for finishing her lessons" }), G.L.egg(anim[Math.floor(Math.random() * anim.length)].id, { from: "a gift from Hazel, for finishing her lessons" })],
+            items: { round: 6, triangle: 3, square: 3, heart: 2, "chaosdrive-g": 1, "chaosdrive-p": 1, "chaosdrive-r": 1, "chaosdrive-y": 1 }, decor: { nest: 1, toybox: 1 } });
+          persist(); jingle("born-change");
+          lines.push(["Hazel", "And that's every lesson! I've posted you a gift: a Chao egg, an animal egg, and supplies. It's waiting in the mailbox by the hall."]);
+        } else if (next) lines.push(["Hazel", `Lesson done. Next, if you like: "${next.name}". It's in the menu under Hazel's lessons.`]);
+        if (G.talking || G.menu || G.battle) setTimeout(() => G && talk(lines), 1500); else talk(lines);
+      }, 600);
+    } else persist();
+  }
+  /* the list under the clock, and the fountain step (got by getting there) */
+  function lessonHud() {
+    const T = lessonState(), box = G.hud.querySelector(".cg-lesson"); if (!box) return;
+    const L = T.cur && LESSONS.find(l => l.id === T.cur);
+    if (L && L.steps.some(s => s[0] === "fountain") && !T.got.fountain && (G.save.region || "central") === "central") { const F = G.Wd.PLAN.fountain; if (Math.hypot(G.keeper.x - F[0], G.keeper.z - F[1]) < 4.2) tut("fountain"); }
+    const html = L && !G.onMap ? `<b>${ico("book")}${esc(L.name)}</b>${L.steps.map(([ev, t]) => `<span class="${T.got[ev] ? "got" : ""}"><i>${T.got[ev] ? ico("check") : ""}</i>${esc(t)}</span>`).join("")}` : "";
+    if (html !== G.hudL) { G.hudL = html; box.innerHTML = html; box.style.display = html ? "" : "none"; }
+  }
+  /* the first visit: Hazel offers them (and says what finishing them brings) */
+  function lessonOffer() {
+    const el = menuOpen(sec("Hazel's lessons", "book", `
+      <p class="cg-text">Hazel: "Would you like me to show you the ropes? Six short lessons, hands-on: you do each thing yourself, and I'll tick it off. They're up to you, and they're in the menu any time, under Hazel's lessons."</p>
+      <p class="cg-text"><b>Finish all six and Hazel posts you a gift: ${AWARD}.</b></p>
+      <div class="cg-mm"><button class="cg-mi" data-f data-focus data-go="yes">${ico("book")}<b>Start the first lesson</b><i>Getting about</i></button>
+        <button class="cg-mi" data-f data-go="no">${ico("clover")}<b>Maybe later</b><i>Have a look round on your own</i></button></div>`), menuClose, "cg-small");
+    el.querySelector('[data-go="yes"]').onclick = () => lessonStart("about");
+    el.querySelector('[data-go="no"]').onclick = () => { menuClose(); toast("Hazel's lessons are in the menu (Enter) any time", "book"); };
   }
 
   /* ---------------------------------------------------------------- the world map
@@ -2029,9 +2179,9 @@
     const S = G.save, n = Object.keys(S.seen || {}).length; S.mile = S.mile || 0;
     while (S.mile < MILESTONES.length && n >= MILESTONES[S.mile]) {
       const m = MILESTONES[S.mile++], rings = m * 4;
-      S.rings += rings;
-      if (m >= 50 && (S.mail || []).length < 8) { S.mail = S.mail || []; const pool = G.D.ANIMALS.filter(a => a.rarity === (m >= 160 ? 4 : 3) && !a.badnik && a.plan !== "fish" && a.plan !== "jelly"); S.mail.push(G.L.egg(pool[Math.floor(Math.random() * pool.length)].id, { from: "sent by Wren Ashby, for the encyclopedias" })); }
-      toast(`${m} kinds recorded! Wren sends ${rings} rings${m >= 50 ? ", and an egg to the mailbox" : ""}`, "book");
+      const egg = m >= 50 ? (() => { const pool = G.D.ANIMALS.filter(a => a.rarity === (m >= 160 ? 4 : 3) && !a.badnik && a.plan !== "fish" && a.plan !== "jelly"); return G.L.egg(pool[Math.floor(Math.random() * pool.length)].id, { from: "sent by Wren Ashby, for the encyclopedias" }); })() : null;
+      letter({ from: "Wren Ashby", title: `${m} kinds recorded`, text: `${m} kinds in your encyclopedias! The Society's thanks${egg ? ", and an egg I found on my rounds" : ""}.`, rings, eggs: egg ? [egg] : null });
+      toast(`${m} kinds recorded! A letter from Wren in the mailbox`, "book");
       persist();
     }
   }

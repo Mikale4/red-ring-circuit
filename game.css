@@ -830,6 +830,16 @@
 .adv-team b{font:700 15px/1 var(--sx-pix);color:var(--sx-yel);text-shadow:var(--sx-out1);white-space:nowrap}
 .adv-team i{font:600 12.5px/1.2 var(--sx-pix);font-style:normal;color:var(--sx-pale);text-align:left}
 .adv-team em{margin-left:auto;font:700 12.5px/1 var(--sx-pix);font-style:normal;color:#fff;background:var(--sx-red);border:2px solid var(--sx-ink);border-radius:8px;padding:5px 8px}
+/* the inbox: a note a row, new ones lit */
+.adv-inbox{width:min(600px,100%)}
+.adv-inlist{display:flex;flex-direction:column;gap:6px;padding:12px 14px;max-height:min(60vh,520px);overflow:auto}
+.adv-msg{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;background:var(--sx-navy2);border:3px solid var(--sx-ink);border-radius:9px}
+.adv-msg.new{box-shadow:inset 0 0 0 2px var(--sx-yel)}
+.adv-msg-ic .ico{width:22px;height:22px}
+.adv-msg b{display:block;font:700 15px/1.2 var(--sx-pix);color:var(--sx-yel);text-shadow:var(--sx-out1)}
+.adv-msg p{margin:3px 0 0;font:500 13px/1.35 var(--sx-pix);color:#fff}
+.adv-msg i{display:block;margin-top:4px;font:600 11px/1 var(--sx-pix);font-style:normal;color:var(--sx-cyan)}
+.adv-inempty{margin:0;padding:14px;font:500 14px/1.45 var(--sx-pix);color:var(--sx-pale)}
 .adv-roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;padding:8px 12px 12px}
 .adv-rst{display:flex;align-items:center;gap:10px;padding:6px 8px;border:2px solid var(--sx-ink);border-radius:10px;background:var(--sx-navy2)}
 .adv-rst canvas{width:66px;height:54px;image-rendering:pixelated;flex:none;border-radius:6px;background:var(--sx-sky)}

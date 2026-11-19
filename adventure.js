@@ -6619,7 +6619,12 @@
     p.vx = -(sgn(b.x - p.x) || p.face) * 7; p.vy = Math.max(p.vy, 9); p.ground = false; p.airMove = false; p.airUses = 0;
     if (p.state === "homing" || p.state === "seek" || p.state === "dash" || p.state === "roll" || p.state === "glide") p.state = "run";
     p.curl = true;
-    if (b.hp <= 0 && !b.gem) { b.state = "boom"; b.t = 0; b.shots.length = 0; b.fires.length = 0; SFX.boom(); }
+    if (b.hp <= 0 && !b.gem) {
+      b.state = "boom"; b.t = 0; b.shots.length = 0; b.fires.length = 0; SFX.boom();
+      /* one time in four, a Chao egg for the garden */
+      if (Math.random() < 0.25) chaoPost({ k: "egg", kind: "chao", from: `for beating Eggman's robot in ${zoneName()}` }, "A Chao egg for your garden",
+        `For beating Eggman's robot in ${zoneName()}, a Chao egg is waiting in your Chao Garden's mailbox.`, "A Chao egg was sent to your Chao Garden!");
+    }
   }
   /* a blow, a shot or a blast that reaches its weak spot (strike) */
   function bossStrike(x0, x1, y0, y1) {
@@ -6993,6 +6998,9 @@
           c.open = true; c.t = 0; b.state = "done"; p.y = c.y + ch - 0.45; p.vy = 6; p.ground = false;
           SFX.pop(); SFX.check(); burst(c.x, c.y + ch, [0xffffff, 0xffd040], 16, 6);
           for (let k = 0; k < 8; k++) setTimeout(() => world && spawnCritter(c.x + (Math.random() - 0.5) * 1.6, c.y + 0.6), k * 120);
+          /* one time in four, one of the freed animals' eggs for the garden */
+          if (Math.random() < 0.25) setTimeout(() => chaoPost({ k: "egg", kind: "animal", from: `the animal capsule in ${zoneName()}` }, "An animal egg for your garden",
+            `One of the animals you freed from the capsule in ${zoneName()} left an egg: it's waiting in your Chao Garden's mailbox.`, "An animal egg was sent to your Chao Garden!"), 900);
         }
       } else {
         c.t += dt;
@@ -7091,11 +7099,15 @@
       carrots: Math.max(prev.carrots || 0, p.carrots), by: best ? p.c.id : prev.by,
     };
     save(saveData);
+    /* a tenth of the rings to the Chao Garden (story, Free Exhibition, the grand prix) */
+    const toGarden = Math.round((p.carrots || 0) * 0.1);
+    const sent = toGarden > 0 && chaoPost({ k: "rings", n: toGarden, from: zoneName() }, "Rings for your garden",
+      `${toGarden} ring${toGarden > 1 ? "s" : ""}, a tenth of the ${p.carrots} from ${zoneName()}, sent to your Chao Garden.`, `${toGarden} ring${toGarden > 1 ? "s" : ""} sent to your Chao Garden!`);
     if (earned && root.Stable && Stable.grant) Stable.grant(earned, "adventure");
     if (NP.on && NP.race) { npFinished(time); return; }              // an online race: home, and wait for the others
     if (GPR) { gpHome(time); return; }                               // the grand prix: home, and your place
     if (RACE) { raceHome(time); return; }                            // a race against a rival: home first
-    setTimeout(() => results({ time, best, grade, carrots: p.carrots, total: world.total, shoes: p.shoes, shoesAll: shoes, falls: p.falls, earned, par }), 1700);
+    setTimeout(() => results({ time, best, grade, carrots: p.carrots, total: world.total, shoes: p.shoes, shoesAll: shoes, falls: p.falls, earned, par, garden: sent ? toGarden : 0 }), 1700);
   }
   function goalStep(p) { if (p.ground && Math.abs(p.vx) < 0.5) p.face = 1; }
   function fireworks(dt) {
@@ -8321,7 +8333,7 @@
       ["gp", "trophy", "Red Ring Circuit", "The grand prix: six cups of four courses, eight runners, and Red Rings with a power in each",
         (() => { const t = (saveData.gp && saveData.gp.trophies) || {}; const n = Object.values(t).reduce((a, x) => a + Object.keys(x).length, 0); return n ? `${n}/18` : "New"; })()],
       ["chao", "clover", "Chao Garden", "Raise Chao and animals in a garden of your own: hatch, feed, play, and watch them grow into themselves",
-        (() => { let n = 0; try { const c = JSON.parse(localStorage.getItem(KEY() + ".chao")); n = c ? (c.chao || []).length + (c.animals || []).length : 0; } catch (e) {} return n ? `${n}` : "New"; })()],
+        (() => { if ((saveData.chaoPost || []).length) return "Mail!"; let n = 0; try { const c = JSON.parse(localStorage.getItem(KEY() + ".chao")); n = c ? (c.chao || []).length + (c.animals || []).length : 0; } catch (e) {} return n ? `${n}` : "New"; })()],
       ["exhibition", "flag", "Free Exhibition", "Any runner in any zone you've opened, Act 1 or Act 2 and its boss: for time, rings and Red Star Rings",
         `${stages().filter((st, i) => cleared(i)).length}/${stages().length}`],
       ["battle", "trophy", "Battle", "Up to four fighters with health, players or CPUs, in any runner's arena", ""],
@@ -8341,6 +8353,7 @@
           <div class="adv-logo">RED RING CIRCUIT</div>
         </div>
         <button class="adv-team" data-team data-k="team">${ico("person")}<b>Fighters ${fightersN()}/${CAST.length}</b>${chalsOpen().length ? `<em>${chalsOpen().length} challenger${chalsOpen().length > 1 ? "s" : ""} waiting</em>` : `<i>Who's on the team, and how to win over the rest</i>`}</button>
+        <button class="adv-team" data-inbox data-k="inbox">${ico("mail")}<b>Inbox</b>${inboxNew() ? `<em>${inboxNew()} new</em>` : `<i>Eggs and rings sent to your Chao Garden, and the like</i>`}</button>
         <div class="adv-mm">
           ${items.map(([id, ic, t, sub, note], i) => `
             <button class="adv-mi" data-mm="${id}" data-k="mm-${id}" ${i === 0 ? "data-focus" : ""}>
@@ -8356,6 +8369,7 @@
     if (root.AdventureOnline) { AdventureOnline._from = "menu"; AdventureOnline.topbar(ov.querySelector(".ao-topbar")); }
     ov.querySelectorAll("[data-mm]").forEach(b => b.onclick = () => go[b.dataset.mm]());
     ov.querySelector("[data-team]").onclick = () => fighters();
+    ov.querySelector("[data-inbox]").onclick = () => inboxScreen();
     ov.querySelector("#advMMBack").onclick = () => title();
     autoFocus();
   }
@@ -10717,12 +10731,60 @@
       cancelAnimationFrame(raf); raf = 0; bgmStop(); inGarden = true;
       const ok = root.ChaoGarden && ChaoGarden.open(host, {
         key: KEY() + ".chao", prog: () => PROG(), tone,
+        /* the zones' post, handed over once (the garden makes letters of it at its mailbox) */
+        post: () => { const p = (saveData.chaoPost || []).slice(); if (p.length) { saveData.chaoPost = []; save(saveData); } return p; },
         sfx: n => { const f = SFX[n]; if (f) f(); },
         onExit: () => { inGarden = false; last = 0; raf = requestAnimationFrame(frame); mainMenu(); },
       });
       if (!ok) { inGarden = false; raf = requestAnimationFrame(frame); note("The Chao Garden needs WebGL to draw its voxels."); }
     });
   }
+  /* ---------------------------------------------------------------- the Chao Garden's post, and the inbox
+     What the zones send the Chao Garden, kept in the save till the garden next opens (it makes
+     letters of them at its mailbox): one time in four, an animal's egg from a boss's animal
+     capsule; one time in four, a Chao's egg for beating one of Eggman's robots; and a tenth of
+     the rings from every stage cleared in the story, Free Exhibition or the grand prix (not
+     online, not the training, not the title's demo). Each also says so on the screen, and
+     leaves a note in the cabinet's inbox (the main menu's Inbox). The garden's own rule, an egg
+     for every hundred animals freed, it counts itself. */
+  const POST_EGGS_MAX = 40;
+  function inboxAdd(title, text, icon) {
+    if (!saveData) return;
+    const I = saveData.inbox = saveData.inbox || [];
+    I.unshift({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), t: Date.now(), title, text, icon: icon || "mail", read: false });
+    if (I.length > 60) I.length = 60;
+  }
+  const inboxNew = () => ((saveData && saveData.inbox) || []).filter(m => !m.read).length;
+  const zoneName = () => { const d = curDef(); return d ? d.name + (d.actN ? " Act " + d.actN : "") : "the zones"; };
+  function chaoPost(item, title, text, shout) {
+    if (SIM || !saveData || TUT || NP.on || (player && (player.demo || player.cpu))) return false;
+    const P = saveData.chaoPost = saveData.chaoPost || [];
+    if (item.k === "rings") { const r = P.find(x => x.k === "rings"); if (r) { r.n += item.n; r.stages = (r.stages || 1) + 1; r.from = item.from; } else P.push(Object.assign({ at: Date.now(), stages: 1 }, item)); }
+    else if (P.filter(x => x.k === "egg").length < POST_EGGS_MAX) P.push(Object.assign({ at: Date.now() }, item));
+    else return false;
+    inboxAdd(title, text, item.k === "rings" ? "clover" : "mail");
+    save(saveData);
+    if (shout) hudToast(shout);
+    return true;
+  }
+  /* when it was, in words */
+  const ago = t => { const s = (Date.now() - t) / 1000; return s < 60 ? "just now" : s < 3600 ? `${Math.floor(s / 60)} min ago` : s < 86400 ? `${Math.floor(s / 3600)} h ago` : new Date(t).toLocaleDateString(); };
+  /* the inbox: everything the game has to tell you, newest first; opening it reads them all */
+  function inboxScreen() {
+    const ov = screenOn("inbox"), I = saveData.inbox || [];
+    ov.innerHTML = `
+      <div class="panel adv-small adv-inbox pop">
+        <div class="panel-hd">${ico("mail")}Inbox<small>${I.length ? `${I.length} note${I.length > 1 ? "s" : ""}` : ""}</small></div>
+        <div class="adv-inlist">${I.length ? I.map(m => `<div class="adv-msg ${m.read ? "" : "new"}"><span class="adv-msg-ic">${ico(m.icon || "mail")}</span><div><b>${esc(m.title)}</b><p>${esc(m.text)}</p><i>${esc(ago(m.t))}${m.read ? "" : " &middot; new"}</i></div></div>`).join("")
+          : `<p class="adv-inempty">Nothing yet. Eggs and rings the zones send your Chao Garden are noted here.</p>`}</div>
+        <div class="adv-btns">${I.length ? `<button class="btn ghost" id="advInClear">${ico("close")}Clear all</button>` : ""}<button class="btn" id="advInBack" data-back data-focus>${ico("back")}Back</button></div>
+      </div>`;
+    I.forEach(m => { m.read = true; }); save(saveData);
+    ov.querySelector("#advInBack").onclick = () => mainMenu();
+    const cl = ov.querySelector("#advInClear"); if (cl) cl.onclick = () => { saveData.inbox = []; save(saveData); inboxScreen(); };
+    setTimeout(autoFocus, 0);
+  }
+
   /* load the courses when they're first wanted (a megabyte of them; the rest of the cabinet doesn't need it) */
   function needGP(then) {
     if (root.AdventureGP) { then(); return; }
@@ -12004,6 +12066,7 @@
           <div class="adv-row adv-big"><span>Grade</span><b class="g g${r.grade}">${r.grade}</b></div>
         </div>
         ${r.earned && root.Stable ? `<div class="adv-pay">${ico("carrot")}<b class="num">+${r.earned}</b> carrots to your stable</div>` : ""}
+        ${r.garden ? `<div class="adv-pay">${ico("clover")}<b class="num">+${r.garden}</b> rings to your Chao Garden</div>` : ""}
         <div class="adv-btns">
           ${storyRun ? (isZone(storyRun.ch) && storyRun.act === 0 ? `<button class="btn" id="advSAct" data-focus>${ico("next")}Go on: Act 2</button>`
             : `<button class="btn" id="advSCont" data-focus>${ico("book")}Go on with the story</button>`)
@@ -13190,7 +13253,7 @@
 
   root.Adventure = { ok: true, open, close, CAST, THEMES,
     _debug: { get cpus() { return CPUS; }, get world() { return world; }, get cam() { return [camX, camY]; }, get player() { return player; }, get GP() { return GP; }, get GPR() { return GPR; }, gpBegin: o => gpBegin(o), npStart: (h, R, plan, me) => npStart(h, R, plan, me), npPlan: (R, id) => npPlan(R, id), get NP() { return NP; }, gpSim: (id, who, seed) => { const r = simRun(gpDef(id), who, seed == null ? 1000 : seed); return { ok: r.ok, time: r.time, end: r.track.length ? r.track[r.track.length - 1][1] : null }; }, gpUse: (id, k) => gpUse(id, k), gpHit: (id, by) => gpHit(id, by), gpPodium: () => gpPodium(), gpMenu: () => gpMenu(), gpDef: id => gpDef(id), coursePic: id => coursePic(id), gpCleanAdd: (id, list) => { GP_CLEAN[id] = list; }, step: (s, n) => { for (let k = 0; k < (n || 1); k++) { readInput(); step(s); worldStep(s); input.jp = input.zp = input.xp = input.cp = 0; } },
-              play: (i, id, a) => { if (id) castId = id; if (i != null) stageIdx = i; actIdx = a || 0; play(); }, draw: dt => draw(dt || 1 / 60), input: INPUT0, keys, touch, parse,
+              play: (i, id, a) => { if (id) castId = id; if (i != null) stageIdx = i; actIdx = a || 0; play(); }, inboxScreen: () => inboxScreen(), inboxNew: () => inboxNew(), bossHit: () => world && world.boss && player && bossHit(world.boss, player), draw: dt => draw(dt || 1 / 60), input: INPUT0, keys, touch, parse,
               get battle() { return battle; }, get punch() { return punch; }, get np() { return NP; }, get tour() { return TOUR; }, frame: t => frame(t), tourSetup, tourMake, tourBracket, tourGo, get demo() { return demo; }, demoTick: (secs, h) => { for (let t = 0; t < secs && demo; t += h || 0.05) demoTick(h || 0.05); }, title, get mode() { return mode; }, get talk() { return talk; }, startBattle, mainMenu, storyMenu, storyEpisode, playChapter, battleSetup, get storyRun() { return storyRun; }, EPS,
               trainingSetup, optionsScreen, arenaDef, emerlLearn, emerlSkills, emerlCast, get saveData() { return saveData; },
               bossWeak: () => world && world.boss && BRAIN[world.boss.key].weak(world.boss),

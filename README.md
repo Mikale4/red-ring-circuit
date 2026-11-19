@@ -274,8 +274,7 @@ attribute it learns a technique from it. They eat (fruit off the ground, or unde
 one drops; hungry and stuck, they come and ask), sleep (most at night), play with the toys and
 each other (tag), talk, spar, tease, swim, explore (finding fruit, nuts, now and then an egg),
 follow you, hide from you; time together makes friends, squabbles rivals, and both go into
-their stories. The animals freed from Eggman's badniks in the zones send eggs to the mailbox,
-one for every eight freed; the Garden Society sends one now and then. Each animal lives as its
+their stories. Eggs are earned, not handed out: see the zones' post and Pip's stall below. Each animal lives as its
 own kind does: birds hop on the ground, fly where they're going and perch up in the trees, the
 ground fowl strut, the waders stalk the shallows, ducks and penguins waddle and swim; monkeys,
 apes and meerkats go on all fours (and meerkats stand up to keep watch); herds keep together and
@@ -372,11 +371,28 @@ Power, gliding off them Agility, the hedge of doors Instinct, the Chaos pads Cha
 Vitality. The race runs itself; you cheer, three times a race, best spent when yours stops to
 watch a butterfly or nods off. Ribbons, rings, records; a class won opens the next one up.
 
+**The zones' post, and the mail.** What you do out in the zones reaches the garden: one time in
+four, an animal's egg from a boss's animal capsule; one time in four, a Chao's egg for beating
+one of Eggman's robots; a tenth of the rings from every stage cleared in the story, Free
+Exhibition or the grand prix (not online, not the training); and an egg for every hundred
+animals freed from badniks. Each is said on the screen when it happens, and noted in the
+cabinet's Inbox (the main menu). The garden turns them into letters at the Central Garden's
+mailbox -- with the Garden Society's now-and-then basket (an egg only rarely), Wren's gifts for
+the encyclopedias and Hazel's -- each letter holding its eggs, rings, things for the bag or the
+habitat; the HUD keeps count of the unread, and the menu's Mail reads them anywhere.
+
+**Hazel's lessons.** The first visit offers six short hands-on lessons (getting about, eggs,
+feeding, care and play, knowing your creatures, the garden's places), optional, in the menu any
+time: each a few things to do yourself, ticked off under the clock as you do them. Finish all
+six and Hazel posts a gift: a Chao egg, an animal egg, fruit, Chaos Drives, a nest bed and a toy
+chest.
+
 **Dojos, the league and the shop.** Three dojo masters (Forest, Mountain, Mechanical) train two
 attributes for rings, or set a trial of three duels for their seal and a technique taught nowhere
 else. The Garden League's commissioner runs five cups in the Mystic Garden's arena; the
-Champion's Cup gives a silver egg. Pip's shop by the hall sells fruit, Chaos Drives, toys, eggs
-of each line, and more room for the garden.
+Champion's Cup gives a silver egg. Pip's shop by the hall sells fruit, Chaos Drives, toys, decor
+and more room for the garden; eggs too, but dear (2,500 rings a Chao egg, 4,000 one of a line,
+1,800 an animal's) and only one a day.
 
 **The badnik raids and the notice board.** A light story: Eggman's badniks (Sonic 1's own:
 Motobugs, Buzz Bombers, Crabmeats, Choppers) have been raiding the gardens. Each raid is told by
