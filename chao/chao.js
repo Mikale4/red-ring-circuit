@@ -1161,8 +1161,9 @@
   }
   function hallMenu() {
     music("hall");
-    const el = menuOpen(sec("The Garden Hall", "door", `<p class="cg-text">Hazel's hall: the warden's desk, the Society's notices, a kettle always on. Its shop and the breeding pens are being made ready.</p>
+    const el = menuOpen(sec("The Garden Hall", "door", `<p class="cg-text">Hazel's hall: the warden's desk, the Society's notices, a kettle always on, and the door through to the race track.</p>
       <div class="cg-mm"><button class="cg-mi" data-f data-focus data-go="duel">${ico("trophy")}<b>Today's visitor</b><i>${esc(visitor().name)} is here, and wants a duel</i></button>
+      <button class="cg-mi" data-f data-go="race">${ico("flag")}<b>The Chao races</b><i>Eight courses, three classes each: ribbons and rings</i></button>
       <button class="cg-mi" data-f data-go="pens">${ico("heart")}<b>The Society's pens</b><i>Pair two grown creatures who are fond of each other</i></button>
       <button class="cg-mi" data-f data-go="rest">${ico("moon")}<b>Rest till morning</b><i>Sleep here; the garden goes on through the night</i></button>
       <button class="cg-mi" data-f data-go="look">${ico("person")}<b>The mirror</b><i>Change how you look</i></button>
@@ -1173,6 +1174,7 @@
       const k = b.dataset.go;
       if (k === "pens") { pens(); return; }
       if (k === "duel") { duelMenu(); return; }
+      if (k === "race") { raceMenu(); return; }
       if (k === "rest") { const t = tod(), add = (t < 0.27 ? 0.27 - t : 1.27 - t); for (const e of G.ents) { G.L.tick(e.c, add * DAY * 0.25, { dayLen: DAY, asleep: true }); e.c.care.energy = 100; e.task = null; } G.save.day += add; menuClose(); toast("Morning", "sun"); persist(); }
       else if (k === "look") creator(false);
       else if (k === "save") { persist(); menuClose(); toast("Saved", "check"); }
@@ -1495,6 +1497,79 @@
     el.querySelector("[data-back]").onclick = menuClose;
     el.querySelector("[data-other]").onclick = () => yardMenu(g.id);
     el.querySelector("[data-again]").onclick = () => trainGo(c, g.id);
+  }
+
+  /* ---------------------------------------------------------------- the races
+     Through the hall to the track (chao-race.js): eight courses, each run in three classes.
+     The Daisy Run is open from the start; winning its Bronze race opens the rest, and winning a
+     class opens the next one up on that course. Only Chao race; a race tires them out. */
+  const RIB = ["#c8823a", "#c8ccd8", "#ffd21a"];
+  const ordN = n => n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th");
+  function raceWon(co, cl) { const r = (G.save.races || {})[co + ":" + cl]; return !!(r && r.best === 1); }
+  function raceMenu(sel) {
+    const S = G.save, RC = root.ChaoRace; if (!RC || !RC.ok) { toast("The race track isn't ready", "info"); return; }
+    S.races = S.races || {};
+    music("race-entry");
+    const open = co => co.id === "daisy" || raceWon("daisy", "bronze");
+    const el = menuOpen(sec("The Chao races", "flag", `
+      <p class="cg-text">The course runs itself: you cheer. Win a class to open the next one up; win the Daisy Run's Bronze race to open the other courses.</p>
+      <div class="cg-list">${RC.COURSES.map((co, i) => `<button class="cg-irow" data-f ${(sel ? sel === co.id : i === 0) ? "data-focus" : ""} data-co="${co.id}" ${open(co) ? "" : "disabled"}>
+        <span class="cg-ribs">${RC.CLASSES.map((cl, j) => `<i style="${raceWon(co.id, cl.id) ? `background:${RIB[j]}` : ""}"></i>`).join("")}</span><b>${esc(co.name)}</b><i>${open(co) ? esc(co.text) : "Win the Daisy Run's Bronze race first"}</i><em>${co.focus ? esc(G.D.ATTRS.find(a => a.id === co.focus).short) : "ALL"}</em></button>`).join("")}</div>
+      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`), () => { menuClose(); music(gardenTune()); }, "cg-small");
+    el.querySelector("[data-back]").onclick = () => { menuClose(); music(gardenTune()); };
+    el.querySelectorAll("[data-co]").forEach(b => b.onclick = () => raceClass(RC.COURSES.find(c => c.id === b.dataset.co)));
+  }
+  function raceClass(co) {
+    const S = G.save, RC = root.ChaoRace;
+    const el = menuOpen(sec(co.name, "flag", `<p class="cg-text">${esc(co.text)}</p>
+      <div class="cg-list">${RC.CLASSES.map((cl, j) => { const ok = j === 0 || raceWon(co.id, RC.CLASSES[j - 1].id), rec = S.races[co.id + ":" + cl.id];
+        return `<button class="cg-irow" data-f ${j === 0 ? "data-focus" : ""} data-cl="${cl.id}" ${ok ? "" : "disabled"}><span class="cg-dot" style="background:${RIB[j]}"></span><b>${esc(cl.name)} class</b><i>${ok ? (rec ? `Best: ${ordN(rec.best)}${rec.time ? `, ${rec.time.toFixed(1)} s` : ""}` : "Not run yet") : `Win the ${RC.CLASSES[j - 1].name} race first`}</i><em>${cl.prize}</em></button>`; }).join("")}</div>
+      <div class="cg-foot"><button class="btn ghost" data-f data-back>${ico("back")}Back</button></div>`), () => raceMenu(co.id), "cg-small");
+    el.querySelector("[data-back]").onclick = () => raceMenu(co.id);
+    el.querySelectorAll("[data-cl]").forEach(b => b.onclick = () => {
+      const cl = RC.CLASSES.find(x => x.id === b.dataset.cl), among = S.chao.slice();
+      if (!among.length) { menuClose(); talk([["Hazel", "Only Chao run the races, love. Hatch one first."]]); return; }
+      pickOne(`${co.name}, ${cl.name}: who runs?`, c => raceGo(c, co, cl), () => raceClass(co), among, c => c.care.energy < 20 ? "Worn out" : `Lv ${G.L.lvSum(c)}`);
+    });
+  }
+  function raceGo(c, co, cl) {
+    if (c.care.energy < 20) { talk([["", `${c.name} is too tired to race. A sleep, or something to eat, first.`]]); return; }
+    menuClose();
+    G.hud.style.display = "none"; G.tagBox.style.display = "none";
+    const rivals = root.ChaoRace.rivals(G.L, G.D, cl, co, 7, [...G.save.chao, ...G.save.animals].map(x => x.name));
+    G.battle = root.ChaoRace.start({ R: G.R, el: G.el, M: G.M, L: G.L, D: G.D, esc, ico, sfx, jingle, music, tone: G.opts.tone, isMenu: () => !!G.menu || !!G.talking }, { c, course: co, cls: cl, rivals }, res => raceOver(c, res));
+    G.battle.train = true;
+  }
+  function raceOver(c, res) {
+    const S = G.save, L = G.L, D = G.D, RC = root.ChaoRace;
+    G.battle = null; G.hud.style.display = ""; G.tagBox.style.display = "";
+    music(gardenTune());
+    if (res.quit) { toast("You left the race", "info"); return; }
+    const co = res.course, cl = res.cls, p = res.place;
+    const rings = p === 1 ? cl.prize : p === 2 ? Math.round(cl.prize / 2) : p === 3 ? Math.round(cl.prize / 4) : 10;
+    S.rings += rings;
+    const key = co.id + ":" + cl.id, prev = S.races[key], first = p === 1 && !(prev && prev.best === 1);
+    /* (the time kept is the best winning time) */
+    S.races[key] = { best: Math.min(prev ? prev.best : 9, p), time: p === 1 && res.time ? Math.min((prev && prev.time) || 1e9, res.time) : (prev && prev.time) || null };
+    /* what it ran, it got better at */
+    const xp = {};
+    for (const [k, len] of res.uses) for (const a in RC.USES[k]) xp[a] = (xp[a] || 0) + RC.USES[k][a] * (k === "run" || k === "swim" ? len : 1);
+    const grew = [];
+    for (const a in xp) { const g = L.train(c, a, Math.round(xp[a] * (1 + (8 - p) * 0.05))); if (g.lv) grew.push(`+${g.lv} ${D.ATTRS.find(x => x.id === a).name}`); if (g.tech) { const t = D.tech(g.tech); toast(`${c.name} learned ${t.name}!`, "star"); c.log.push([S.day, `Learned ${t.name}.`]); } }
+    c.care.energy = clamp(c.care.energy - 22, 0, 100); c.care.food = clamp(c.care.food - 10, 0, 100);
+    c.care.mood = clamp(c.care.mood + (p <= 3 ? 10 : -4), 0, 100); c.bond = clamp(c.bond + 2, 0, 100);
+    c.log.push([S.day, `Ran the ${co.name} (${cl.name}): ${ordN(p)}.`]);
+    if (p === 1) { c.ribbons = c.ribbons || []; c.ribbons.push(`${co.name}, ${cl.name}`); S.ach.raceWins = (S.ach.raceWins || 0) + 1; G.L.raise(c, "hero", 1); }
+    persist();
+    const opened = first && co.id === "daisy" && cl.id === "bronze" ? "The other courses are open now!" : first && cl.id !== "gold" ? `The ${RC.CLASSES[RC.CLASSES.indexOf(cl) + 1].name} class of the ${co.name} is open now.` : "";
+    const el = menuOpen(sec(co.name, "flag", `
+      <div class="cg-tres"><div class="cg-tgrade ${p === 1 ? "gS" : p <= 3 ? "gA" : "gD"}">${p}</div>
+        <div class="cg-tres-tx"><b>${ordN(p)} place</b><i>${esc(cl.name)} class${res.time ? `, ${res.time.toFixed(1)} s` : ""}. ${rings} rings.${p === 1 ? " A ribbon!" : ""}</i>
+          <p>${esc(c.name)}: ${grew.length ? esc(grew.join(", ")) : "a little better at what it ran"}.${opened ? ` ${esc(opened)}` : ""}</p></div></div>
+      <div class="cg-foot"><button class="btn ghost" data-f data-other>${ico("flag")}Another race</button><button class="btn" data-f data-focus data-again ${c.care.energy >= 20 ? "" : "disabled"}>${ico("swap")}Run it again</button><button class="btn ghost" data-f data-back>${ico("back")}Done</button></div>`), menuClose, "cg-small");
+    el.querySelector("[data-back]").onclick = menuClose;
+    el.querySelector("[data-other]").onclick = () => raceMenu(co.id);
+    el.querySelector("[data-again]").onclick = () => raceGo(c, co, cl);
   }
 
   /* ---------------------------------------------------------------- the dojos
