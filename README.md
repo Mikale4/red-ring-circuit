@@ -722,6 +722,26 @@ Online line at the top. Until a player's first measurement arrives their bars pu
 player's room bars can show on their tag too -- over their head and on their HUD card, and on the
 other runners' name tags in races -- with Options' **Ping on player tags** (on at first; turn it off there).
 
+**Playing across the world.** A room links the two browsers directly where it can (WebRTC, with
+several public STUN servers -- Google's, Cloudflare's, Twilio's -- to find a way through the
+routers in between), and through the encrypted relay over the lobby's brokers where it can't;
+the ping bars' tooltip says which. What changes every frame -- the host's battle snapshots, a
+guest's buttons, every runner's position in a race, the grand prix's CPUs -- goes on a fast lane
+of its own: on a direct link an unordered channel, so one message lost on its way across the
+world doesn't hold up the ones behind it; over the relay a latest-only message, never queued
+behind the rest or sent again (the brokers pass only so many a second, and a queue of old
+positions was what made a far guest's game fall seconds behind). Everything else (results,
+effects and sounds, the story's scenes) goes in order and is never lost. Positions are stamped
+with the sender's clock, and other players' runners, the host's CPUs and a guest's fighters are
+drawn a seventh of a second in the past, between the two words either side of then -- smooth
+however unevenly they arrive -- never through the ground, and with their frames running on the
+receiver's own clock (a word arriving no longer jumps a runner's or a move's frames back and
+forth). A word that comes late still takes its place; a doubled one is dropped. Rollback, the
+fighting games' way, needs an engine that can save and replay every frame exactly, which this one
+isn't; this is the way games with players continents apart keep it smooth instead. A guest's own
+moves still take the round trip to the host (about a quarter of a second between the Gulf and
+the American east coast).
+
 - **Battle**: up to four, the host's arena, rules, lives or KOs, time and health, teams or not,
   CPUs to fill. The host runs the fight and sends it out twenty times a second; everyone's
   buttons go to the host. The results move the online rating.

@@ -11009,7 +11009,7 @@
     }
     if (G.online && NP.host && Rr.rivals.length) {                // the host: where its CPUs are, to the others, ten times a second
       Rr.cT = (Rr.cT || 0) + dt;
-      if (Rr.cT >= 0.1) { Rr.cT = 0; Online.toAll({ t: "np.gc", c: Rr.rivals.filter(v => v.q).map(v => [v.r.id, r3(v.x), r3(v.y), v.q.p._rf || ["idle", 0, 1], v.fin != null ? 1 : 0, v.shield ? 1 : 0, v.q.p.star > 0 ? 1 : 0, v.pow || 0]) }, true); }
+      if (Rr.cT >= 0.1) { Rr.cT = 0; npFast({ t: "np.gc", ts: npNow(), q: ++NP.gq, c: Rr.rivals.filter(v => v.q).map(v => [v.r.id, r3(v.x), r3(v.y), v.q.p._rf || ["idle", 0, 1], v.fin != null ? 1 : 0, v.shield ? 1 : 0, v.q.p.star > 0 ? 1 : 0, v.pow || 0]) }); }
     }
     /* your Red Rings: run into one and the box spins */
     for (const e of w.powers) {
@@ -11043,7 +11043,7 @@
     gpStepShots(dt);
     if (G.online) {                                        // online: where you are, to the others; the other players, touched
       Rr.gT += dt;
-      if (Rr.gT >= 0.1 && !G.watch) { Rr.gT = 0; const d = { t: "np.g", x: r3(p.x), y: r3(p.y), rf: p._rf || ["idle", 0, 1], fin: Rr.myFin != null ? 1 : 0, pw: Rr.power || 0 }; if (NP.host) Online.toAll(Object.assign({ id: NP.me }, d), true); else Online.toHost(d); }
+      if (Rr.gT >= 0.066 && !G.watch) { Rr.gT = 0; const d = { t: "np.g", ts: npNow(), q: ++NP.gq, x: r3(p.x), y: r3(p.y), rf: p._rf || ["idle", 0, 1], fin: Rr.myFin != null ? 1 : 0, pw: Rr.power || 0 }; if (NP.host) npFast(Object.assign({ id: NP.me }, d)); else npFastHost(d); }
       for (const r of G.runners) if (r.human && !r.me) {
         const g = NP.ghosts.get(r.netId); if (!g) continue;
         if (g.fin && Rr.seen[r.netId] == null) Rr.seen[r.netId] = t;
@@ -11067,17 +11067,20 @@
   /* the host's CPU on a guest's screen: on toward where the host last said it was (np.gc), and
      touching the world here as it does there */
   function gpCard(v, dt) {
-    const k = Math.min(1, dt * 12);
-    v.x += (v.tx - v.x) * k; v.y += (v.ty - v.y) * k;
-    if (Math.abs(v.tx - v.x) > 6 || Math.abs(v.ty - v.y) > 6) { v.x = v.tx; v.y = v.ty; }
+    const a = npAt(v);
+    if (a) { v.x = a.x; v.y = npGround(a.x, a.y, a.rf); if (a.rf) { v.rf = a.rf; v.face = a.rf[2] || 1; } }
+    else { const k = Math.min(1, dt * 12); v.x += (v.tx - v.x) * k; v.y += (v.ty - v.y) * k; }
     if (v.fin == null) ghostTouch(v, v.x, v.y, v.rf);
     v.lastX = v.x;
   }
   function gpNetCpu(d) {
     const Rr = GPR; if (!Rr || !Array.isArray(d.c)) return;
+    const fresh = d.q == null || Rr.gcq == null || d.q > Rr.gcq; if (fresh) Rr.gcq = d.q;          // (a late word: its places, but not its news)
     for (const [id, x, y, rf, fin, sh, st, pw] of d.c) {
       const v = Rr.rivals.find(o => o.r.id === id); if (!v || v.q) continue;
-      v.tx = +x || 0; v.ty = +y || 0; v.rf = Array.isArray(rf) ? rf : v.rf; v.face = (v.rf || [])[2] || 1;
+      npPush(v, d.ts, +x || 0, +y || 0, Array.isArray(rf) ? rf : v.rf);
+      if (!fresh) continue;
+      v.tx = +x || 0; v.ty = +y || 0;
       v.shield = !!sh; v.star = st ? 1 : 0; v.pow = POWERS[pw] ? pw : null;
       if (fin && v.fin == null) { v.fin = world ? world.t : 0; Rr.fin.push({ id, t: v.fin }); }
     }
@@ -12031,7 +12034,7 @@
      beside the hero (the host), or a race through the chapter's stage; then the scene after.
      A TOURNAMENT: the bracket is the host's; its players' matches are online battles that
      everyone else in the room watches, and matches between CPUs are settled at once. */
-  const NP = { on: false, host: false, room: null, plan: null, me: null, kind: null, ev: [], snapT: 0, inT: 0, seq: 0,
+  const NP = { on: false, host: false, room: null, plan: null, me: null, kind: null, ev: [], snapT: 0, inT: 0, seq: 0, gq: 0, iq: 0,
                remote: new Map(), cnt: null, sent: null, ghosts: new Map(), gT: 0, race: null, story: null, who: null, em: null, def: null, myInp: null };
   let npDepth = 0, shotNid = 0;
   /* the host's effects, sounds and camera moves, noted (once: not the ones they set off themselves) */
@@ -12253,7 +12256,7 @@
     const h = I.L | I.R << 1 | I.U << 2 | I.D << 3 | I.J << 4 | I.Z << 5 | I.X << 6 | I.C << 7;
     const key = h + ":" + C.jp + ":" + C.zp + ":" + C.xp + ":" + C.cp + ":" + C.dl + ":" + C.dr;
     NP.inT += dt;
-    if (key !== NP.sent || NP.inT > 0.2) { NP.sent = key; NP.inT = 0; Online.toHost({ t: "np.in", h, c: [C.jp, C.zp, C.xp, C.cp, C.dl, C.dr] }); }
+    if (key !== NP.sent || NP.inT > 0.1) { NP.sent = key; NP.inT = 0; npFastHost({ t: "np.in", q: ++NP.iq, h, c: [C.jp, C.zp, C.xp, C.cp, C.dl, C.dr] }); }
   }
   /* what each fighter's picture needs, and the HUD (numbers to three places) */
   const NPF = ["x", "y", "vx", "vy", "face", "ground", "state", "curl", "rev", "hp", "hpMax", "burst", "lives", "kos", "score", "downs", "dealt", "landed", "ko", "koT", "out", "elim",
@@ -12278,8 +12281,9 @@
     const B = battle; if (!B || !NP.on || !NP.host) return;
     NP.snapT += dt; if (NP.snapT < 0.05) return; NP.snapT = 0;
     const w = world;
-    Online.toAll({ t: "np.s", q: ++NP.seq, bt: r3(B.t), c: r3(B.clock), lv: B.live ? 1 : 0, ov: B.over ? 1 : 0, in: r3(B.intro), w: B.winner == null ? null : B.winner,
-      f: B.fs.map(npSerF), s: w.shots.filter(s => !s.gone).map(npSerS), r: w.traps.filter(t => !t.gone).map(npSerT), e: NP.ev }, true);
+    npFast({ t: "np.s", ts: npNow(), q: ++NP.seq, bt: r3(B.t), c: r3(B.clock), lv: B.live ? 1 : 0, ov: B.over ? 1 : 0, in: r3(B.intro), w: B.winner == null ? null : B.winner,
+      f: B.fs.map(npSerF), s: w.shots.filter(s => !s.gone).map(npSerS), r: w.traps.filter(t => !t.gone).map(npSerT) });
+    if (NP.ev.length) Online.toAll({ t: "np.e", e: NP.ev }, true);   // (the sounds and sparks: in order, and never lost)
     NP.ev = [];
   }
   function npApplySnap(d) {
@@ -12293,7 +12297,11 @@
       for (const k of NPF) if (k !== "x" && k !== "y") f[k] = o[k] !== undefined ? o[k] : NPF_DEF[k] !== undefined ? NPF_DEF[k] : 0;
       f._tx = o.x || 0; f._ty = o.y || 0; f._tvx = o.vx || 0; f._tvy = o.vy || 0;
       if (!f._snapped) { f.x = f._tx; f.y = f._ty; f._snapped = true; }
-      f.mv = o.mv || null; f.sp = o.sp || null; f.tor = o.tor || null; f.er = o.er || null; f.cmb = o.cmb || { n: 0, dmg: 0 };
+      npPush(f, d.ts, f._tx, f._ty, null);
+      /* a move's clock runs on here between snapshots; a snapshot of the same move doesn't wind it
+         back (the frames would jump back and forth: the flicker), only a new move starts it again */
+      const keepT = (was, now) => { if (!now) return null; if (was && now.name === was.name && now.body === was.body && Math.abs(was.t - now.t) < 0.3 && was.t > now.t) now.t = was.t; return now; };
+      f.mv = keepT(f.mv, o.mv || null); f.sp = keepT(f.sp, o.sp || null); f.tor = keepT(f.tor, o.tor || null); f.er = keepT(f.er, o.er || null); f.cmb = o.cmb || { n: 0, dmg: 0 };
       const ib = o.ib | 0; f.inp.L = ib & 1 ? 1 : 0; f.inp.R = ib & 2 ? 1 : 0; f.inp.J = ib & 16 ? 1 : 0;
       f.alive = !f.ko && !f.out; f.hh = f.hh || f.c.h;
     });
@@ -12301,7 +12309,7 @@
       k: a[11] || undefined, ghost: a[12] || undefined, range: a[13] || undefined, trail: a[14] || undefined, vx: a[15], vy: a[16] }), s => makeCard(s.who, s.ghost ? "ghost" : "fx"));
     npMirror(world.traps, d.r, a => ({ nid: a[0], who: a[1], kind: a[2], x: a[3], y: a[4], face: a[5], t: a[6], life: a[7], grounded: !!a[8], flies: !!a[9], landT: a[10], faint: !!a[11] }),
       t => makeCard(t.who, t.faint ? "faint" : "fx"));
-    npReplay(d.e || []);
+    npReplay(d.e || []);            // (an older host: its effects in the snapshot)
   }
   function npMirror(list, rows, mk, card) {
     const seen = new Set();
@@ -12324,8 +12332,12 @@
     const k = Math.min(1, dt * 16), ahead = Math.min(0.1, (performance.now() - (NP.snapAt || 0)) / 1000);
     for (const f of B.fs) {
       if (f._tx == null) continue;
-      const tx = f._tx + f._tvx * ahead, ty = Math.max(f.ground ? f._ty : -9, f._ty + f._tvy * ahead);
-      if (Math.abs(tx - f.x) > 3 || Math.abs(ty - f.y) > 3) { f.x = tx; f.y = ty; } else { f.x += (tx - f.x) * k; f.y += (ty - f.y) * k; }
+      const a = npAt(f);
+      if (a) { f.x = a.x; f.y = a.y; }
+      else {
+        const tx = f._tx + f._tvx * ahead, ty = Math.max(f.ground ? f._ty : -9, f._ty + f._tvy * ahead);
+        if (Math.abs(tx - f.x) > 3 || Math.abs(ty - f.y) > 3) { f.x = tx; f.y = ty; } else { f.x += (tx - f.x) * k; f.y += (ty - f.y) * k; }
+      }
       if (f.mv) f.mv.t += dt; if (f.sp) f.sp.t += dt; if (f.tor) f.tor.t += dt; if (f.er) f.er.t += dt;
     }
     for (const s of w.shots) if (!s.gone) { s.x += (s.vx || 0) * dt; s.y += (s.vy || 0) * dt; s.t += dt; }
@@ -12418,8 +12430,8 @@
   function npHostGot(id, d) {
     if (!NP.on) return;
     switch (d.t) {
-      case "np.in": NP.remote.set(id, d); break;
-      case "np.g": Online.toAll(Object.assign({}, d, { id }), true); npGhost(id, d); break;
+      case "np.in": { const o = NP.remote.get(id); if (d.q != null && o && o.q != null && d.q <= o.q && d.q > o.q - 1000) break; NP.remote.set(id, d); break; }   // (late, or the relay's second copy)
+      case "np.g": npFast(Object.assign({}, d, { id })); npGhost(id, d); break;
       case "np.fin": npRaceFin(id, +d.time || 0); break;
       case "np.ok": if (NP.story) { NP.story.ok.add(id); npStoryCheck(); } break;
       case "np.gok": gpNetReady(id); break;
@@ -12432,6 +12444,7 @@
     if (!NP.on && d.t !== "np.tour") return;
     switch (d.t) {
       case "np.s": npApplySnap(d); break;
+      case "np.e": if (battle) npReplay(d.e || []); break;
       case "np.end": {
         const B = battle; if (!B) break;
         d.f.forEach((o, i) => { const f = B.fs[i]; if (f) Object.assign(f, o); });
@@ -12613,13 +12626,72 @@
       if (n !== R.said) { R.said = n; if (n > 0) { caption(String(n), true); SFX.blip ? SFX.blip() : SFX.pop(); } else { caption("Go!"); SFX.dash(); world.t = 0; } }
     }
     NP.gT += dt;
-    if (NP.gT >= 0.1 && player && R.go && !NP.watch) {               // (a spectator runs nowhere)
+    if (NP.gT >= 0.066 && player && R.go && !NP.watch) {             // (a spectator runs nowhere)
       NP.gT = 0;
-      const p = player, d = { t: "np.g", x: r3(p.x), y: r3(p.y), rf: p._rf || ["idle", 0, 1], fin: R.mine != null ? 1 : 0 };
-      if (NP.host) { Online.toAll(Object.assign({ id: NP.me }, d), true); } else Online.toHost(d);
+      const p = player, d = { t: "np.g", ts: npNow(), q: ++NP.gq, x: r3(p.x), y: r3(p.y), rf: p._rf || ["idle", 0, 1], fin: R.mine != null ? 1 : 0 };
+      if (NP.host) npFast(Object.assign({ id: NP.me }, d)); else npFastHost(d);
     }
   }
   const npHold = () => !!(NP.on && NP.race && (!NP.race.go || NP.race.count > 0.4));
+  /* What another player's game says of a runner (or the host's of its CPUs and fighters) comes
+     stamped with the sender's clock. We draw it a little in the past -- NP_DELAY behind the
+     newest word -- between the two words either side of then: smooth however unevenly the words
+     arrive from the other side of the world, and never cutting a corner through a hill. */
+  const NP_DELAY = 140;
+  const npNow = () => Math.round(performance.now());
+  const npFast = msg => (Online.toAllFast || Online.toAll)(msg, true);
+  const npFastHost = msg => (Online.toHostFast || Online.toHost)(msg);
+  function npPush(o, ts, x, y, rf) {
+    const now = performance.now();
+    if (typeof ts !== "number") ts = now;                                 // (an older game: no stamp)
+    const off = now - ts;
+    o.off = o.off == null || off < o.off ? off : o.off + Math.min(1, off - o.off);   // (the quickest a word has come: the clocks' difference, give or take)
+    const B = o.buf || (o.buf = []), last = B[B.length - 1];
+    if (last && ts < last.ts - 5000) B.length = 0;                                                    // (a new clock: start again)
+    else if (last && ts > last.ts && Math.hypot(x - last.x, y - last.y) > 8) B.length = 0;           // (back at a Star Post, or in again: no sliding there)
+    let i = B.length; while (i > 0 && B[i - 1].ts > ts) i--;                                           // (a word that came late still goes in its place)
+    if (i > 0 && B[i - 1].ts === ts) return;                                                           // (the relay's second copy)
+    B.splice(i, 0, { ts, x, y, rf }); if (B.length > 40) B.shift();
+  }
+  function npAt(o) {
+    const B = o.buf; if (!B || !B.length) return null;
+    const t = performance.now() - o.off - NP_DELAY;
+    if (B[0].ts >= t) return B[0];
+    for (let i = B.length - 1; i >= 0; i--) if (B[i].ts <= t) {
+      const a = B[i], b = B[i + 1];
+      if (b) { const k = (t - a.ts) / Math.max(1, b.ts - a.ts); return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k, rf: k < 0.5 ? a.rf : b.rf }; }
+      /* past the newest word: on a little the way it was going, a fifth of a second at most --
+         and if the words keep coming late, the link has slowed: wait for them a little longer */
+      const p = B[i - 1], late = t - a.ts;
+      if (late > 300) o.off += (late - 200) * 0.05;
+      if (!p) return a;
+      const k = Math.min(200, late) / Math.max(1, a.ts - p.ts);
+      return { x: a.x + (a.x - p.x) * k, y: a.y + (a.y - p.y) * k, rf: a.rf };
+    }
+    return B[B.length - 1];
+  }
+  /* never in the ground: on the surface where it is (and onto it, running) */
+  const NP_AIR = /jump|fall|spin|roll|fly|glide|hurt|spring|launch|double|air|ball|dive|float|swim|homing|tornado|ride|zip|tube|cannon|rail|grind|climb|hang|wall|spark|catch/;
+  function npGround(x, y, rf) {
+    if (!world) return y;
+    const gy = groundY(x, y + 0.45);
+    if (gy == null) return y;
+    const open = !solid(tile(Math.floor(x), Math.floor(gy + 0.05))) && !solid(tile(Math.floor(x), Math.floor(gy + 1.05)));   // (not a ceiling over a low road)
+    if (!open) return y;
+    if (y < gy) return gy;
+    if (!(rf && NP_AIR.test(rf[0])) && y - gy < 0.3) return gy;
+    return y;
+  }
+  /* its frames run here, by its own clock, rather than jumping to whichever the last word had:
+     a run's or a ball's pace from how fast it's going; anything else, as the sender had it */
+  function npFrame(g, name, rf, n, sp, dt) {
+    const A = g.anim || (g.anim = { name: null, t: 0, sp: 0 });
+    if (A.name !== name) { A.name = name; A.t = 0; } else A.t += dt;
+    A.sp += (sp - A.sp) * Math.min(1, dt * 6);
+    const loop = name === "run" ? 5 + A.sp * 1.15 : name === "spin" || name === "roll" ? 12 + A.sp * 1.4 : name === "idle" ? 7 : name === "start" ? 10 : name === "fly" ? 12 : 0;
+    if (loop) return Math.floor(A.t * loop) % n;
+    return Math.min(rf[1] | 0, n - 1);
+  }
   function npGhost(id, d) {
     if (id === NP.me || !world || !NP.on) return;
     let g = NP.ghosts.get(id);
@@ -12632,16 +12704,18 @@
       g = { id, name: mem.name, sheet, spr, x: +d.x || 0, y: +d.y || 0, tx: +d.x || 0, ty: +d.y || 0, rf: d.rf, fin: false };
       NP.ghosts.set(id, g);
     }
-    g.tx = +d.x || 0; g.ty = +d.y || 0; g.rf = Array.isArray(d.rf) ? d.rf : g.rf; g.fin = !!d.fin; g.pw = d.pw || null;   // (pw: the power they hold, in the grand prix)
+    const fresh = d.q == null || g.q == null || d.q > g.q || d.q < g.q - 1000;                      // (a late word: its place, but not its news)
+    if (fresh) { g.q = d.q; g.tx = +d.x || 0; g.ty = +d.y || 0; g.fin = !!d.fin; g.pw = d.pw || null; }   // (pw: the power they hold, in the grand prix)
+    npPush(g, d.ts, +d.x || 0, +d.y || 0, Array.isArray(d.rf) ? d.rf : g.rf);
   }
   function npDrawGhosts(dt) {
     for (const g of NP.ghosts.values()) {
-      const k = Math.min(1, dt * 12);
-      g.x += (g.tx - g.x) * k; g.y += (g.ty - g.y) * k;
-      if (Math.abs(g.tx - g.x) > 6 || Math.abs(g.ty - g.y) > 6) { g.x = g.tx; g.y = g.ty; }
-      const rf = g.rf || ["idle", 0, 1], L = framesOf(g.sheet, rf[0]) || framesOf(g.sheet, "idle");
+      const a = npAt(g), px = g.x;
+      if (a) { g.x = a.x; g.y = npGround(a.x, a.y, a.rf); if (a.rf) g.rf = a.rf; }
+      else { const k = Math.min(1, dt * 12); g.x += (g.tx - g.x) * k; g.y += (g.ty - g.y) * k; }
+      const rf = g.rf || ["idle", 0, 1], name = framesOf(g.sheet, rf[0]) ? rf[0] : "idle", L = framesOf(g.sheet, name);
       g.spr.visible = !!L;
-      if (L) setFrame(g.spr, framesOf(g.sheet, rf[0]) ? rf[0] : "idle", Math.min(rf[1] | 0, L.length - 1), rf[2] || 1, g.x, g.y);
+      if (L) setFrame(g.spr, name, npFrame(g, name, rf, L.length, Math.abs(g.x - px) / Math.max(1e-3, dt), dt), rf[2] || 1, g.x, g.y);
       if (!g.fin && (NP.race || GPR) && !battle) ghostTouch(g, g.x, g.y, rf);
     }
   }

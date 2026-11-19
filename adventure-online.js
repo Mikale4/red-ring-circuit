@@ -40,9 +40,17 @@
   const AO = root.AdventureOnline = {};
   const esc = s => U.esc(s);
   const ico = n => (A ? A.ico(n) : '');
-  const PROTO = 'rrc-room-2';                          // (2: rooms with spectators)
+  const PROTO = 'rrc-room-3';                          // (2: rooms with spectators; 3: the fast lane, stamped positions)
   const PEER_JS = ['https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js', 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js'];
   const PREFIX = 'redringcircuit-room-', ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  /* how two browsers find a way to each other through their routers: several public STUN servers
+     (Google's, Cloudflare's, Twilio's), so a direct link opens far more often -- across the world,
+     a direct link is the only quick one; the relay (net/relay.js) is the fallback */
+  const ICE = { iceServers: [
+    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302', 'stun:stun3.l.google.com:19302', 'stun:stun4.l.google.com:19302'] },
+    { urls: 'stun:stun.cloudflare.com:3478' },
+    { urls: 'stun:global.stun.twilio.com:3478' },
+  ], iceCandidatePoolSize: 4 };
   const MAXES = { battle: 4, race: 8, gp: 8, story: 3, tourney: 8 };
   /* SPECTATORS: up to six seats on top of the players' (anyone may take one, the host too). A
      spectator plays nobody: they watch the match -- following any player or CPU, or the whole
@@ -241,7 +249,25 @@
   }
   function toAll(msg, exceptMe) { if (!N || !N.host) return; for (const m of N.room.members) if (!(exceptMe && m.id === N.myId)) toMember(m.id, msg); }
   function toHost(msg) { if (!N) return; if (N.host) hostGot(N.myId, msg); else if (N.conn && N.conn.open) { try { N.conn.send(msg); } catch (e) { /* closed */ } } }
+  /* the fast lane: positions, inputs, snapshots -- whatever is sent many times a second and is
+     out of date by the next. Direct links have their unordered lane for it; over the relay it goes
+     as a latest-only message, never queued behind the rest or sent again. */
+  const fastOut = (c, msg) => { try { if (c.sendV) c.sendV(msg); else c.send(msg); } catch (e) { /* closed */ } };
+  function toMemberFast(id, msg) {
+    if (!N || !N.host) return;
+    if (id === N.myId) { setTimeout(() => { if (N) guestGot(msg); }, 0); return; }
+    const M = N.mem.get(id); if (!M) return;
+    if (M.fast && M.fast.open) { try { M.fast.send(msg); return; } catch (e) { /* the other lane */ } }
+    if (M.conn && M.conn.open) fastOut(M.conn, msg);
+  }
+  function toAllFast(msg, exceptMe) { if (!N || !N.host) return; for (const m of N.room.members) if (!(exceptMe && m.id === N.myId)) toMemberFast(m.id, msg); }
+  function toHostFast(msg) {
+    if (!N) return; if (N.host) { hostGot(N.myId, msg); return; }
+    if (N.fast && N.fast.open) { try { N.fast.send(msg); return; } catch (e) { /* the other lane */ } }
+    if (N.conn && N.conn.open) fastOut(N.conn, msg);
+  }
   Online.toAll = toAll; Online.toHost = toHost; Online.toMember = toMember;
+  Online.toAllFast = toAllFast; Online.toHostFast = toHostFast; Online.toMemberFast = toMemberFast;
 
   /* ===================================================== the host's side */
   function newRoom(o, code) {
@@ -293,7 +319,7 @@
     const now = performance.now(), table = {};
     for (const m of S0.room.members) {
       if (m.host) continue;
-      toMember(m.id, { t: 'ping', s: now });
+      toMemberFast(m.id, { t: 'ping', s: now });
       const M = S0.mem.get(m.id);
       if (M && M.pongAt && now - M.pongAt > PING_EVERY * 3) m.ping = Math.max(m.ping || 0, Math.round(now - M.pongAt));   // (no answer for a while: as slow as that at least)
       if (m.ping != null) table[m.id] = m.ping;
@@ -313,7 +339,8 @@
   }
   function pingBars(m) {
     const lv = m.host ? 4 : pingLevel(m.ping);
-    const tip = m.host ? 'Host: the room runs on their connection' : m.ping == null ? 'Measuring the ping…' : 'Ping ' + Math.round(m.ping) + ' ms';
+    const M = N && N.host && N.mem && N.mem.get(m.id), via = M ? M.via : (N && !N.host && m.id === N.myId ? N.via : null);
+    const tip = m.host ? 'Host: the room runs on their connection' : m.ping == null ? 'Measuring the ping…' : 'Ping ' + Math.round(m.ping) + ' ms' + (via === 'relay' ? ' (through the relay: a direct link couldn\'t open)' : via === 'direct' ? ' (a direct link)' : '');
     return `<i class="ao-ping p${lv}" data-pid="${esc(m.id)}" title="${tip}" aria-label="${tip}"><s></s><s></s><s></s><s></s></i>`;
   }
   Online.pingBars = id => { const m = N && N.room ? memberOf(id) : null; return m ? pingBars(m) : ''; };
@@ -326,6 +353,13 @@
     });
   }
   function sysSay(text) { if (!N) return; const c = { sys: text }; if (N.host) { toAll({ t: 'chat', c }, true); gotChat(c); } }
+  /* a guest's fast lane (see Online.join): tied to them by their link's id */
+  function fastConn(conn) {
+    conn.on('open', () => { if (!N || !N.host) return; const M = N.mem.get(conn.peer); if (M) M.fast = conn; else (N.fastWait = N.fastWait || new Map()).set(conn.peer, conn); });
+    conn.on('data', d => { if (N && N.host && d && typeof d === 'object' && typeof d.t === 'string' && N.mem.has(conn.peer)) hostGot(conn.peer, d); });
+    conn.on('close', () => { const M = N && N.mem && N.mem.get(conn.peer); if (M && M.fast === conn) M.fast = null; });
+    conn.on('error', () => { });
+  }
   function hostConn(conn) {
     conn.on('data', d => hostData(conn, d));
     conn.on('close', () => memberGone(conn.peer, 'left'));
@@ -350,7 +384,8 @@
       if (!spec && nPlay >= R.max) { if (nSpec < SPEC_MAX) spec = true; else return deny('full'); }
       if (spec && nSpec >= SPEC_MAX) return deny(R.playing ? 'playing' : nPlay < R.max ? 'specfull' : 'full');
       if (R.priv && !chal && String(d.pass || '') !== N.pass) return deny(d.pass ? 'wrongpass' : 'pass');
-      N.mem.set(id, { conn });
+      N.mem.set(id, { conn, via: conn.sendV ? 'relay' : 'direct' });
+      if (N.fastWait && N.fastWait.has(id)) { N.mem.get(id).fast = N.fastWait.get(id); N.fastWait.delete(id); }
       const teamN = t => playersOf(R).filter(m => m.team === t).length;
       const m = { id, uid, name: U.clean(me.name, 16) || 'Player', lv: (+me.lv | 0) || 1, r: Math.round(+me.r || 1000), who: A.validWho(me.who), em: me.em && typeof me.em === 'object' ? me.em : null,
         team: teamN(0) <= teamN(1) ? 0 : 1, ready: spec, host: false, spec };
@@ -472,7 +507,7 @@
       case 'kick': toast('The host removed you from the room.', 'bad'); endSession(); AO.lobby(); break;
       case 'closed': hostGone('The host closed the room.'); break;
       case 'start': N.room = d.room; A.np.start(false, d.room, d.plan, N.myId, !!d.late); break;   // (late: a spectator into a match under way)
-      case 'ping': toHost({ t: 'pong', s: d.s }); break;  // (straight back: the host times it)
+      case 'ping': toHostFast({ t: 'pong', s: d.s }); break;  // (straight back, on the lane the game uses: the host times it)
       case 'pings': if (N.room && d.p && typeof d.p === 'object') { for (const m of N.room.members) if (typeof d.p[m.id] === 'number') m.ping = d.p[m.id]; paintPings(); } break;
     }
   }
@@ -505,6 +540,7 @@
       try { if (S0.relay) S0.relay.stop(); } catch (e) { /* fine */ }
       for (const t of S0.tries || []) { try { t.close(); } catch (e) { /* fine */ } }
       try { if (S0.conn) S0.conn.close(); } catch (e) { /* fine */ }
+      try { if (S0.fast) S0.fast.close(); } catch (e) { /* fine */ }
       try { if (S0.peer) S0.peer.destroy(); } catch (e) { /* fine */ }
     }, 300);
     clearTimeout(S0.relayT); clearInterval(S0.pingT);
@@ -533,7 +569,7 @@
     waiting('Opening your room…');
     try { await loadPeer(); } catch (e) { if (N === S0) { N = null; toast(e.message, 'bad'); AO.lobby(); } return; }
     const open = () => {
-      const code = makeCode(), peer = new Peer(PREFIX + code, { debug: 0 });
+      const code = makeCode(), peer = new Peer(PREFIX + code, { debug: 0, config: ICE });
       S0.peer = peer;
       peer.on('open', id => {
         if (N !== S0) { try { peer.destroy(); } catch (e) { /* fine */ } return; }
@@ -547,7 +583,7 @@
         setPresence(); AO.room();
         if (o.chal) Net.send(o.chal.to, 'chal', { code, pass: S0.pass, desc: MODES[S0.room.mode] + ' · ' + roomWhat(S0.room) }, true).then(r => { if (r.err) toast(r.err, 'bad'); else toast('Invite sent to ' + o.chal.name + '.', 'gold'); });
       });
-      peer.on('connection', conn => { if (N !== S0) return; hostConn(conn); });
+      peer.on('connection', conn => { if (N !== S0) return; if (conn.metadata && conn.metadata.fast) fastConn(conn); else hostConn(conn); });
       peer.on('error', e => {
         if (N !== S0) return;
         if (e.type === 'unavailable-id') { try { peer.destroy(); } catch (x) { /* fine */ } open(); return; }
@@ -574,6 +610,16 @@
       link.on('data', d => { if (N === S0) guestGot(d); });
       link.on('close', () => { if (N === S0) hostGone('Lost the connection to the room.'); });
       link.send(hello());
+      S0.via = link.sendV ? 'relay' : 'direct';
+      /* linked directly: a second lane beside it for what changes every frame -- unordered, so one
+         message lost on the way across the world doesn't hold up the ones behind it */
+      if (!link.sendV && S0.peer) {
+        const f = S0.peer.connect(PREFIX + code, { reliable: false, serialization: 'json', label: 'fast-' + U.rid(6), metadata: { fast: 1 } });
+        f.on('open', () => { if (N === S0) S0.fast = f; });
+        f.on('data', d => { if (N === S0) guestGot(d); });
+        f.on('close', () => { if (S0.fast === f) S0.fast = null; });
+        f.on('error', () => { });
+      }
     };
     const tryRelay = () => {
       if (N !== S0 || S0.conn || S0.relayed) return; S0.relayed = true;
@@ -581,7 +627,7 @@
       link.on('open', () => adopt(link));
       link.on('close', () => { if (N === S0 && !S0.conn) { N = null; toast('Couldn\'t reach that room. It may have closed.', 'bad'); AO.lobby(); } });
     };
-    const peer = new Peer({ debug: 0 }); S0.peer = peer;
+    const peer = new Peer({ debug: 0, config: ICE }); S0.peer = peer;
     peer.on('open', () => {
       if (N !== S0) return;
       const conn = peer.connect(PREFIX + code, { reliable: true, serialization: 'json' }); S0.tries.push(conn);

@@ -15,7 +15,9 @@
      g/<id>   to one guest
      all      to every guest (the host's last will)
    k is 'syn' (a guest asking to link, with its public key), 'ack' (the host's
-   answer, with its key), 'd' (a message: n, iv, ct), 'rx' (messages up to a
+   answer, with its key), 'd' (a message: n, iv, ct), 'v' (a latest-only message: iv,
+   ct, and its kind: never confirmed or sent again, and one still waiting to go is
+   replaced by a newer one of its kind -- positions, inputs, snapshots), 'rx' (messages up to a
    arrived; heartbeats carry a too, and anything not confirmed is sent again),
    'hb' (still here), 'fin' (gone) or 'gone' (a last will: the broker lost
    that side; it may only be a blip on one broker, so the link closes if
@@ -75,6 +77,9 @@
     return {
       pub(t, fr, u) {
         for (const Q of cl) {
+          /* a latest-only message takes the place of the one of its kind still waiting (the broker
+             passes only so many a second: the newest is the one worth sending) */
+          if (u && u.vol) { const it = Q.q.find(x => x.u && x.u.vol === u.vol && x.t === t); if (it) { it.fr = fr; continue; } }
           if (Q.q.length > 300) { const old = Q.q.shift(); if (old.u) old.u.q--; }
           Q.q.push({ t, fr, u }); if (u) u.q++;
           if (!Q.t) Q.pump();
@@ -106,6 +111,15 @@
           out(fr, u);
         }).catch(() => {});
       },
+      /* a latest-only message (see 'v' above): sealed the same way, sent once, never waited for */
+      sendV(msg) {
+        if (!L.open) return;
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        subtle.encrypt({ name: 'AES-GCM', iv }, L.key, te.encode(JSON.stringify(msg))).then(ct => {
+          if (L.closed) return;
+          out({ k: 'v', iv: b64(iv), ct: b64(ct) }, { vol: String((msg && msg.t) || 'v'), q: 0 });
+        }).catch(() => {});
+      },
       /* everything up to this number has arrived */
       upTo() { let n = L.next - 1; while (L.held.has(n + 1)) n++; return n; },
       beat() { out({ k: 'hb', a: L.upTo() }); },
@@ -121,6 +135,12 @@
         L.heard = Date.now(); L.suspect = false;
         if (fr.k === 'fin') { L.end(false); return; }
         if (typeof fr.a === 'number') for (const n of [...L.unsent.keys()]) if (n <= fr.a) L.unsent.delete(n);
+        if (fr.k === 'v' && L.key && typeof fr.iv === 'string') {          // latest-only: straight through (the copy from the other broker dropped)
+          const seen = L.vseen || (L.vseen = new Set());
+          if (seen.has(fr.iv)) return; seen.add(fr.iv); if (seen.size > 200) seen.delete(seen.values().next().value);
+          subtle.decrypt({ name: 'AES-GCM', iv: unb64(fr.iv) }, L.key, unb64(fr.ct)).then(b => { if (!L.closed) L.emit('data', JSON.parse(td.decode(b))); }).catch(() => {});
+          return;
+        }
         if (fr.k !== 'd' || !L.key || typeof fr.n !== 'number') return;
         if (!L.rxT) L.rxT = setTimeout(() => { L.rxT = null; if (!L.closed) out({ k: 'rx', a: L.upTo() }); }, 250);   // (copies too: our last 'rx' may have been lost)
         if (fr.n < L.next || L.held.has(fr.n) || L.held.size > 500) return;
